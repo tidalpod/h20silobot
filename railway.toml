@@ -2,6 +2,6 @@
 builder = "dockerfile"
 
 [deploy]
-healthcheckPath = "/"
-healthcheckTimeout = 300
+# No health check - this is a worker process, not a web server
+healthcheckPath = ""
 restartPolicyType = "always"
