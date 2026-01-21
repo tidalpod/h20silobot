@@ -1,0 +1,22 @@
+# Web Scraping
+playwright==1.40.0
+
+# Telegram Bot
+python-telegram-bot[job-queue]==20.7
+
+# Database
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+
+# Scheduling
+apscheduler==3.10.4
+
+# Security
+cryptography==41.0.7
+
+# Utilities
+python-dotenv==1.0.0
+aiohttp==3.9.1
+
+# Development
+rich==13.7.0  # For pretty console output during debugging
