@@ -8,18 +8,13 @@ Main entry point for the Telegram bot that tracks water bills from BSA Online.
 import asyncio
 import logging
 import sys
+import os
 
-from config import config
-from bot.bot import WaterBillBot
-
-# Configure logging
+# Configure logging (stdout only for Railway)
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("bot.log")
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 
 # Reduce noise from libraries
@@ -32,21 +27,38 @@ logger = logging.getLogger(__name__)
 
 async def main():
     """Main entry point"""
+    logger.info("=" * 50)
+    logger.info("Water Bill Tracker Bot Starting...")
+    logger.info("=" * 50)
+
+    # Log environment check
+    logger.info(f"TELEGRAM_BOT_TOKEN set: {bool(os.getenv('TELEGRAM_BOT_TOKEN'))}")
+    logger.info(f"DATABASE_URL set: {bool(os.getenv('DATABASE_URL'))}")
+
+    # Import after logging setup
+    from config import config
+    from bot.bot import WaterBillBot
+
     # Validate configuration
     errors = config.validate()
     if errors:
         logger.error("Configuration errors:")
         for error in errors:
             logger.error(f"  - {error}")
+        logger.error("Exiting due to configuration errors")
         sys.exit(1)
+
+    logger.info("Configuration validated successfully")
 
     bot = WaterBillBot()
 
     try:
+        logger.info("Initializing bot...")
         await bot.start()
+        logger.info("Bot started successfully!")
+        logger.info("Waiting for messages...")
 
         # Keep running
-        logger.info("Bot is running. Press Ctrl+C to stop.")
         while True:
             await asyncio.sleep(1)
 
