@@ -27,27 +27,24 @@ class WaterBillBot:
 
         # Try to initialize database
         try:
-            from database.connection import init_db, get_engine
+            print("[BOT] Attempting database connection...")
+            from database.connection import init_db, is_connected
 
-            # This will attempt to connect
-            engine = get_engine()
+            success = await init_db()
 
-            if engine:
-                logger.info("Database engine available, initializing tables...")
-                success = await init_db()
-                if success:
-                    self.db_available = True
-                    logger.info("Database initialized successfully")
-                else:
-                    logger.error("Database init returned False")
-                    self.db_available = False
+            if success and is_connected():
+                self.db_available = True
+                print("[BOT] Database connection: SUCCESS")
+                logger.info("Database connected")
             else:
-                logger.warning("Database engine not available - running without DB")
                 self.db_available = False
+                print("[BOT] Database connection: FAILED")
+                logger.warning("Database not available")
         except Exception as e:
+            print(f"[BOT] Database exception: {e}")
             logger.error(f"Database init failed: {e}")
             import traceback
-            logger.error(traceback.format_exc())
+            traceback.print_exc()
             self.db_available = False
 
         # Set up Telegram bot

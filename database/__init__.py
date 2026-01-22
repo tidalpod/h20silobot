@@ -1,5 +1,5 @@
 """Database module"""
-from .models import Base, Property, WaterBill, ScrapingLog
-from .connection import get_db, init_db
+from .models import Base, Property, WaterBill, ScrapingLog, TelegramUser, BillStatus
+from .connection import init_db, get_session, is_connected
 
-__all__ = ["Base", "Property", "WaterBill", "ScrapingLog", "get_db", "init_db"]
+__all__ = ["Base", "Property", "WaterBill", "ScrapingLog", "TelegramUser", "BillStatus", "init_db", "get_session", "is_connected"]
