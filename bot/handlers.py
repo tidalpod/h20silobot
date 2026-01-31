@@ -419,7 +419,11 @@ async def show_property_detail(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             text += "\n_No bill data yet. Tap Refresh to fetch._"
 
+        # Build BSA Online payment URL
+        bsa_url = f"https://bsaonline.com/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid=305"
+
         keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💳 Pay on BSA Online", url=bsa_url)],
             [
                 InlineKeyboardButton("🔄 Refresh", callback_data=f"refresh_prop_{prop.id}"),
                 InlineKeyboardButton("🗑️ Remove", callback_data=f"remove_prop_{prop.id}")
