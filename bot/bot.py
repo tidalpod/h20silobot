@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from telegram import BotCommand
 from telegram.ext import Application
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -76,6 +77,21 @@ class WaterBillBot:
 
         logger.info("Starting Telegram application...")
         await self.application.start()
+
+        # Set up bot commands menu (the menu button in Telegram)
+        commands = [
+            BotCommand("start", "🏠 Main menu"),
+            BotCommand("summary", "📊 Bill summary dashboard"),
+            BotCommand("properties", "📍 View all properties"),
+            BotCommand("overdue", "🔴 View overdue bills"),
+            BotCommand("add", "➕ Add new property"),
+            BotCommand("remove", "🗑️ Remove a property"),
+            BotCommand("refresh", "🔄 Refresh bill data"),
+            BotCommand("status", "⚙️ Bot status"),
+            BotCommand("help", "❓ Help & commands"),
+        ]
+        await self.application.bot.set_my_commands(commands)
+        logger.info("Bot commands menu configured")
 
         logger.info("Starting polling for updates...")
         await self.application.updater.start_polling(drop_pending_updates=True)
