@@ -121,14 +121,16 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "add":
         await query.edit_message_text(
             "📍 *Add New Property*\n\n"
-            "Please send the BSA Online account number for the property.\n\n"
-            "Example: `302913026`",
+            "Send the *street address* or *account number*:\n\n"
+            "Examples:\n"
+            "• `3040 Alvina` (address)\n"
+            "• `302913026` (account #)",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ Cancel", callback_data="back_to_menu")
             ]])
         )
-        context.user_data['awaiting_account'] = True
+        context.user_data['awaiting_property_input'] = True
     elif action == "remove":
         await show_remove_menu(query, context)
     elif action == "status":
@@ -144,6 +146,7 @@ async def back_to_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Clear any pending states
     context.user_data.pop('awaiting_account', None)
+    context.user_data.pop('awaiting_property_input', None)
 
     user = update.effective_user
     db_available = context.bot_data.get('db_available', False)
@@ -706,66 +709,107 @@ _Tap any property to see details!_
     await query.edit_message_text(help_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 
-async def handle_account_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle account number input for adding property via menu"""
-    if not context.user_data.get('awaiting_account'):
-        return  # Not expecting account input
+async def handle_property_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle address or account number input for adding property via menu"""
+    if not context.user_data.get('awaiting_property_input'):
+        return  # Not expecting input
 
-    account_number = update.message.text.strip()
-    context.user_data.pop('awaiting_account', None)
+    user_input = update.message.text.strip()
+    context.user_data.pop('awaiting_property_input', None)
 
-    if len(account_number) < 4:
+    if len(user_input) < 3:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Try Again", callback_data="menu_add")],
             [InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")]
         ])
         await update.message.reply_text(
-            "❌ Invalid account number. Must be at least 4 characters.",
+            "❌ Input too short. Please enter a valid address or account number.",
             reply_markup=keyboard
         )
         return
+
+    # Detect if input is account number (all digits) or address (contains letters)
+    is_account_number = user_input.replace(" ", "").isdigit()
 
     try:
         from database.connection import get_session
         from database.models import Property
         from sqlalchemy import select
 
+        # Show searching message
+        search_type = "account number" if is_account_number else "address"
+        status_msg = await update.message.reply_text(
+            f"🔍 *Searching BSA Online...*\n\nLooking up {search_type}: `{user_input}`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+        # Import and use scraper
+        from scraper.bsa_scraper import BSAScraper
+
+        bill_data = None
+        async with BSAScraper() as scraper:
+            if is_account_number:
+                bill_data = await scraper.search_by_account(user_input)
+            else:
+                bill_data = await scraper.search_by_address(user_input)
+
+        if not bill_data or not bill_data.account_number:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Try Again", callback_data="menu_add")],
+                [InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")]
+            ])
+            await status_msg.edit_text(
+                f"❌ *Property Not Found*\n\n"
+                f"No property found for: `{user_input}`\n\n"
+                f"Please check the {search_type} and try again.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=keyboard
+            )
+            return
+
+        # Check if already tracked
         async with get_session() as session:
             result = await session.execute(
-                select(Property).where(Property.bsa_account_number == account_number)
+                select(Property).where(Property.bsa_account_number == bill_data.account_number)
             )
             existing = result.scalar_one_or_none()
 
             if existing:
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(f"📍 View {existing.address[:20]}", callback_data=f"prop_{existing.id}")],
+                    [InlineKeyboardButton(f"📍 View Property", callback_data=f"prop_{existing.id}")],
                     [InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")]
                 ])
-                await update.message.reply_text(
-                    f"⚠️ This account is already being tracked:\n*{existing.address}*",
+                await status_msg.edit_text(
+                    f"⚠️ *Already Tracked*\n\n"
+                    f"This property is already being tracked:\n\n"
+                    f"*Address:* {existing.address}\n"
+                    f"*Account:* `{existing.bsa_account_number}`",
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=keyboard
                 )
                 return
 
+            # Add the new property with scraped data
             new_prop = Property(
-                bsa_account_number=account_number,
-                address=f"Pending lookup: {account_number}"
+                bsa_account_number=bill_data.account_number,
+                address=bill_data.address or f"Property {bill_data.account_number}",
+                owner_name=bill_data.owner_name
             )
             session.add(new_prop)
             await session.commit()
             prop_id = new_prop.id
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Refresh Now", callback_data="menu_refresh")],
-            [InlineKeyboardButton("📍 View Properties", callback_data="menu_properties")],
+            [InlineKeyboardButton("📍 View Property", callback_data=f"prop_{prop_id}")],
+            [InlineKeyboardButton("🔄 Refresh All", callback_data="menu_refresh")],
             [InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")]
         ])
 
-        await update.message.reply_text(
+        await status_msg.edit_text(
             f"✅ *Property Added!*\n\n"
-            f"Account: `{account_number}`\n\n"
-            f"Tap *Refresh Now* to fetch bill data.",
+            f"*Address:* {bill_data.address}\n"
+            f"*Account:* `{bill_data.account_number}`\n"
+            f"*Amount Due:* ${bill_data.amount_due:,.2f}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard
         )
@@ -773,8 +817,10 @@ async def handle_account_input(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.error(f"Error adding property: {e}")
         await update.message.reply_text(
-            f"❌ Error: {str(e)}",
+            f"❌ *Error Adding Property*\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔄 Try Again", callback_data="menu_add"),
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
         )
@@ -1093,8 +1139,10 @@ async def add_property_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await update.message.reply_text(
         "📍 *Add New Property*\n\n"
-        "Please enter the BSA Online account number for the property:\n\n"
-        "Example: `302913026`\n\n"
+        "Send the *street address* or *account number*:\n\n"
+        "Examples:\n"
+        "• `3040 Alvina` (address)\n"
+        "• `302913026` (account #)\n\n"
         "Use /cancel to cancel.",
         parse_mode=ParseMode.MARKDOWN
     )
@@ -1102,42 +1150,81 @@ async def add_property_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def add_property_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle account number input for adding property"""
-    account_number = update.message.text.strip()
+    """Handle address or account number input for adding property via /add command"""
+    user_input = update.message.text.strip()
 
-    if len(account_number) < 4:
-        await update.message.reply_text("Invalid account number. Please try again.")
+    if len(user_input) < 3:
+        await update.message.reply_text("Input too short. Please enter a valid address or account number.")
         return ADDING_PROPERTY
+
+    # Detect if input is account number (all digits) or address (contains letters)
+    is_account_number = user_input.replace(" ", "").isdigit()
+    search_type = "account number" if is_account_number else "address"
 
     try:
         from database.connection import get_session
         from database.models import Property
         from sqlalchemy import select
 
+        # Show searching message
+        status_msg = await update.message.reply_text(
+            f"🔍 *Searching BSA Online...*\n\nLooking up {search_type}: `{user_input}`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+        # Import and use scraper
+        from scraper.bsa_scraper import BSAScraper
+
+        bill_data = None
+        async with BSAScraper() as scraper:
+            if is_account_number:
+                bill_data = await scraper.search_by_account(user_input)
+            else:
+                bill_data = await scraper.search_by_address(user_input)
+
+        if not bill_data or not bill_data.account_number:
+            await status_msg.edit_text(
+                f"❌ *Property Not Found*\n\n"
+                f"No property found for: `{user_input}`\n\n"
+                f"Please check the {search_type} and try again with /add",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return ConversationHandler.END
+
+        # Check if already tracked
         async with get_session() as session:
             result = await session.execute(
-                select(Property).where(Property.bsa_account_number == account_number)
+                select(Property).where(Property.bsa_account_number == bill_data.account_number)
             )
             existing = result.scalar_one_or_none()
 
             if existing:
-                await update.message.reply_text(
-                    f"This account is already being tracked:\n{existing.address}"
+                await status_msg.edit_text(
+                    f"⚠️ *Already Tracked*\n\n"
+                    f"This property is already being tracked:\n\n"
+                    f"*Address:* {existing.address}\n"
+                    f"*Account:* `{existing.bsa_account_number}`",
+                    parse_mode=ParseMode.MARKDOWN
                 )
                 return ConversationHandler.END
 
+            # Add the new property with scraped data
             new_prop = Property(
-                bsa_account_number=account_number,
-                address=f"Pending lookup: {account_number}"
+                bsa_account_number=bill_data.account_number,
+                address=bill_data.address or f"Property {bill_data.account_number}",
+                owner_name=bill_data.owner_name
             )
             session.add(new_prop)
             await session.commit()
 
-            await update.message.reply_text(
-                f"✅ Property added with account: `{account_number}`\n\n"
-                "Use /refresh to fetch bill data.",
-                parse_mode=ParseMode.MARKDOWN
-            )
+        await status_msg.edit_text(
+            f"✅ *Property Added!*\n\n"
+            f"*Address:* {bill_data.address}\n"
+            f"*Account:* `{bill_data.account_number}`\n"
+            f"*Amount Due:* ${bill_data.amount_due:,.2f}\n\n"
+            f"Use /properties to view all properties.",
+            parse_mode=ParseMode.MARKDOWN
+        )
 
     except Exception as e:
         logger.error(f"Error adding property: {e}")
@@ -1376,10 +1463,10 @@ def setup_handlers(application):
     application.add_handler(CallbackQueryHandler(remove_property_callback, pattern="^remove_"))
     application.add_handler(CallbackQueryHandler(remove_property_confirm, pattern="^confirm_remove_"))
 
-    # Handle text input for menu-based add property
+    # Handle text input for menu-based add property (address or account number)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        handle_account_input
+        handle_property_input
     ))
 
     logger.info("Bot handlers configured")
