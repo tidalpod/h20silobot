@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Conversation states
 ADDING_PROPERTY = 1
+REMOVING_PROPERTY = 2
 
 
 def format_currency(amount: Decimal) -> str:
@@ -71,6 +72,7 @@ I help you track water bills for your properties from BSA Online (City of Warren
 /overdue - Show overdue bills only
 /refresh - Manually update bill data
 /add - Add a new property to track
+/remove - Remove a property from tracking
 /help - Show this help message
 
 *Status Indicators:*
@@ -98,6 +100,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ➕ *Manage Properties:*
 /add - Add new property to track
+/remove - Remove a property from tracking
 
 ⚙️ *Info:*
 /status - Bot status and last update time
@@ -378,6 +381,155 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def remove_property_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /remove command - start removing a property"""
+    db_available = context.bot_data.get('db_available', False)
+
+    if not db_available:
+        await update.message.reply_text("⚠️ Database not connected. Cannot remove properties.")
+        return
+
+    try:
+        from database.connection import get_session
+        from database.models import Property
+        from sqlalchemy import select
+
+        async with get_session() as session:
+            result = await session.execute(
+                select(Property)
+                .where(Property.is_active == True)
+                .order_by(Property.address)
+            )
+            properties = result.scalars().all()
+
+        if not properties:
+            await update.message.reply_text(
+                "No properties to remove.\nUse /add to add properties first."
+            )
+            return
+
+        # Create inline keyboard with property options
+        keyboard = []
+        for prop in properties:
+            # Truncate address if too long for button
+            display_addr = prop.address[:40] + "..." if len(prop.address) > 40 else prop.address
+            keyboard.append([
+                InlineKeyboardButton(
+                    display_addr,
+                    callback_data=f"remove_prop_{prop.id}"
+                )
+            ])
+
+        keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="remove_cancel")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            "🗑️ *Remove Property*\n\n"
+            "Select the property you want to remove:",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+    except Exception as e:
+        logger.error(f"Error in remove_property_start: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+async def remove_property_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle property selection for removal"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "remove_cancel":
+        await query.edit_message_text("Operation cancelled.")
+        return
+
+    if query.data.startswith("remove_prop_"):
+        prop_id = int(query.data.replace("remove_prop_", ""))
+
+        try:
+            from database.connection import get_session
+            from database.models import Property
+            from sqlalchemy import select
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(Property).where(Property.id == prop_id)
+                )
+                prop = result.scalar_one_or_none()
+
+            if not prop:
+                await query.edit_message_text("❌ Property not found.")
+                return
+
+            # Show confirmation
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Yes, Remove", callback_data=f"confirm_remove_{prop_id}"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="remove_cancel")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                f"⚠️ *Confirm Removal*\n\n"
+                f"Are you sure you want to remove this property?\n\n"
+                f"*Address:* {prop.address}\n"
+                f"*Account:* `{prop.bsa_account_number}`\n\n"
+                f"This will stop tracking bills for this property.",
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+        except Exception as e:
+            logger.error(f"Error in remove_property_callback: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+
+async def remove_property_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle confirmation of property removal"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "remove_cancel":
+        await query.edit_message_text("Operation cancelled.")
+        return
+
+    if query.data.startswith("confirm_remove_"):
+        prop_id = int(query.data.replace("confirm_remove_", ""))
+
+        try:
+            from database.connection import get_session
+            from database.models import Property
+            from sqlalchemy import select
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(Property).where(Property.id == prop_id)
+                )
+                prop = result.scalar_one_or_none()
+
+                if not prop:
+                    await query.edit_message_text("❌ Property not found.")
+                    return
+
+                address = prop.address
+                # Soft delete - set is_active to False
+                prop.is_active = False
+                await session.commit()
+
+            await query.edit_message_text(
+                f"✅ *Property Removed*\n\n"
+                f"*{address}* has been removed from tracking.\n\n"
+                f"Use /add to add it back if needed.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+        except Exception as e:
+            logger.error(f"Error in remove_property_confirm: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /status command"""
     db_available = context.bot_data.get('db_available', False)
@@ -442,5 +594,10 @@ def setup_handlers(application):
         fallbacks=[CommandHandler("cancel", cancel_command)],
     )
     application.add_handler(add_conv)
+
+    # Remove property command and callbacks
+    application.add_handler(CommandHandler("remove", remove_property_start))
+    application.add_handler(CallbackQueryHandler(remove_property_callback, pattern="^remove_"))
+    application.add_handler(CallbackQueryHandler(remove_property_confirm, pattern="^confirm_remove_"))
 
     logger.info("Bot handlers configured")
