@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ pha.name }}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/phas" class="text-sm text-gray-500 hover:text-gray-700">🏛️ PHAs</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900">{{ pha.name }}</li>
+            </ol>
+        </nav>
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                    <span>🏛️</span> {{ pha.name }}
+                </h1>
+                {% if pha.city and pha.state %}
+                <p class="mt-1 text-sm text-gray-500 flex items-center gap-1">
+                    <span>📍</span> {{ pha.city }}, {{ pha.state }}
+                </p>
+                {% endif %}
+            </div>
+            <a href="/phas/{{ pha.id }}/edit" class="inline-flex items-center rounded-xl bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+                ✏️ Edit
+            </a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Contact Info -->
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>👤</span> Contact Information
+            </h3>
+        </div>
+        <div class="p-5 space-y-4">
+            {% if pha.contact_name %}
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gray-100 rounded-lg">
+                    <span>👤</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Contact Name</p>
+                    <p class="font-medium text-gray-900">{{ pha.contact_name }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pha.email %}
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-blue-100 rounded-lg">
+                    <span>📧</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Email</p>
+                    <a href="mailto:{{ pha.email }}" class="font-medium text-blue-600 hover:underline">{{ pha.email }}</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pha.phone %}
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-green-100 rounded-lg">
+                    <span>📞</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Phone</p>
+                    <a href="tel:{{ pha.phone }}" class="font-medium text-gray-900">{{ pha.phone }}</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pha.fax %}
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gray-100 rounded-lg">
+                    <span>📠</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Fax</p>
+                    <p class="font-medium text-gray-900">{{ pha.fax }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pha.website %}
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-purple-100 rounded-lg">
+                    <span>🌐</span>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Website</p>
+                    <a href="{{ pha.website }}" target="_blank" class="font-medium text-blue-600 hover:underline">{{ pha.website }}</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not pha.contact_name and not pha.email and not pha.phone %}
+            <p class="text-gray-500 text-center py-4">No contact information added yet</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Address -->
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>📍</span> Address
+            </h3>
+        </div>
+        <div class="p-5">
+            {% if pha.address or pha.city %}
+            <div class="text-gray-900">
+                {% if pha.address %}<p>{{ pha.address }}</p>{% endif %}
+                {% if pha.city or pha.state or pha.zip_code %}
+                <p>{{ pha.city }}{% if pha.city and pha.state %}, {% endif %}{{ pha.state }} {{ pha.zip_code }}</p>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-4">No address added yet</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Notes -->
+    {% if pha.notes %}
+    <div class="lg:col-span-2 bg-white shadow-sm rounded-xl border border-gray-200">
+        <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>📝</span> Notes
+            </h3>
+        </div>
+        <div class="p-5">
+            <p class="text-gray-700 whitespace-pre-wrap">{{ pha.notes }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="lg:col-span-2 bg-gradient-to-r from-purple-50 to-blue-50 shadow-sm rounded-xl border border-purple-200 p-5">
+        <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-4">
+            <span>⚡</span> Quick Actions
+        </h3>
+        <div class="flex flex-wrap gap-3">
+            <a href="/recertifications/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-purple-500 hover:to-purple-400 transition-all">
+                <span class="mr-2">📋</span>
+                New Recertification
+            </a>
+            {% if pha.email %}
+            <a href="mailto:{{ pha.email }}" class="inline-flex items-center rounded-xl bg-white border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-all">
+                <span class="mr-2">📧</span>
+                Send Email
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

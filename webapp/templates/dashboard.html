@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+            <span>📊</span> Dashboard
+        </h1>
+        <p class="mt-1 text-sm text-gray-500">Welcome back! Here's an overview of your properties.</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Stats cards -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <!-- Total Properties -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 bg-blue-100 rounded-xl">
+                    <span class="text-2xl">🏠</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Properties</dt>
+                        <dd class="text-2xl font-bold text-gray-900">{{ total_properties }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-5 py-3 border-t border-gray-100">
+            <a href="/properties" class="text-sm font-medium text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                View all <span>→</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Overdue Bills -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100 {% if overdue_count > 0 %}ring-2 ring-red-200{% endif %}">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 bg-red-100 rounded-xl">
+                    <span class="text-2xl">🚨</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Overdue Bills</dt>
+                        <dd class="text-2xl font-bold {% if overdue_count > 0 %}text-red-600{% else %}text-gray-900{% endif %}">{{ overdue_count }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="bg-red-50 px-5 py-3 border-t border-red-100">
+            <span class="text-sm font-semibold text-red-700">💰 ${{ "%.2f"|format(total_overdue_amount) }} total</span>
+        </div>
+    </div>
+
+    <!-- Due Soon -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100 {% if due_soon_count > 0 %}ring-2 ring-yellow-200{% endif %}">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 bg-yellow-100 rounded-xl">
+                    <span class="text-2xl">⏰</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Due Soon (7 days)</dt>
+                        <dd class="text-2xl font-bold {% if due_soon_count > 0 %}text-yellow-600{% else %}text-gray-900{% endif %}">{{ due_soon_count }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="bg-yellow-50 px-5 py-3 border-t border-yellow-100">
+            <span class="text-sm font-semibold text-yellow-700">💰 ${{ "%.2f"|format(total_due_soon_amount) }} total</span>
+        </div>
+    </div>
+
+    <!-- Total Tenants -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 bg-green-100 rounded-xl">
+                    <span class="text-2xl">👥</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Active Tenants</dt>
+                        <dd class="text-2xl font-bold text-gray-900">{{ total_tenants }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-5 py-3 border-t border-gray-100">
+            <a href="/tenants" class="text-sm font-medium text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                View all <span>→</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="mb-8">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <span>⚡</span> Quick Actions
+    </h2>
+    <div class="flex flex-wrap gap-3">
+        <a href="/properties/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
+            <span class="mr-2">➕</span>
+            Add Property
+        </a>
+        <a href="/bills/refresh" class="inline-flex items-center rounded-xl bg-gradient-to-r from-green-600 to-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-green-500 hover:to-green-400 transition-all">
+            <span class="mr-2">🔄</span>
+            Refresh All Bills
+        </a>
+        <a href="/recertifications" class="inline-flex items-center rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-purple-500 hover:to-purple-400 transition-all">
+            <span class="mr-2">📋</span>
+            Recertifications
+        </a>
+        {% if overdue_count > 0 %}
+        <a href="/notifications/bulk?type=overdue" class="inline-flex items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-red-500 hover:to-red-400 transition-all pulse-dot">
+            <span class="mr-2">📧</span>
+            Notify Overdue ({{ overdue_count }})
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Overdue Bills List -->
+    {% if overdue_bills %}
+    <div class="bg-white shadow-sm rounded-xl border border-red-200">
+        <div class="px-5 py-4 border-b border-red-100 bg-red-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-red-800 flex items-center gap-2">
+                <span>🚨</span> Overdue Bills
+            </h3>
+        </div>
+        <ul class="divide-y divide-gray-100">
+            {% for item in overdue_bills[:5] %}
+            <li>
+                <a href="/properties/{{ item.property.id }}" class="block px-5 py-4 hover:bg-red-50 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ item.property.address }}</p>
+                            <p class="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                <span>📅</span> Due: {{ item.bill.due_date.strftime('%b %d, %Y') if item.bill.due_date else 'N/A' }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-red-600">${{ "%.2f"|format(item.bill.amount_due) }}</p>
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                🔴 Overdue
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if overdue_count > 5 %}
+        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
+            <a href="/properties?status=overdue" class="text-sm font-medium text-red-600 hover:text-red-500">
+                View all {{ overdue_count }} overdue →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Due Soon Bills List -->
+    {% if due_soon_bills %}
+    <div class="bg-white shadow-sm rounded-xl border border-yellow-200">
+        <div class="px-5 py-4 border-b border-yellow-100 bg-yellow-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-yellow-800 flex items-center gap-2">
+                <span>⏰</span> Due Soon
+            </h3>
+        </div>
+        <ul class="divide-y divide-gray-100">
+            {% for item in due_soon_bills[:5] %}
+            <li>
+                <a href="/properties/{{ item.property.id }}" class="block px-5 py-4 hover:bg-yellow-50 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ item.property.address }}</p>
+                            <p class="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                <span>📅</span> Due: {{ item.bill.due_date.strftime('%b %d, %Y') if item.bill.due_date else 'N/A' }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-yellow-600">${{ "%.2f"|format(item.bill.amount_due) }}</p>
+                            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
+                                🟡 Due Soon
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if due_soon_count > 5 %}
+        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
+            <a href="/properties?status=due_soon" class="text-sm font-medium text-yellow-600 hover:text-yellow-500">
+                View all {{ due_soon_count }} due soon →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recent Notifications -->
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 {% if not overdue_bills and not due_soon_bills %}lg:col-span-2{% endif %}">
+        <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>📨</span> Recent Notifications
+            </h3>
+        </div>
+        {% if recent_notifications %}
+        <ul class="divide-y divide-gray-100">
+            {% for notification in recent_notifications %}
+            <li class="px-5 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-900 flex items-center gap-2">
+                            {% if notification.channel.value == 'sms' %}
+                            <span>📱</span>
+                            {% else %}
+                            <span>📧</span>
+                            {% endif %}
+                            {{ notification.recipient }}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">{{ notification.created_at.strftime('%b %d, %H:%M') }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                        {% if notification.status.value == 'sent' or notification.status.value == 'delivered' %}bg-green-100 text-green-700
+                        {% elif notification.status.value == 'failed' %}bg-red-100 text-red-700
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {% if notification.status.value == 'sent' or notification.status.value == 'delivered' %}✅{% elif notification.status.value == 'failed' %}❌{% else %}⏳{% endif %}
+                        {{ notification.status.value|capitalize }}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
+            <a href="/notifications" class="text-sm font-medium text-blue-600 hover:text-blue-500">View all notifications →</a>
+        </div>
+        {% else %}
+        <div class="px-5 py-12 text-center text-gray-500">
+            <span class="text-4xl">📭</span>
+            <p class="mt-2">No notifications sent yet</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Empty state if no issues -->
+    {% if not overdue_bills and not due_soon_bills %}
+    <div class="bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm rounded-xl border border-green-200 p-8 text-center">
+        <span class="text-6xl">🎉</span>
+        <h3 class="mt-4 text-xl font-semibold text-green-800">All Caught Up!</h3>
+        <p class="mt-2 text-green-600">No overdue or upcoming bills. Great job staying on top of things!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

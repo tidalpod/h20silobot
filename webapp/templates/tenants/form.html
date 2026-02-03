@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{% if tenant %}Edit Tenant{% else %}Add Tenant{% endif %}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/tenants" class="text-sm text-gray-500 hover:text-gray-700">Tenants</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900">{% if tenant %}Edit{% else %}Add New{% endif %}</li>
+            </ol>
+        </nav>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+            {% if tenant %}Edit Tenant{% else %}Add New Tenant{% endif %}
+        </h1>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg">
+    <form action="{% if tenant %}/tenants/{{ tenant.id }}/edit{% else %}/tenants/new{% endif %}" method="POST" class="p-6">
+        {% if error %}
+        <div class="mb-4 rounded-md bg-red-50 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-red-800">{{ error }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="space-y-6">
+            <div class="border-b border-gray-900/10 pb-6">
+                <h2 class="text-base font-semibold leading-7 text-gray-900">Tenant Information</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-600">Enter the tenant's contact details.</p>
+
+                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+                    <div class="sm:col-span-4">
+                        <label for="property_id" class="block text-sm font-medium leading-6 text-gray-900">Property *</label>
+                        <div class="mt-2">
+                            <select name="property_id" id="property_id" required
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3">
+                                <option value="">Select a property</option>
+                                {% for prop in properties %}
+                                <option value="{{ prop.id }}" {% if selected_property_id == prop.id %}selected{% endif %}>
+                                    {{ prop.address }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-4">
+                        <label for="name" class="block text-sm font-medium leading-6 text-gray-900">Name *</label>
+                        <div class="mt-2">
+                            <input type="text" name="name" id="name" required
+                                   value="{{ tenant.name if tenant else '' }}"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-3">
+                        <label for="phone" class="block text-sm font-medium leading-6 text-gray-900">Phone</label>
+                        <div class="mt-2">
+                            <input type="tel" name="phone" id="phone"
+                                   value="{{ tenant.phone if tenant else '' }}"
+                                   placeholder="+1 (555) 555-5555"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Used for SMS notifications</p>
+                    </div>
+
+                    <div class="sm:col-span-3">
+                        <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email</label>
+                        <div class="mt-2">
+                            <input type="email" name="email" id="email"
+                                   value="{{ tenant.email if tenant else '' }}"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Used for email notifications</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-900/10 pb-6">
+                <h2 class="text-base font-semibold leading-7 text-gray-900">Status & Dates</h2>
+
+                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+                    <div class="sm:col-span-6">
+                        <div class="flex items-center gap-6">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="is_primary" value="true"
+                                       {% if tenant and tenant.is_primary %}checked{% endif %}
+                                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                                <span class="ml-2 text-sm text-gray-900">Primary Contact</span>
+                            </label>
+                            {% if tenant %}
+                            <label class="flex items-center">
+                                <input type="checkbox" name="is_active" value="true"
+                                       {% if tenant.is_active %}checked{% endif %}
+                                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                                <span class="ml-2 text-sm text-gray-900">Active</span>
+                            </label>
+                            {% endif %}
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Primary contacts receive notifications first</p>
+                    </div>
+
+                    <div class="sm:col-span-3">
+                        <label for="move_in_date" class="block text-sm font-medium leading-6 text-gray-900">Move-in Date</label>
+                        <div class="mt-2">
+                            <input type="date" name="move_in_date" id="move_in_date"
+                                   value="{{ tenant.move_in_date.isoformat() if tenant and tenant.move_in_date else '' }}"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    {% if tenant %}
+                    <div class="sm:col-span-3">
+                        <label for="move_out_date" class="block text-sm font-medium leading-6 text-gray-900">Move-out Date</label>
+                        <div class="mt-2">
+                            <input type="date" name="move_out_date" id="move_out_date"
+                                   value="{{ tenant.move_out_date.isoformat() if tenant and tenant.move_out_date else '' }}"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="pb-6">
+                <h2 class="text-base font-semibold leading-7 text-gray-900">Notes</h2>
+
+                <div class="mt-4">
+                    <textarea name="notes" id="notes" rows="3"
+                              class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">{{ tenant.notes if tenant else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-x-6">
+            {% if tenant %}
+            <form action="/tenants/{{ tenant.id }}/delete" method="POST" class="mr-auto" onsubmit="return confirm('Are you sure you want to deactivate this tenant?')">
+                <button type="submit" class="text-sm font-semibold text-red-600 hover:text-red-500">
+                    Deactivate Tenant
+                </button>
+            </form>
+            {% endif %}
+            <a href="{% if tenant %}/properties/{{ tenant.property_id }}{% elif selected_property_id %}/properties/{{ selected_property_id }}{% else %}/tenants{% endif %}" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+            <button type="submit" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                {% if tenant %}Save Changes{% else %}Add Tenant{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

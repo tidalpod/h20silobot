@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Compose Notification{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/notifications" class="text-sm text-gray-500 hover:text-gray-700">Notifications</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900">Compose</li>
+            </ol>
+        </nav>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Compose Notification</h1>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Compose Form -->
+    <div class="lg:col-span-2">
+        <div class="bg-white shadow rounded-lg">
+            <form action="/notifications/send" method="POST" class="p-6">
+                <div class="space-y-6">
+                    <!-- Property Selection -->
+                    <div>
+                        <label for="property_id" class="block text-sm font-medium leading-6 text-gray-900">Property *</label>
+                        <div class="mt-2">
+                            <select name="property_id" id="property_id" required
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3"
+                                    onchange="updateTenants(this.value)">
+                                <option value="">Select a property</option>
+                                {% for prop in properties %}
+                                <option value="{{ prop.id }}" {% if selected_property and selected_property.id == prop.id %}selected{% endif %}>
+                                    {{ prop.address }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tenant Selection -->
+                    <div>
+                        <label for="tenant_id" class="block text-sm font-medium leading-6 text-gray-900">Tenant</label>
+                        <div class="mt-2">
+                            <select name="tenant_id" id="tenant_id"
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3"
+                                    onchange="updateRecipient()">
+                                <option value="">Select a tenant (optional)</option>
+                                {% for tenant in tenants %}
+                                <option value="{{ tenant.id }}"
+                                        data-phone="{{ tenant.phone or '' }}"
+                                        data-email="{{ tenant.email or '' }}"
+                                        data-name="{{ tenant.name }}"
+                                        {% if selected_tenant and selected_tenant.id == tenant.id %}selected{% endif %}>
+                                    {{ tenant.name }}{% if tenant.is_primary %} (Primary){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Selecting a tenant will auto-fill the recipient</p>
+                    </div>
+
+                    <!-- Channel Selection -->
+                    <div>
+                        <label class="block text-sm font-medium leading-6 text-gray-900">Channel *</label>
+                        <div class="mt-2 flex gap-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="channel" value="sms" checked
+                                       {% if not has_twilio %}disabled{% endif %}
+                                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600"
+                                       onchange="toggleChannel('sms')">
+                                <span class="ml-2 text-sm text-gray-900">SMS</span>
+                                {% if not has_twilio %}
+                                <span class="ml-1 text-xs text-red-500">(Not configured)</span>
+                                {% endif %}
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="channel" value="email"
+                                       {% if not has_email %}disabled{% endif %}
+                                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600"
+                                       onchange="toggleChannel('email')">
+                                <span class="ml-2 text-sm text-gray-900">Email</span>
+                                {% if not has_email %}
+                                <span class="ml-1 text-xs text-red-500">(Not configured)</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Recipient -->
+                    <div>
+                        <label for="recipient" class="block text-sm font-medium leading-6 text-gray-900">Recipient *</label>
+                        <div class="mt-2">
+                            <input type="text" name="recipient" id="recipient" required
+                                   placeholder="Phone number or email address"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    <!-- Subject (Email only) -->
+                    <div id="subject-field">
+                        <label for="subject" class="block text-sm font-medium leading-6 text-gray-900">Subject</label>
+                        <div class="mt-2">
+                            <input type="text" name="subject" id="subject"
+                                   value="Water Bill Notice"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    <!-- Message -->
+                    <div>
+                        <label for="message" class="block text-sm font-medium leading-6 text-gray-900">Message *</label>
+                        <div class="mt-2">
+                            <textarea name="message" id="message" rows="6" required
+                                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"></textarea>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500" id="char-count">0 characters</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end gap-x-6">
+                    <a href="/notifications" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+                    <button type="submit" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                        Send Notification
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Templates Sidebar -->
+    <div class="space-y-6">
+        <!-- Quick Templates -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Quick Templates</h3>
+            </div>
+            <div class="px-4 py-5 sm:p-6 space-y-3">
+                <button type="button" onclick="useTemplate('overdue')" class="w-full text-left px-3 py-2 text-sm bg-red-50 text-red-700 rounded-md hover:bg-red-100">
+                    Overdue Notice
+                </button>
+                <button type="button" onclick="useTemplate('due_soon')" class="w-full text-left px-3 py-2 text-sm bg-yellow-50 text-yellow-700 rounded-md hover:bg-yellow-100">
+                    Due Soon Reminder
+                </button>
+                <button type="button" onclick="useTemplate('custom')" class="w-full text-left px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100">
+                    Custom Message
+                </button>
+            </div>
+        </div>
+
+        <!-- Bill Info -->
+        {% if latest_bill %}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Current Bill</h3>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+                <dl class="space-y-2">
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Amount Due</dt>
+                        <dd class="text-sm font-medium text-gray-900">${{ "%.2f"|format(latest_bill.amount_due) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm text-gray-500">Due Date</dt>
+                        <dd class="text-sm text-gray-900">{{ latest_bill.due_date.strftime('%b %d, %Y') if latest_bill.due_date else 'N/A' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Store property data for tenant lookup
+    const propertyTenants = {
+        {% for prop in properties %}
+        {{ prop.id }}: [
+            {% for tenant in prop.tenants if tenant.is_active %}
+            {
+                id: {{ tenant.id }},
+                name: "{{ tenant.name }}",
+                phone: "{{ tenant.phone or '' }}",
+                email: "{{ tenant.email or '' }}",
+                is_primary: {{ 'true' if tenant.is_primary else 'false' }}
+            },
+            {% endfor %}
+        ],
+        {% endfor %}
+    };
+
+    const templates = {
+        overdue: {
+            subject: "Water Bill Overdue Notice",
+            sms: "NOTICE: Your water bill for {{ selected_property.address if selected_property else '{address}' }} is OVERDUE. Amount due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}. Please pay immediately to avoid late fees.",
+            email: "Dear {name},\n\nThis is a notice that your water bill for {{ selected_property.address if selected_property else '{address}' }} is currently OVERDUE.\n\nAmount Due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}\nDue Date: {{ latest_bill.due_date.strftime('%B %d, %Y') if latest_bill and latest_bill.due_date else '{due_date}' }}\n\nPlease make your payment as soon as possible.\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nProperty Management"
+        },
+        due_soon: {
+            subject: "Water Bill Due Soon",
+            sms: "REMINDER: Your water bill for {{ selected_property.address if selected_property else '{address}' }} is due soon. Amount: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}.",
+            email: "Dear {name},\n\nThis is a friendly reminder that your water bill for {{ selected_property.address if selected_property else '{address}' }} is due soon.\n\nAmount Due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}\nDue Date: {{ latest_bill.due_date.strftime('%B %d, %Y') if latest_bill and latest_bill.due_date else '{due_date}' }}\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nProperty Management"
+        },
+        custom: {
+            subject: "Property Notice",
+            sms: "",
+            email: ""
+        }
+    };
+
+    let currentChannel = 'sms';
+
+    function toggleChannel(channel) {
+        currentChannel = channel;
+        const subjectField = document.getElementById('subject-field');
+        if (channel === 'sms') {
+            subjectField.style.display = 'none';
+        } else {
+            subjectField.style.display = 'block';
+        }
+        updateRecipient();
+    }
+
+    function updateTenants(propertyId) {
+        const tenantSelect = document.getElementById('tenant_id');
+        tenantSelect.innerHTML = '<option value="">Select a tenant (optional)</option>';
+
+        if (propertyId && propertyTenants[propertyId]) {
+            propertyTenants[propertyId].forEach(tenant => {
+                const option = document.createElement('option');
+                option.value = tenant.id;
+                option.dataset.phone = tenant.phone;
+                option.dataset.email = tenant.email;
+                option.dataset.name = tenant.name;
+                option.textContent = tenant.name + (tenant.is_primary ? ' (Primary)' : '');
+                tenantSelect.appendChild(option);
+            });
+        }
+    }
+
+    function updateRecipient() {
+        const tenantSelect = document.getElementById('tenant_id');
+        const recipientInput = document.getElementById('recipient');
+        const selectedOption = tenantSelect.options[tenantSelect.selectedIndex];
+
+        if (selectedOption && selectedOption.value) {
+            if (currentChannel === 'sms' && selectedOption.dataset.phone) {
+                recipientInput.value = selectedOption.dataset.phone;
+            } else if (currentChannel === 'email' && selectedOption.dataset.email) {
+                recipientInput.value = selectedOption.dataset.email;
+            }
+        }
+    }
+
+    function useTemplate(templateName) {
+        const template = templates[templateName];
+        const messageField = document.getElementById('message');
+        const subjectField = document.getElementById('subject');
+
+        if (currentChannel === 'sms') {
+            messageField.value = template.sms;
+        } else {
+            messageField.value = template.email;
+            subjectField.value = template.subject;
+        }
+
+        // Replace {name} placeholder if tenant selected
+        const tenantSelect = document.getElementById('tenant_id');
+        const selectedOption = tenantSelect.options[tenantSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.name) {
+            messageField.value = messageField.value.replace('{name}', selectedOption.dataset.name);
+        }
+
+        updateCharCount();
+    }
+
+    function updateCharCount() {
+        const messageField = document.getElementById('message');
+        const charCount = document.getElementById('char-count');
+        charCount.textContent = messageField.value.length + ' characters';
+        if (currentChannel === 'sms' && messageField.value.length > 160) {
+            charCount.classList.add('text-yellow-600');
+        } else {
+            charCount.classList.remove('text-yellow-600');
+        }
+    }
+
+    // Initialize
+    document.getElementById('message').addEventListener('input', updateCharCount);
+    toggleChannel('sms');
+
+    {% if selected_tenant %}
+    updateRecipient();
+    {% endif %}
+</script>
+{% endblock %}

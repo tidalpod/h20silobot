@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}{% if recertification %}Edit Recertification{% else %}New Recertification{% endif %}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/recertifications" class="text-sm text-gray-500 hover:text-gray-700">📋 Recertifications</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900">{% if recertification %}Edit{% else %}New{% endif %}</li>
+            </ol>
+        </nav>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+            {% if recertification %}✏️ Edit Recertification{% else %}➕ New Recertification{% endif %}
+        </h1>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-sm rounded-xl border border-gray-200">
+    <form action="{% if recertification %}/recertifications/{{ recertification.id }}/edit{% else %}/recertifications/new{% endif %}" method="POST" class="p-6">
+        {% if error %}
+        <div class="mb-6 rounded-xl bg-red-50 p-4 border border-red-200">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">❌</span>
+                <p class="text-sm font-medium text-red-800">{{ error }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="space-y-8">
+            <!-- Tenant Selection -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>👤</span> Select Tenant
+                </h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label for="tenant_id" class="block text-sm font-medium text-gray-700 mb-1">Tenant *</label>
+                        <select name="tenant_id" id="tenant_id" required
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 px-4 py-2.5"
+                                onchange="updateTenantInfo()">
+                            <option value="">Select a tenant...</option>
+                            {% for tenant in tenants %}
+                            <option value="{{ tenant.id }}"
+                                    data-property="{{ tenant.property_ref.address if tenant.property_ref else '' }}"
+                                    data-lease-start="{{ tenant.lease_start_date.isoformat() if tenant.lease_start_date else '' }}"
+                                    data-current-rent="{{ tenant.current_rent or '' }}"
+                                    {% if selected_tenant and selected_tenant.id == tenant.id %}selected{% endif %}>
+                                {{ tenant.name }} - {{ tenant.property_ref.address if tenant.property_ref else 'No Property' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="tenant-info" class="hidden bg-purple-50 rounded-xl p-4 border border-purple-200">
+                        <p class="text-sm text-purple-800"><span class="font-medium">🏠 Property:</span> <span id="selected-property"></span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHA Selection -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>🏛️</span> Public Housing Authority
+                </h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label for="pha_id" class="block text-sm font-medium text-gray-700 mb-1">PHA (Optional)</label>
+                        <select name="pha_id" id="pha_id"
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 px-4 py-2.5">
+                            <option value="">Select a PHA...</option>
+                            {% for pha in phas %}
+                            <option value="{{ pha.id }}">{{ pha.name }}{% if pha.city %} - {{ pha.city }}, {{ pha.state }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Don't see your PHA? <a href="/phas/new" class="text-purple-600 hover:underline">Add a new PHA</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lease & Rent Info -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>💰</span> Lease & Rent Information
+                </h2>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="lease_start_date" class="block text-sm font-medium text-gray-700 mb-1">📅 Lease Start Date *</label>
+                        <input type="date" name="lease_start_date" id="lease_start_date" required
+                               value="{{ selected_tenant.lease_start_date.isoformat() if selected_tenant and selected_tenant.lease_start_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 px-4 py-2.5"
+                               onchange="calculateEligibleDate()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">✅ Eligible Date (9 months)</label>
+                        <div id="eligible-date-display" class="block w-full rounded-lg bg-gray-100 border border-gray-300 px-4 py-2.5 text-gray-600">
+                            Select lease start date
+                        </div>
+                    </div>
+                    <div>
+                        <label for="current_rent" class="block text-sm font-medium text-gray-700 mb-1">💵 Current Rent *</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <input type="number" name="current_rent" id="current_rent" required step="0.01" min="0"
+                                   value="{{ selected_tenant.current_rent if selected_tenant and selected_tenant.current_rent else '' }}"
+                                   placeholder="0.00"
+                                   class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 pl-8 pr-4 py-2.5">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="proposed_rent" class="block text-sm font-medium text-gray-700 mb-1">💰 Proposed New Rent *</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <input type="number" name="proposed_rent" id="proposed_rent" required step="0.01" min="0"
+                                   value="{{ selected_tenant.proposed_rent if selected_tenant and selected_tenant.proposed_rent else '' }}"
+                                   placeholder="0.00"
+                                   class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 pl-8 pr-4 py-2.5"
+                                   onchange="calculateIncrease()">
+                        </div>
+                    </div>
+                </div>
+                <div id="rent-increase-info" class="hidden mt-4 bg-green-50 rounded-xl p-4 border border-green-200">
+                    <p class="text-sm text-green-800">
+                        <span class="font-medium">📈 Rent Increase:</span>
+                        <span id="increase-amount">$0.00</span>
+                        (<span id="increase-percent">0%</span>)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>📝</span> Notes
+                </h2>
+                <div>
+                    <textarea name="notes" id="notes" rows="3"
+                              placeholder="Any additional notes about this recertification request..."
+                              class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 px-4 py-2.5"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200 flex items-center justify-end gap-3">
+            <a href="/recertifications" class="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900">Cancel</a>
+            <button type="submit" class="rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-purple-500 hover:to-purple-400 transition-all">
+                ➕ Create Recertification
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function updateTenantInfo() {
+    const select = document.getElementById('tenant_id');
+    const infoDiv = document.getElementById('tenant-info');
+    const propertySpan = document.getElementById('selected-property');
+    const leaseInput = document.getElementById('lease_start_date');
+    const rentInput = document.getElementById('current_rent');
+
+    const option = select.options[select.selectedIndex];
+
+    if (option.value) {
+        const property = option.dataset.property;
+        const leaseStart = option.dataset.leaseStart;
+        const currentRent = option.dataset.currentRent;
+
+        propertySpan.textContent = property || 'No property assigned';
+        infoDiv.classList.remove('hidden');
+
+        if (leaseStart && !leaseInput.value) {
+            leaseInput.value = leaseStart;
+            calculateEligibleDate();
+        }
+        if (currentRent && !rentInput.value) {
+            rentInput.value = currentRent;
+        }
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
+function calculateEligibleDate() {
+    const leaseInput = document.getElementById('lease_start_date');
+    const display = document.getElementById('eligible-date-display');
+
+    if (leaseInput.value) {
+        const leaseDate = new Date(leaseInput.value);
+        leaseDate.setMonth(leaseDate.getMonth() + 9);
+
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        const eligibleStr = leaseDate.toLocaleDateString('en-US', options);
+
+        const today = new Date();
+        if (leaseDate <= today) {
+            display.innerHTML = `<span class="text-green-600 font-medium">✅ ${eligibleStr} (Eligible now!)</span>`;
+        } else {
+            const diffTime = leaseDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            display.innerHTML = `<span class="text-orange-600">${eligibleStr} (${diffDays} days away)</span>`;
+        }
+    } else {
+        display.textContent = 'Select lease start date';
+    }
+}
+
+function calculateIncrease() {
+    const currentRent = parseFloat(document.getElementById('current_rent').value) || 0;
+    const proposedRent = parseFloat(document.getElementById('proposed_rent').value) || 0;
+    const infoDiv = document.getElementById('rent-increase-info');
+    const amountSpan = document.getElementById('increase-amount');
+    const percentSpan = document.getElementById('increase-percent');
+
+    if (currentRent > 0 && proposedRent > 0) {
+        const increase = proposedRent - currentRent;
+        const percent = (increase / currentRent) * 100;
+
+        amountSpan.textContent = '$' + increase.toFixed(2);
+        percentSpan.textContent = percent.toFixed(1) + '%';
+        infoDiv.classList.remove('hidden');
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateTenantInfo();
+    calculateEligibleDate();
+    calculateIncrease();
+});
+</script>
+{% endblock %}

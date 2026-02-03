@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}PHAs{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                <span>🏛️</span> Public Housing Authorities
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Manage PHA contacts for recertification requests</p>
+        </div>
+        <a href="/phas/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
+            <span class="mr-2">➕</span>
+            Add PHA
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+    {% if phas %}
+    <div class="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        {% for pha in phas %}
+        <div class="bg-white border border-gray-200 rounded-xl p-5 card-hover">
+            <div class="flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-purple-100 rounded-lg">
+                        <span class="text-xl">🏛️</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">{{ pha.name }}</h3>
+                        {% if pha.city and pha.state %}
+                        <p class="text-sm text-gray-500">📍 {{ pha.city }}, {{ pha.state }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 space-y-2 text-sm">
+                {% if pha.contact_name %}
+                <p class="flex items-center gap-2 text-gray-600">
+                    <span>👤</span> {{ pha.contact_name }}
+                </p>
+                {% endif %}
+                {% if pha.email %}
+                <p class="flex items-center gap-2 text-gray-600">
+                    <span>📧</span>
+                    <a href="mailto:{{ pha.email }}" class="text-blue-600 hover:underline">{{ pha.email }}</a>
+                </p>
+                {% endif %}
+                {% if pha.phone %}
+                <p class="flex items-center gap-2 text-gray-600">
+                    <span>📞</span> {{ pha.phone }}
+                </p>
+                {% endif %}
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+                <a href="/phas/{{ pha.id }}" class="flex-1 text-center py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    View Details
+                </a>
+                <a href="/phas/{{ pha.id }}/edit" class="flex-1 text-center py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    ✏️ Edit
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        <span class="text-6xl">🏛️</span>
+        <h3 class="mt-4 text-lg font-semibold text-gray-900">No PHAs Added Yet</h3>
+        <p class="mt-2 text-gray-500">Add a Public Housing Authority to start managing recertifications</p>
+        <div class="mt-6">
+            <a href="/phas/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
+                <span class="mr-2">➕</span>
+                Add Your First PHA
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

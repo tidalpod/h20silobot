@@ -20,3 +20,35 @@ aiohttp==3.9.1
 
 # Development
 rich==13.7.0  # For pretty console output during debugging
+
+# =============================================================================
+# Web Application Dependencies
+# =============================================================================
+
+# FastAPI Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Templates
+jinja2==3.1.3
+
+# Form handling
+python-multipart==0.0.6
+
+# Session management
+itsdangerous==2.1.2
+
+# Password hashing
+bcrypt==4.1.2
+
+# Date utilities
+python-dateutil==2.8.2
+
+# SMS (Twilio)
+twilio==8.10.0
+
+# Email (SendGrid)
+sendgrid==6.11.0
+
+# Async file handling
+aiofiles==23.2.1

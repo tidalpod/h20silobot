@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Tenants{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Tenants</h1>
+        <a href="/tenants/new" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Tenant
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="bg-white shadow rounded-lg mb-6 p-4">
+    <form method="GET" class="flex flex-wrap gap-4 items-end">
+        <div class="min-w-[200px]">
+            <label for="property_id" class="block text-sm font-medium text-gray-700 mb-1">Property</label>
+            <select name="property_id" id="property_id" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3">
+                <option value="">All Properties</option>
+                {% for prop in properties %}
+                <option value="{{ prop.id }}" {% if property_id == prop.id %}selected{% endif %}>{{ prop.address }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="flex items-center">
+                <input type="checkbox" name="active_only" value="true" {% if active_only %}checked{% endif %}
+                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                <span class="ml-2 text-sm text-gray-900">Active only</span>
+            </label>
+        </div>
+        <button type="submit" class="rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-200">
+            Filter
+        </button>
+        {% if property_id or not active_only %}
+        <a href="/tenants" class="text-sm text-gray-600 hover:text-gray-900">Clear filters</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Tenants list -->
+<div class="bg-white shadow rounded-lg overflow-hidden">
+    {% if tenants %}
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for tenant in tenants %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">
+                        {{ tenant.name }}
+                        {% if tenant.is_primary %}
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 ml-2">Primary</span>
+                        {% endif %}
+                    </div>
+                    {% if tenant.move_in_date %}
+                    <p class="text-xs text-gray-500">Since {{ tenant.move_in_date.strftime('%b %Y') }}</p>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <a href="/properties/{{ tenant.property_ref.id }}" class="text-sm text-blue-600 hover:text-blue-500">
+                        {{ tenant.property_ref.address }}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if tenant.phone %}
+                    <p>{{ tenant.phone }}</p>
+                    {% endif %}
+                    {% if tenant.email %}
+                    <p class="text-xs">{{ tenant.email }}</p>
+                    {% endif %}
+                    {% if not tenant.phone and not tenant.email %}
+                    <span class="text-gray-400">No contact info</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if tenant.is_active %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="/tenants/{{ tenant.id }}/edit" class="text-blue-600 hover:text-blue-900 mr-3">Edit</a>
+                    <a href="/notifications/compose?tenant_id={{ tenant.id }}" class="text-gray-600 hover:text-gray-900">Notify</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No tenants found</h3>
+        <p class="mt-1 text-sm text-gray-500">Get started by adding a tenant to a property.</p>
+        <div class="mt-6">
+            <a href="/tenants/new" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add Tenant
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

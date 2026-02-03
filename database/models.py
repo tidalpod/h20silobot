@@ -12,6 +12,11 @@ from sqlalchemy.orm import relationship, declarative_base
 Base = declarative_base()
 
 
+# =============================================================================
+# Enums
+# =============================================================================
+
+
 class BillStatus(PyEnum):
     CURRENT = "current"
     DUE_SOON = "due_soon"  # Within 7 days
@@ -26,10 +31,43 @@ class Property(Base):
 
     id = Column(Integer, primary_key=True)
     address = Column(String(255), nullable=False)
+    city = Column(String(100), nullable=True)
+    state = Column(String(2), nullable=True)
+    zip_code = Column(String(10), nullable=True)
     bsa_account_number = Column(String(50), unique=True, nullable=False)
     parcel_number = Column(String(50), nullable=True)
     tenant_name = Column(String(255), nullable=True)
     owner_name = Column(String(255), nullable=True)
+
+    # Property details
+    bedrooms = Column(Integer, nullable=True)
+    bathrooms = Column(Numeric(3, 1), nullable=True)  # e.g., 2.5 baths
+    square_feet = Column(Integer, nullable=True)
+    year_built = Column(Integer, nullable=True)
+    lot_size = Column(String(50), nullable=True)
+    property_type = Column(String(50), nullable=True)  # Single Family, Multi-Family, etc.
+
+    # Occupancy status
+    is_vacant = Column(Boolean, default=False)
+
+    # City certification
+    has_city_certification = Column(Boolean, default=False)
+    city_certification_date = Column(Date, nullable=True)
+    city_certification_expiry = Column(Date, nullable=True)
+
+    # Rental license
+    has_rental_license = Column(Boolean, default=False)
+    rental_license_number = Column(String(50), nullable=True)
+    rental_license_issued = Column(Date, nullable=True)
+    rental_license_expiry = Column(Date, nullable=True)
+
+    # Section 8 inspection
+    section8_inspection_status = Column(String(50), nullable=True)  # scheduled, passed, failed, pending
+    section8_inspection_date = Column(Date, nullable=True)
+    section8_inspection_notes = Column(Text, nullable=True)
+
+    # Web user ownership (optional - for web app property management)
+    web_user_id = Column(Integer, ForeignKey("web_users.id", ondelete="SET NULL"), nullable=True)
 
     # Tracking
     is_active = Column(Boolean, default=True)
@@ -38,6 +76,11 @@ class Property(Base):
 
     # Relationships
     bills = relationship("WaterBill", back_populates="property", order_by="desc(WaterBill.statement_date)")
+    tenants = relationship("Tenant", back_populates="property_ref", order_by="desc(Tenant.is_primary)")
+    notifications = relationship("Notification", back_populates="property")
+    taxes = relationship("PropertyTax", back_populates="property", order_by="desc(PropertyTax.tax_year)")
+    recertifications = relationship("Recertification", back_populates="property_ref")
+    web_user = relationship("WebUser", back_populates="properties")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -95,6 +138,7 @@ class WaterBill(Base):
 
     # Relationships
     property = relationship("Property", back_populates="bills")
+    notifications = relationship("Notification", back_populates="bill")
 
     # Indexes
     __table_args__ = (
@@ -154,3 +198,286 @@ class TelegramUser(Base):
 
     def __repr__(self):
         return f"<TelegramUser {self.username or self.telegram_id}>"
+
+
+# =============================================================================
+# Web Application Models
+# =============================================================================
+
+class NotificationChannel(PyEnum):
+    """Notification delivery channel"""
+    SMS = "sms"
+    EMAIL = "email"
+
+
+class NotificationStatus(PyEnum):
+    """Notification delivery status"""
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    DELIVERED = "delivered"
+
+
+class WebUser(Base):
+    """Web application users (separate from Telegram users)"""
+    __tablename__ = "web_users"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+
+    # Relationships
+    properties = relationship("Property", back_populates="web_user")
+
+    def __repr__(self):
+        return f"<WebUser {self.email}>"
+
+
+class Tenant(Base):
+    """Tenants linked to properties"""
+    __tablename__ = "tenants"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    # Contact info
+    name = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=True)
+    email = Column(String(255), nullable=True)
+
+    # Status
+    is_primary = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+
+    # Dates
+    move_in_date = Column(Date, nullable=True)
+    move_out_date = Column(Date, nullable=True)
+    lease_start_date = Column(Date, nullable=True)  # For recertification calculation
+    lease_end_date = Column(Date, nullable=True)
+
+    # Rent info
+    current_rent = Column(Numeric(10, 2), nullable=True)
+    proposed_rent = Column(Numeric(10, 2), nullable=True)
+
+    # Notes
+    notes = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property", back_populates="tenants")
+    notifications = relationship("Notification", back_populates="tenant")
+    recertifications = relationship("Recertification", back_populates="tenant")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_tenants_property_active", "property_id", "is_active"),
+    )
+
+    def __repr__(self):
+        return f"<Tenant {self.name} @ Property {self.property_id}>"
+
+    @property
+    def recert_eligible_date(self):
+        """Calculate when recertification can be submitted (9 months after lease start)"""
+        if self.lease_start_date:
+            from dateutil.relativedelta import relativedelta
+            return self.lease_start_date + relativedelta(months=9)
+        return None
+
+    @property
+    def days_until_recert(self):
+        """Days until recertification is eligible"""
+        if self.recert_eligible_date:
+            delta = self.recert_eligible_date - datetime.now().date()
+            return delta.days
+        return None
+
+
+class Notification(Base):
+    """Notification log for SMS/Email tracking"""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="SET NULL"), nullable=True)
+    bill_id = Column(Integer, ForeignKey("water_bills.id", ondelete="SET NULL"), nullable=True)
+
+    # Message details
+    channel = Column(Enum(NotificationChannel), nullable=False)
+    recipient = Column(String(255), nullable=False)
+    subject = Column(String(255), nullable=True)
+    message = Column(Text, nullable=False)
+
+    # Status tracking
+    status = Column(Enum(NotificationStatus), default=NotificationStatus.PENDING)
+    external_id = Column(String(100), nullable=True)  # Twilio SID or SendGrid ID
+    sent_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    tenant = relationship("Tenant", back_populates="notifications")
+    property = relationship("Property", back_populates="notifications")
+    bill = relationship("WaterBill", back_populates="notifications")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_notifications_status", "status"),
+        Index("ix_notifications_created", "created_at"),
+    )
+
+    def __repr__(self):
+        return f"<Notification {self.channel.value} to {self.recipient} - {self.status.value}>"
+
+
+class PropertyTax(Base):
+    """Property tax records"""
+    __tablename__ = "property_taxes"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    # Tax details
+    tax_year = Column(Integer, nullable=False)
+    amount_due = Column(Numeric(10, 2), nullable=True)
+    due_date = Column(Date, nullable=True)
+    status = Column(String(20), nullable=True)  # paid, due, delinquent
+    parcel_number = Column(String(50), nullable=True)
+
+    # Tracking
+    scraped_at = Column(DateTime, default=datetime.utcnow)
+    raw_data = Column(Text, nullable=True)
+
+    # Relationships
+    property = relationship("Property", back_populates="taxes")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_property_taxes_property_year", "property_id", "tax_year"),
+    )
+
+    def __repr__(self):
+        return f"<PropertyTax {self.tax_year} - ${self.amount_due}>"
+
+
+# =============================================================================
+# PHA & Recertification Models
+# =============================================================================
+
+class RecertStatus(PyEnum):
+    """Recertification status"""
+    PENDING = "pending"          # Not yet eligible
+    ELIGIBLE = "eligible"        # 9 months reached, can submit
+    SUBMITTED = "submitted"      # Request sent to PHA
+    IN_REVIEW = "in_review"      # PHA reviewing
+    APPROVED = "approved"        # Rent increase approved
+    DENIED = "denied"            # Rent increase denied
+    COMPLETED = "completed"      # Process complete
+
+
+class PHA(Base):
+    """Public Housing Authority information"""
+    __tablename__ = "phas"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+
+    # Contact info
+    contact_name = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(20), nullable=True)
+    fax = Column(String(20), nullable=True)
+
+    # Address
+    address = Column(String(255), nullable=True)
+    city = Column(String(100), nullable=True)
+    state = Column(String(2), nullable=True)
+    zip_code = Column(String(10), nullable=True)
+
+    # Additional info
+    website = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    recertifications = relationship("Recertification", back_populates="pha")
+
+    def __repr__(self):
+        return f"<PHA {self.name}>"
+
+
+class Recertification(Base):
+    """Recertification tracking for rent increases"""
+    __tablename__ = "recertifications"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    pha_id = Column(Integer, ForeignKey("phas.id", ondelete="SET NULL"), nullable=True)
+
+    # Rent details
+    current_rent = Column(Numeric(10, 2), nullable=True)
+    proposed_rent = Column(Numeric(10, 2), nullable=True)
+    approved_rent = Column(Numeric(10, 2), nullable=True)
+
+    # Dates
+    lease_start_date = Column(Date, nullable=True)
+    eligible_date = Column(Date, nullable=True)  # 9 months after lease start
+    submitted_date = Column(Date, nullable=True)
+    effective_date = Column(Date, nullable=True)  # When new rent starts
+
+    # Status
+    status = Column(Enum(RecertStatus), default=RecertStatus.PENDING)
+
+    # Communication tracking
+    last_email_sent = Column(DateTime, nullable=True)
+    email_count = Column(Integer, default=0)
+
+    # Notes and documents
+    notes = Column(Text, nullable=True)
+    pha_response = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tenant = relationship("Tenant", back_populates="recertifications")
+    property_ref = relationship("Property", back_populates="recertifications")
+    pha = relationship("PHA", back_populates="recertifications")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_recertifications_status", "status"),
+        Index("ix_recertifications_eligible_date", "eligible_date"),
+    )
+
+    def __repr__(self):
+        return f"<Recertification {self.tenant_id} - {self.status.value}>"
+
+    @property
+    def rent_increase(self):
+        """Calculate proposed rent increase amount"""
+        if self.current_rent and self.proposed_rent:
+            return self.proposed_rent - self.current_rent
+        return None
+
+    @property
+    def rent_increase_percent(self):
+        """Calculate proposed rent increase percentage"""
+        if self.current_rent and self.proposed_rent and self.current_rent > 0:
+            return ((self.proposed_rent - self.current_rent) / self.current_rent) * 100
+        return None

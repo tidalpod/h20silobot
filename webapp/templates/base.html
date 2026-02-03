@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Blue Deer{% endblock %} | Property Management</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom styles -->
+    <style>
+        [x-cloak] { display: none !important; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request.htmx-indicator { display: inline-block; }
+
+        /* Gradient background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+        }
+
+        /* Card hover effect */
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Status pulse animation */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50">
+    <div class="min-h-full">
+        <!-- Navigation -->
+        {% if user %}
+        <nav class="gradient-bg shadow-lg">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <a href="/" class="text-white font-bold text-xl flex items-center gap-2">
+                                <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 rounded-full bg-white/90 p-0.5">
+                                <span>Blue Deer</span>
+                            </a>
+                        </div>
+                        <div class="hidden md:block">
+                            <div class="ml-10 flex items-baseline space-x-1">
+                                <a href="/" class="{% if request.url.path == '/' %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>📊</span> Dashboard
+                                </a>
+                                <a href="/properties" class="{% if '/properties' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>🏠</span> Properties
+                                </a>
+                                <a href="/tenants" class="{% if '/tenants' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>👥</span> Tenants
+                                </a>
+                                <a href="/recertifications" class="{% if '/recertifications' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>📋</span> Recertifications
+                                </a>
+                                <a href="/phas" class="{% if '/phas' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>🏛️</span> PHAs
+                                </a>
+                                <a href="/notifications" class="{% if '/notifications' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>📨</span> Notifications
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="ml-8 flex items-center gap-4">
+                            <!-- Divider -->
+                            <div class="h-6 w-px bg-white/30"></div>
+                            <!-- User dropdown -->
+                            <div class="relative">
+                                <button onclick="document.getElementById('user-dropdown').classList.toggle('hidden')"
+                                        class="text-white/90 text-sm flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors cursor-pointer">
+                                    <span>👤</span>
+                                    <span class="font-medium">{{ user.name or user.email }}</span>
+                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <!-- Dropdown menu -->
+                                <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                                    <a href="/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <span>⚙️</span> Settings
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="/logout" class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                        <span>🚪</span> Logout
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Mobile menu button -->
+                    <div class="-mr-2 flex md:hidden">
+                        <button type="button" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="inline-flex items-center justify-center rounded-lg bg-white/20 p-2 text-white hover:bg-white/30 transition-colors">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Mobile menu -->
+            <div class="md:hidden hidden" id="mobile-menu">
+                <div class="space-y-1 px-2 pb-3 pt-2 sm:px-3">
+                    <a href="/" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📊 Dashboard</a>
+                    <a href="/properties" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏠 Properties</a>
+                    <a href="/tenants" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">👥 Tenants</a>
+                    <a href="/recertifications" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📋 Recertifications</a>
+                    <a href="/phas" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏛️ PHAs</a>
+                    <a href="/notifications" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📨 Notifications</a>
+                </div>
+                <div class="border-t border-white/20 pb-3 pt-4">
+                    <div class="flex items-center px-5 gap-2 text-white">
+                        <span>👤</span>
+                        <span>{{ user.name or user.email }}</span>
+                    </div>
+                    <div class="mt-3 space-y-1 px-2">
+                        <a href="/profile" class="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-white hover:bg-white/10">⚙️ Settings</a>
+                        <a href="/logout" class="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-white hover:bg-white/10">🚪 Logout</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        {% endif %}
+
+        <!-- Page header -->
+        {% block header %}{% endblock %}
+
+        <!-- Main content -->
+        <main>
+            <div class="mx-auto max-w-7xl py-6 px-4 sm:px-6 lg:px-8">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <!-- Footer -->
+        {% if user %}
+        <footer class="mt-auto py-6 text-center text-sm text-gray-500">
+            <p class="flex items-center justify-center gap-2">
+                <img src="/static/images/logo.png" alt="Blue Deer" class="h-5 w-5">
+                Blue Deer Property Management
+            </p>
+        </footer>
+        {% endif %}
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // Toast notification helper
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-green-500';
+            const emoji = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅';
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 flex items-center gap-2`;
+            toast.innerHTML = `<span>${emoji}</span><span>${message}</span>`;
+            document.getElementById('toast-container').appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // HTMX event handlers
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Handle flash messages or toast triggers
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('user-dropdown');
+            const button = event.target.closest('button');
+            if (dropdown && !dropdown.contains(event.target) && (!button || !button.onclick?.toString().includes('user-dropdown'))) {
+                dropdown.classList.add('hidden');
+            }
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

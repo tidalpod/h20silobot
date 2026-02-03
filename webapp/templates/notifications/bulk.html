@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Notifications{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/notifications" class="text-sm text-gray-500 hover:text-gray-700">Notifications</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900">Bulk Send</li>
+            </ol>
+        </nav>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+            Send {{ type|capitalize }} Notifications
+        </h1>
+        <p class="mt-1 text-sm text-gray-500">
+            Send notifications to all tenants with {{ type }} bills
+        </p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<form action="/notifications/bulk/send" method="POST">
+    <input type="hidden" name="type" value="{{ type }}">
+
+    <!-- Channel Selection -->
+    <div class="bg-white shadow rounded-lg mb-6 p-4">
+        <label class="block text-sm font-medium leading-6 text-gray-900 mb-2">Notification Channel</label>
+        <div class="flex gap-4">
+            <label class="flex items-center">
+                <input type="radio" name="channel" value="sms" checked
+                       {% if not has_twilio %}disabled{% endif %}
+                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600">
+                <span class="ml-2 text-sm text-gray-900">SMS</span>
+                {% if not has_twilio %}
+                <span class="ml-1 text-xs text-red-500">(Not configured)</span>
+                {% endif %}
+            </label>
+            <label class="flex items-center">
+                <input type="radio" name="channel" value="email"
+                       {% if not has_email %}disabled{% endif %}
+                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600">
+                <span class="ml-2 text-sm text-gray-900">Email</span>
+                {% if not has_email %}
+                <span class="ml-1 text-xs text-red-500">(Not configured)</span>
+                {% endif %}
+            </label>
+        </div>
+    </div>
+
+    <!-- Message Preview -->
+    <div class="bg-white shadow rounded-lg mb-6 p-4">
+        <h3 class="text-sm font-medium text-gray-900 mb-2">Message Template</h3>
+        <div class="bg-gray-50 p-3 rounded-md text-sm text-gray-700 whitespace-pre-wrap">{{ template.sms }}</div>
+        <p class="mt-2 text-xs text-gray-500">Variables like {address}, {amount}, {due_date} will be replaced with actual values</p>
+    </div>
+
+    <!-- Properties List -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Properties to Notify</h3>
+                <p class="mt-1 text-sm text-gray-500">{{ properties|length }} properties with {{ type }} bills and active tenants</p>
+            </div>
+            <div>
+                <label class="flex items-center">
+                    <input type="checkbox" id="select-all" onchange="toggleAll(this.checked)"
+                           class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                    <span class="ml-2 text-sm text-gray-900">Select All</span>
+                </label>
+            </div>
+        </div>
+
+        {% if properties %}
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+                        <span class="sr-only">Select</span>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Due</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenants</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for item in properties %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox" name="property_ids" value="{{ item.property.id }}"
+                               class="property-checkbox h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                            {{ item.property.address }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${{ "%.2f"|format(item.bill.amount_due) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ item.bill.due_date.strftime('%b %d, %Y') if item.bill.due_date else 'N/A' }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% for tenant in item.tenants %}
+                        <div class="text-sm">
+                            <span class="text-gray-900">{{ tenant.name }}</span>
+                            <span class="text-gray-500 text-xs">
+                                {% if tenant.phone %}{{ tenant.phone }}{% endif %}
+                                {% if tenant.phone and tenant.email %} / {% endif %}
+                                {% if tenant.email %}{{ tenant.email }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="px-4 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+            <span class="text-sm text-gray-500" id="selected-count">0 properties selected</span>
+            <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" id="send-btn" disabled>
+                Send Notifications
+            </button>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No properties to notify</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                There are no {{ type }} properties with tenants who have contact information.
+            </p>
+            <div class="mt-6">
+                <a href="/" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                    Return to Dashboard
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</form>
+
+<script>
+    function toggleAll(checked) {
+        document.querySelectorAll('.property-checkbox').forEach(cb => {
+            cb.checked = checked;
+        });
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const count = document.querySelectorAll('.property-checkbox:checked').length;
+        document.getElementById('selected-count').textContent = count + ' properties selected';
+        document.getElementById('send-btn').disabled = count === 0;
+    }
+
+    document.querySelectorAll('.property-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+</script>
+{% endblock %}
