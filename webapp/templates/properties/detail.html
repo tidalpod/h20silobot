@@ -5,24 +5,87 @@
 {% block header %}
 <header class="bg-white shadow">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-start">
+        <!-- Breadcrumb -->
+        <nav class="flex mb-3" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/properties" class="text-sm text-gray-500 hover:text-gray-700">Properties</a></li>
+                <li><span class="text-gray-400">/</span></li>
+                <li class="text-sm text-gray-900 font-medium">{{ property.address }}</li>
+            </ol>
+        </nav>
+
+        <!-- Property Header with Status Pills -->
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-                <nav class="flex mb-2" aria-label="Breadcrumb">
-                    <ol class="flex items-center space-x-2">
-                        <li><a href="/properties" class="text-sm text-gray-500 hover:text-gray-700">Properties</a></li>
-                        <li><span class="text-gray-400">/</span></li>
-                        <li class="text-sm text-gray-900">{{ property.address }}</li>
-                    </ol>
-                </nav>
-                <h1 class="text-3xl font-bold tracking-tight text-gray-900">{{ property.address }}</h1>
-                <p class="mt-1 text-sm text-gray-500">Account: {{ property.bsa_account_number }}</p>
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900">{{ property.address }}</h1>
+                {% if property.city or property.state or property.zip_code %}
+                <p class="text-sm text-gray-600 mt-0.5">{{ property.city or '' }}{% if property.city and property.state %}, {% endif %}{{ property.state or '' }} {{ property.zip_code or '' }}</p>
+                {% endif %}
+
+                <!-- Status Pills Row -->
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <!-- Active/Inactive -->
+                    {% if property.is_active %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600">Inactive</span>
+                    {% endif %}
+
+                    <!-- Occupancy -->
+                    {% if active_tenants %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                        <span class="mr-1">👥</span> Occupied ({{ active_tenants|length }})
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">
+                        <span class="mr-1">🔑</span> Vacant
+                    </span>
+                    {% endif %}
+
+                    <!-- Section 8 -->
+                    {% set has_section8_tenant = active_tenants | selectattr('is_section8', 'true') | list | length > 0 %}
+                    {% if has_section8_tenant %}
+                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
+                        <span class="mr-1">🏛️</span> Section 8
+                    </span>
+                    {% endif %}
+
+                    <!-- Rental License -->
+                    {% if property.has_rental_license %}
+                    <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                        <span class="mr-1">📜</span> Licensed
+                    </span>
+                    {% endif %}
+
+                    <!-- City Certification -->
+                    {% if property.has_city_certification %}
+                    <span class="inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700">
+                        <span class="mr-1">✓</span> Certified
+                    </span>
+                    {% endif %}
+
+                    <!-- Water Bill Alert -->
+                    {% if current_status.value == 'overdue' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+                        <span class="mr-1">💧</span> Bill Overdue
+                    </span>
+                    {% endif %}
+                </div>
             </div>
-            <div class="flex gap-2">
-                <a href="/properties/{{ property.id }}/edit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+
+            <!-- Header Actions -->
+            <div class="flex gap-2 flex-shrink-0">
+                <a href="/properties/{{ property.id }}/edit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    <svg class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    </svg>
                     Edit
                 </a>
                 <a href="/notifications/compose?property_id={{ property.id }}" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
-                    Send Notification
+                    <svg class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    Notify
                 </a>
             </div>
         </div>
@@ -32,376 +95,681 @@
 
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Main content -->
+    <!-- Main Content Area -->
     <div class="lg:col-span-2 space-y-6">
-        <!-- Current Bill Status -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">Current Bill Status</h3>
-            </div>
-            <div class="px-4 py-5 sm:p-6">
-                {% if latest_bill %}
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <p class="text-3xl font-bold text-gray-900">${{ "%.2f"|format(latest_bill.amount_due) }}</p>
-                        <p class="text-sm text-gray-500">Amount Due</p>
-                    </div>
-                    <div class="text-right">
-                        {% if current_status.value == 'overdue' %}
-                        <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">Overdue</span>
-                        {% elif current_status.value == 'due_soon' %}
-                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700">Due Soon</span>
-                        {% elif current_status.value == 'current' %}
-                        <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">Current</span>
-                        {% elif current_status.value == 'paid' %}
-                        <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">Paid</span>
-                        {% else %}
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">Unknown</span>
+
+        <!-- Tab Navigation -->
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                <button onclick="showTab('overview')" id="tab-overview" class="tab-btn border-b-2 border-blue-500 py-3 px-1 text-sm font-medium text-blue-600">
+                    Overview
+                </button>
+                <button onclick="showTab('tenants')" id="tab-tenants" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                    Tenants{% if active_tenants %} ({{ active_tenants|length }}){% endif %}
+                </button>
+                <button onclick="showTab('compliance')" id="tab-compliance" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                    Compliance
+                </button>
+                <button onclick="showTab('utilities')" id="tab-utilities" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                    Utilities
+                    {% if current_status.value == 'overdue' %}
+                    <span class="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">!</span>
+                    {% endif %}
+                </button>
+            </nav>
+        </div>
+
+        <!-- TAB: Overview -->
+        <div id="panel-overview" class="tab-panel space-y-6">
+            <!-- Property Details Card -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h3 class="text-base font-semibold text-gray-900">Property Details</h3>
+                </div>
+                <div class="px-5 py-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {% if property.property_type %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ property.property_type }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.bedrooms or property.bathrooms %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Bed / Bath</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">
+                                {{ property.bedrooms or '-' }} / {{ property.bathrooms or '-' }}
+                            </dd>
+                        </div>
+                        {% endif %}
+                        {% if property.square_feet %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Sq Ft</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ "{:,}".format(property.square_feet) }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.year_built %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Year Built</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ property.year_built }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.owner_name %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Owner</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ property.owner_name }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.lot_size %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Lot Size</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ property.lot_size }}</dd>
+                        </div>
                         {% endif %}
                     </div>
+
+                    <!-- Account Numbers - Collapsed by default -->
+                    <details class="mt-4 pt-4 border-t border-gray-100">
+                        <summary class="text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700">Account Numbers</summary>
+                        <div class="mt-2 grid grid-cols-2 gap-4">
+                            <div>
+                                <dt class="text-xs text-gray-500">BSA Account</dt>
+                                <dd class="text-sm text-gray-700 font-mono">{{ property.bsa_account_number }}</dd>
+                            </div>
+                            {% if property.parcel_number %}
+                            <div>
+                                <dt class="text-xs text-gray-500">Parcel Number</dt>
+                                <dd class="text-sm text-gray-700 font-mono">{{ property.parcel_number }}</dd>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </details>
                 </div>
-                <dl class="grid grid-cols-2 gap-4">
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Due Date</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ latest_bill.due_date.strftime('%B %d, %Y') if latest_bill.due_date else 'N/A' }}</dd>
+            </div>
+
+            <!-- Quick Status Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Occupancy -->
+                <div class="bg-white shadow rounded-lg p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 p-2 rounded-lg {% if active_tenants %}bg-blue-100{% else %}bg-orange-100{% endif %}">
+                            <span class="text-lg">{% if active_tenants %}👥{% else %}🔑{% endif %}</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-xs font-medium text-gray-500 uppercase">Occupancy</p>
+                            <p class="text-sm font-semibold {% if active_tenants %}text-blue-700{% else %}text-orange-700{% endif %}">
+                                {% if active_tenants %}{{ active_tenants|length }} Tenant{{ 's' if active_tenants|length > 1 else '' }}{% else %}Vacant{% endif %}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Statement Date</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ latest_bill.statement_date.strftime('%B %d, %Y') if latest_bill.statement_date else 'N/A' }}</dd>
+                </div>
+
+                <!-- License Status -->
+                <div class="bg-white shadow rounded-lg p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 p-2 rounded-lg {% if property.has_rental_license %}bg-green-100{% else %}bg-gray-100{% endif %}">
+                            <span class="text-lg">📜</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-xs font-medium text-gray-500 uppercase">License</p>
+                            <p class="text-sm font-semibold {% if property.has_rental_license %}text-green-700{% else %}text-gray-500{% endif %}">
+                                {% if property.has_rental_license %}Active{% else %}None{% endif %}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Current Charges</dt>
-                        <dd class="mt-1 text-sm text-gray-900">${{ "%.2f"|format(latest_bill.current_charges or 0) }}</dd>
+                </div>
+
+                <!-- Inspection Status -->
+                <div class="bg-white shadow rounded-lg p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 p-2 rounded-lg
+                            {% if property.section8_inspection_status == 'passed' %}bg-green-100
+                            {% elif property.section8_inspection_status == 'failed' %}bg-red-100
+                            {% elif property.section8_inspection_status %}bg-yellow-100
+                            {% else %}bg-gray-100{% endif %}">
+                            <span class="text-lg">🔍</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-xs font-medium text-gray-500 uppercase">Inspection</p>
+                            <p class="text-sm font-semibold
+                                {% if property.section8_inspection_status == 'passed' %}text-green-700
+                                {% elif property.section8_inspection_status == 'failed' %}text-red-700
+                                {% elif property.section8_inspection_status %}text-yellow-700
+                                {% else %}text-gray-500{% endif %}">
+                                {% if property.section8_inspection_status %}{{ property.section8_inspection_status|capitalize }}{% else %}N/A{% endif %}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Previous Balance</dt>
-                        <dd class="mt-1 text-sm text-gray-900">${{ "%.2f"|format(latest_bill.previous_balance or 0) }}</dd>
+                </div>
+
+                <!-- Water Bill -->
+                <div class="bg-white shadow rounded-lg p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 p-2 rounded-lg
+                            {% if current_status.value == 'overdue' %}bg-red-100
+                            {% elif current_status.value == 'due_soon' %}bg-yellow-100
+                            {% elif current_status.value == 'paid' %}bg-green-100
+                            {% else %}bg-gray-100{% endif %}">
+                            <span class="text-lg">💧</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-xs font-medium text-gray-500 uppercase">Water Bill</p>
+                            <p class="text-sm font-semibold
+                                {% if current_status.value == 'overdue' %}text-red-700
+                                {% elif current_status.value == 'due_soon' %}text-yellow-700
+                                {% elif current_status.value == 'paid' %}text-green-700
+                                {% else %}text-gray-700{% endif %}">
+                                {% if latest_bill %}${{ "%.2f"|format(latest_bill.amount_due) }}{% else %}No Data{% endif %}
+                            </p>
+                        </div>
                     </div>
-                    {% if latest_bill.late_fees and latest_bill.late_fees > 0 %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Late Fees</dt>
-                        <dd class="mt-1 text-sm text-red-600">${{ "%.2f"|format(latest_bill.late_fees) }}</dd>
+                </div>
+            </div>
+
+            <!-- Section 8 / PHA Info (if applicable) -->
+            {% if has_section8_tenant %}
+            {% set section8_tenants = active_tenants | selectattr('is_section8', 'true') | list %}
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <span class="text-xl mr-3">🏛️</span>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-semibold text-purple-900">Section 8 Property</h4>
+                        <p class="text-sm text-purple-700 mt-1">
+                            {{ section8_tenants|length }} tenant{{ 's' if section8_tenants|length > 1 else '' }} with housing voucher{{ 's' if section8_tenants|length > 1 else '' }}
+                        </p>
+                        {% for tenant in section8_tenants %}
+                        {% if tenant.pha %}
+                        <p class="text-xs text-purple-600 mt-1">PHA: {{ tenant.pha.name }}</p>
+                        {% endif %}
+                        {% if tenant.voucher_amount %}
+                        <p class="text-xs text-purple-600">Voucher: ${{ "%.2f"|format(tenant.voucher_amount) }}/mo</p>
+                        {% endif %}
+                        {% endfor %}
                     </div>
-                    {% endif %}
-                    {% if latest_bill.water_usage_gallons %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Water Usage</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ "{:,}".format(latest_bill.water_usage_gallons) }} gallons</dd>
-                    </div>
-                    {% endif %}
-                </dl>
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <a href="https://bsaonline.com/?uid=305" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-500 text-sm">
-                        Pay on BSA Online &rarr;
+                    <a href="#" onclick="showTab('tenants'); return false;" class="text-xs text-purple-600 hover:text-purple-800 font-medium">View Details →</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TAB: Tenants -->
+        <div id="panel-tenants" class="tab-panel hidden space-y-6">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-base font-semibold text-gray-900">Tenants</h3>
+                    <a href="/tenants/new?property_id={{ property.id }}" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500">
+                        + Add Tenant
                     </a>
                 </div>
-                {% else %}
-                <p class="text-gray-500">No bill data available. Try refreshing bills.</p>
-                {% endif %}
+                <div class="divide-y divide-gray-100">
+                    {% if active_tenants %}
+                    {% for tenant in active_tenants %}
+                    <div class="px-5 py-4 flex items-center justify-between hover:bg-gray-50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
+                                {{ tenant.name[0]|upper }}
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm font-medium text-gray-900">{{ tenant.name }}</p>
+                                    {% if tenant.is_primary %}
+                                    <span class="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">Primary</span>
+                                    {% endif %}
+                                    {% if tenant.is_section8 %}
+                                    <span class="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Section 8</span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center gap-3 mt-0.5">
+                                    {% if tenant.phone %}
+                                    <p class="text-xs text-gray-500">📱 {{ tenant.phone }}</p>
+                                    {% endif %}
+                                    {% if tenant.email %}
+                                    <p class="text-xs text-gray-500">✉️ {{ tenant.email }}</p>
+                                    {% endif %}
+                                </div>
+                                {% if tenant.is_section8 and tenant.pha %}
+                                <p class="text-xs text-purple-600 mt-1">🏛️ {{ tenant.pha.name }}{% if tenant.voucher_amount %} · ${{ "%.2f"|format(tenant.voucher_amount) }}/mo{% endif %}</p>
+                                {% endif %}
+                                {% if tenant.move_in_date %}
+                                <p class="text-xs text-gray-400 mt-1">Move-in: {{ tenant.move_in_date.strftime('%b %d, %Y') }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <a href="/tenants/{{ tenant.id }}/edit" class="text-gray-400 hover:text-gray-600 p-2">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
+                        </a>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="px-5 py-12 text-center">
+                        <span class="text-4xl">👤</span>
+                        <p class="mt-2 text-sm text-gray-500">No tenants assigned to this property</p>
+                        <a href="/tenants/new?property_id={{ property.id }}" class="inline-flex items-center mt-3 text-sm font-medium text-blue-600 hover:text-blue-500">
+                            + Add first tenant
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <!-- Bill History -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">Bill History</h3>
+        <!-- TAB: Compliance -->
+        <div id="panel-compliance" class="tab-panel hidden space-y-6">
+            <!-- Rental License -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">📜 Rental License</h3>
+                    {% if property.has_rental_license %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Licensed</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if property.has_rental_license %}
+                    <dl class="grid grid-cols-2 gap-4">
+                        {% if property.rental_license_number %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">License Number</dt>
+                            <dd class="mt-1 text-sm text-gray-900 font-mono">{{ property.rental_license_number }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.rental_license_issued %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Issue Date</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ property.rental_license_issued.strftime('%b %d, %Y') }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.rental_license_expiry %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Expiration</dt>
+                            <dd class="mt-1 text-sm {% if property.rental_license_expiry < today %}text-red-600 font-semibold{% else %}text-gray-900{% endif %}">
+                                {{ property.rental_license_expiry.strftime('%b %d, %Y') }}
+                                {% if property.rental_license_expiry < today %} — EXPIRED{% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No rental license on file. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Add license info →</a></p>
+                    {% endif %}
+                </div>
             </div>
+
+            <!-- City Certification -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">🏛️ City Certification</h3>
+                    {% if property.has_city_certification %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Certified</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Certified</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if property.has_city_certification %}
+                    <dl class="grid grid-cols-2 gap-4">
+                        {% if property.city_certification_date %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Certification Date</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ property.city_certification_date.strftime('%b %d, %Y') }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.city_certification_expiry %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Expiration</dt>
+                            <dd class="mt-1 text-sm {% if property.city_certification_expiry < today %}text-red-600 font-semibold{% else %}text-gray-900{% endif %}">
+                                {{ property.city_certification_expiry.strftime('%b %d, %Y') }}
+                                {% if property.city_certification_expiry < today %} — EXPIRED{% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No city certification on file. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Add certification →</a></p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Section 8 Inspection -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">🔍 Section 8 Inspection</h3>
+                    {% if property.section8_inspection_status == 'passed' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Passed</span>
+                    {% elif property.section8_inspection_status == 'failed' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Failed</span>
+                    {% elif property.section8_inspection_status == 'scheduled' %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
+                    {% elif property.section8_inspection_status == 'pending' %}
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">Pending</span>
+                    {% elif property.section8_inspection_status == 'reinspection' %}
+                    <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">Re-inspection</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if property.section8_inspection_status %}
+                    <dl class="grid grid-cols-2 gap-4">
+                        {% if property.section8_inspection_date %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Inspection Date</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ property.section8_inspection_date.strftime('%b %d, %Y') }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.section8_inspection_notes %}
+                        <div class="col-span-2">
+                            <dt class="text-xs font-medium text-gray-500">Notes</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ property.section8_inspection_notes }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No inspection scheduled. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Schedule inspection →</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Utilities -->
+        <div id="panel-utilities" class="tab-panel hidden space-y-6">
+            <!-- Current Water Bill -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">💧</span>
+                        <h3 class="text-base font-semibold text-gray-900">Water Bill</h3>
+                        <span class="text-xs text-gray-400">via BSA Online</span>
+                    </div>
+                    {% if current_status.value == 'overdue' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Overdue</span>
+                    {% elif current_status.value == 'due_soon' %}
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">Due Soon</span>
+                    {% elif current_status.value == 'current' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Current</span>
+                    {% elif current_status.value == 'paid' %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Paid</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if latest_bill %}
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <p class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(latest_bill.amount_due) }}</p>
+                            <p class="text-xs text-gray-500">Amount Due</p>
+                        </div>
+                        <div class="text-right">
+                            {% if latest_bill.due_date %}
+                            <p class="text-sm font-medium text-gray-900">{{ latest_bill.due_date.strftime('%b %d, %Y') }}</p>
+                            <p class="text-xs text-gray-500">Due Date</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <dl class="grid grid-cols-3 gap-4 text-center py-3 border-t border-b border-gray-100">
+                        <div>
+                            <dt class="text-xs text-gray-500">Current</dt>
+                            <dd class="text-sm font-medium text-gray-900">${{ "%.2f"|format(latest_bill.current_charges or 0) }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-gray-500">Previous</dt>
+                            <dd class="text-sm font-medium text-gray-900">${{ "%.2f"|format(latest_bill.previous_balance or 0) }}</dd>
+                        </div>
+                        {% if latest_bill.late_fees and latest_bill.late_fees > 0 %}
+                        <div>
+                            <dt class="text-xs text-gray-500">Late Fees</dt>
+                            <dd class="text-sm font-medium text-red-600">${{ "%.2f"|format(latest_bill.late_fees) }}</dd>
+                        </div>
+                        {% else %}
+                        <div>
+                            <dt class="text-xs text-gray-500">Usage</dt>
+                            <dd class="text-sm font-medium text-gray-900">{% if latest_bill.water_usage_gallons %}{{ "{:,}".format(latest_bill.water_usage_gallons) }} gal{% else %}-{% endif %}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    <div class="mt-4 flex items-center justify-between">
+                        <a href="https://bsaonline.com/?uid=305" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500">
+                            Pay on BSA Online →
+                        </a>
+                        <button hx-post="/api/properties/{{ property.id }}/refresh" hx-swap="none" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
+                            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-6">
+                        <span class="text-3xl">💧</span>
+                        <p class="mt-2 text-sm text-gray-500">No bill data available</p>
+                        <button hx-post="/api/properties/{{ property.id }}/refresh" hx-swap="none" class="inline-flex items-center mt-3 text-sm font-medium text-blue-600 hover:text-blue-500">
+                            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Fetch Bill Data
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bill History -->
             {% if bills %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statement</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for bill in bills %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ bill.statement_date.strftime('%b %d, %Y') if bill.statement_date else 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                ${{ "%.2f"|format(bill.amount_due) }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                {% set bill_status = bill.calculate_status() %}
-                                {% if bill_status.value == 'overdue' %}
-                                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
-                                {% elif bill_status.value == 'due_soon' %}
-                                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Due Soon</span>
-                                {% elif bill_status.value == 'current' %}
-                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Current</span>
-                                {% elif bill_status.value == 'paid' %}
-                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Paid</span>
-                                {% else %}
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">-</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="px-4 py-8 text-center text-gray-500">
-                <p>No bill history available</p>
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h3 class="text-base font-semibold text-gray-900">Bill History</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statement</th>
+                                <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due</th>
+                                <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th class="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for bill in bills %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {{ bill.statement_date.strftime('%b %d, %Y') if bill.statement_date else '-' }}
+                                </td>
+                                <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else '-' }}
+                                </td>
+                                <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                                    ${{ "%.2f"|format(bill.amount_due) }}
+                                </td>
+                                <td class="px-5 py-3 whitespace-nowrap text-center">
+                                    {% set bill_status = bill.calculate_status() %}
+                                    {% if bill_status.value == 'overdue' %}
+                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
+                                    {% elif bill_status.value == 'due_soon' %}
+                                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Due Soon</span>
+                                    {% elif bill_status.value == 'current' %}
+                                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Current</span>
+                                    {% elif bill_status.value == 'paid' %}
+                                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Paid</span>
+                                    {% else %}
+                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="space-y-6">
-        <!-- Property Details -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">🏠 Property Details</h3>
-            </div>
-            <div class="px-4 py-5 sm:p-6">
-                <dl class="space-y-4">
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Address</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.address }}</dd>
-                    </div>
-                    {% if property.city or property.state or property.zip_code %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">City/State/ZIP</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.city or '' }}{% if property.city and property.state %}, {% endif %}{{ property.state or '' }} {{ property.zip_code or '' }}</dd>
-                    </div>
-                    {% endif %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">BSA Account</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.bsa_account_number }}</dd>
-                    </div>
-                    {% if property.parcel_number %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Parcel Number</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.parcel_number }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if property.bedrooms or property.bathrooms or property.square_feet %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Specs</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            {% if property.bedrooms %}{{ property.bedrooms }} bed{% endif %}
-                            {% if property.bathrooms %} / {{ property.bathrooms }} bath{% endif %}
-                            {% if property.square_feet %} / {{ "{:,}".format(property.square_feet) }} sqft{% endif %}
-                        </dd>
-                    </div>
-                    {% endif %}
-                    {% if property.year_built %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Year Built</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.year_built }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if property.property_type %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Type</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.property_type }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if property.owner_name %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Owner</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ property.owner_name }}</dd>
-                    </div>
-                    {% endif %}
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Status</dt>
-                        <dd class="mt-1 flex gap-2">
-                            {% if property.is_active %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Active</span>
-                            {% else %}
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">Inactive</span>
-                            {% endif %}
-                            {% if property.is_vacant %}
-                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">Vacant</span>
-                            {% else %}
-                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Occupied</span>
-                            {% endif %}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
-        </div>
-
-        <!-- Licensing & Certifications -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">📜 Licensing & Certifications</h3>
-            </div>
-            <div class="px-4 py-5 sm:p-6">
-                <dl class="space-y-4">
-                    <!-- City Certification -->
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">🏛️ City Certification</dt>
-                        <dd class="mt-1">
-                            {% if property.has_city_certification %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">✅ Certified</span>
-                            {% if property.city_certification_date %}
-                            <p class="text-xs text-gray-500 mt-1">Issued: {{ property.city_certification_date.strftime('%b %d, %Y') }}</p>
-                            {% endif %}
-                            {% if property.city_certification_expiry %}
-                            <p class="text-xs {% if property.city_certification_expiry < today %}text-red-600{% else %}text-gray-500{% endif %} mt-1">
-                                Expires: {{ property.city_certification_expiry.strftime('%b %d, %Y') }}
-                                {% if property.city_certification_expiry < today %} (EXPIRED){% endif %}
-                            </p>
-                            {% endif %}
-                            {% else %}
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Not Certified</span>
-                            {% endif %}
-                        </dd>
-                    </div>
-
-                    <!-- Rental License -->
-                    <div class="pt-3 border-t border-gray-100">
-                        <dt class="text-sm font-medium text-gray-500">📋 Rental License</dt>
-                        <dd class="mt-1">
-                            {% if property.has_rental_license %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">✅ Licensed</span>
-                            {% if property.rental_license_number %}
-                            <p class="text-xs text-gray-500 mt-1">License #: {{ property.rental_license_number }}</p>
-                            {% endif %}
-                            {% if property.rental_license_issued %}
-                            <p class="text-xs text-gray-500 mt-1">Issued: {{ property.rental_license_issued.strftime('%b %d, %Y') }}</p>
-                            {% endif %}
-                            {% if property.rental_license_expiry %}
-                            <p class="text-xs {% if property.rental_license_expiry < today %}text-red-600{% else %}text-gray-500{% endif %} mt-1">
-                                Expires: {{ property.rental_license_expiry.strftime('%b %d, %Y') }}
-                                {% if property.rental_license_expiry < today %} (EXPIRED){% endif %}
-                            </p>
-                            {% endif %}
-                            {% else %}
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">No License</span>
-                            {% endif %}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
-        </div>
-
-        <!-- Section 8 Inspection -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">🔍 Section 8 Inspection</h3>
-            </div>
-            <div class="px-4 py-5 sm:p-6">
-                {% if property.section8_inspection_status %}
-                <div class="mb-3">
-                    {% if property.section8_inspection_status == 'passed' %}
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">✅ Passed</span>
-                    {% elif property.section8_inspection_status == 'failed' %}
-                    <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">❌ Failed</span>
-                    {% elif property.section8_inspection_status == 'scheduled' %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">📅 Scheduled</span>
-                    {% elif property.section8_inspection_status == 'pending' %}
-                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700">⏳ Pending</span>
-                    {% elif property.section8_inspection_status == 'reinspection' %}
-                    <span class="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-700">🔄 Re-inspection Needed</span>
-                    {% else %}
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">{{ property.section8_inspection_status }}</span>
-                    {% endif %}
-                </div>
-                {% if property.section8_inspection_date %}
-                <p class="text-sm text-gray-600">
-                    <span class="font-medium">Date:</span> {{ property.section8_inspection_date.strftime('%B %d, %Y') }}
-                </p>
+    <!-- Right Sidebar - Operations Panel -->
+    <div class="space-y-4">
+        <!-- Compliance Alerts (if any) -->
+        {% set has_expired_license = property.has_rental_license and property.rental_license_expiry and property.rental_license_expiry < today %}
+        {% set has_expired_cert = property.has_city_certification and property.city_certification_expiry and property.city_certification_expiry < today %}
+        {% set has_failed_inspection = property.section8_inspection_status == 'failed' %}
+        {% if has_expired_license or has_expired_cert or has_failed_inspection or current_status.value == 'overdue' %}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 class="text-sm font-semibold text-red-800 flex items-center gap-2">
+                <span>⚠️</span> Action Required
+            </h4>
+            <ul class="mt-2 space-y-1 text-sm text-red-700">
+                {% if has_expired_license %}
+                <li>• Rental license expired</li>
                 {% endif %}
-                {% if property.section8_inspection_notes %}
-                <p class="text-sm text-gray-500 mt-2">
-                    <span class="font-medium">Notes:</span> {{ property.section8_inspection_notes }}
-                </p>
+                {% if has_expired_cert %}
+                <li>• City certification expired</li>
                 {% endif %}
-                {% else %}
-                <p class="text-sm text-gray-500">No Section 8 inspection scheduled</p>
+                {% if has_failed_inspection %}
+                <li>• Section 8 inspection failed</li>
                 {% endif %}
-            </div>
+                {% if current_status.value == 'overdue' %}
+                <li>• Water bill overdue (${{ "%.2f"|format(latest_bill.amount_due) }})</li>
+                {% endif %}
+            </ul>
         </div>
-
-        <!-- Tenants -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">Tenants</h3>
-                <a href="/tenants/new?property_id={{ property.id }}" class="text-sm text-blue-600 hover:text-blue-500">Add</a>
-            </div>
-            <div class="px-4 py-5 sm:p-6">
-                {% if active_tenants %}
-                <ul class="divide-y divide-gray-200 -my-4">
-                    {% for tenant in active_tenants %}
-                    <li class="py-3">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-900">
-                                    {{ tenant.name }}
-                                    {% if tenant.is_primary %}
-                                    <span class="text-xs text-blue-600">(Primary)</span>
-                                    {% endif %}
-                                </p>
-                                {% if tenant.phone %}
-                                <p class="text-xs text-gray-500">{{ tenant.phone }}</p>
-                                {% endif %}
-                            </div>
-                            <a href="/tenants/{{ tenant.id }}/edit" class="text-gray-400 hover:text-gray-600">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                                </svg>
-                            </a>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p class="text-sm text-gray-500">No tenants assigned</p>
-                {% endif %}
-            </div>
-        </div>
+        {% endif %}
 
         <!-- Quick Actions -->
         <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">Actions</h3>
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h4 class="text-sm font-semibold text-gray-900">Quick Actions</h4>
             </div>
-            <div class="px-4 py-5 sm:p-6 space-y-3">
-                <button hx-post="/api/properties/{{ property.id }}/refresh"
-                        hx-swap="none"
-                        class="w-full inline-flex justify-center items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
-                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                    Refresh Bill Data
-                </button>
-                <a href="/notifications/compose?property_id={{ property.id }}"
-                   class="w-full inline-flex justify-center items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
-                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                    </svg>
-                    Send Notification
+            <div class="p-3 space-y-2">
+                <a href="/tenants/new?property_id={{ property.id }}" class="w-full inline-flex items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500">
+                    <span class="mr-2">👤</span> Add Tenant
                 </a>
-                <form action="/properties/{{ property.id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to deactivate this property? It will be hidden but can be restored.')">
-                    <button type="submit" class="w-full inline-flex justify-center items-center rounded-md bg-yellow-100 px-3 py-2 text-sm font-semibold text-yellow-700 shadow-sm hover:bg-yellow-200">
-                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
-                        Deactivate Property
+                <a href="/notifications/compose?property_id={{ property.id }}" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    <span class="mr-2">📧</span> Send Notification
+                </a>
+                <button hx-post="/api/properties/{{ property.id }}/refresh" hx-swap="none" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    <span class="mr-2">🔄</span> Refresh Bills
+                </button>
+            </div>
+        </div>
+
+        <!-- Tenants Summary -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h4 class="text-sm font-semibold text-gray-900">Tenants</h4>
+                <a href="#" onclick="showTab('tenants'); return false;" class="text-xs text-blue-600 hover:text-blue-500">View all</a>
+            </div>
+            <div class="p-3">
+                {% if active_tenants %}
+                <ul class="space-y-2">
+                    {% for tenant in active_tenants[:3] %}
+                    <li class="flex items-center gap-2 text-sm">
+                        <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600">{{ tenant.name[0]|upper }}</div>
+                        <span class="text-gray-900 truncate">{{ tenant.name }}</span>
+                        {% if tenant.is_section8 %}
+                        <span class="text-purple-600 text-xs">S8</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                    {% if active_tenants|length > 3 %}
+                    <li class="text-xs text-gray-500">+{{ active_tenants|length - 3 }} more</li>
+                    {% endif %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500">No tenants</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Compliance Status -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h4 class="text-sm font-semibold text-gray-900">Compliance</h4>
+            </div>
+            <div class="p-3 space-y-3">
+                <!-- License -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Rental License</span>
+                    {% if property.has_rental_license %}
+                    <span class="text-xs font-medium {% if has_expired_license %}text-red-600{% else %}text-green-600{% endif %}">
+                        {% if has_expired_license %}Expired{% else %}Active{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">None</span>
+                    {% endif %}
+                </div>
+                <!-- Certification -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">City Cert</span>
+                    {% if property.has_city_certification %}
+                    <span class="text-xs font-medium {% if has_expired_cert %}text-red-600{% else %}text-green-600{% endif %}">
+                        {% if has_expired_cert %}Expired{% else %}Active{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">None</span>
+                    {% endif %}
+                </div>
+                <!-- Inspection -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Inspection</span>
+                    {% if property.section8_inspection_status %}
+                    <span class="text-xs font-medium
+                        {% if property.section8_inspection_status == 'passed' %}text-green-600
+                        {% elif property.section8_inspection_status == 'failed' %}text-red-600
+                        {% else %}text-yellow-600{% endif %}">
+                        {{ property.section8_inspection_status|capitalize }}
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">N/A</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="px-3 pb-3">
+                <a href="#" onclick="showTab('compliance'); return false;" class="block text-center text-xs text-blue-600 hover:text-blue-500 py-1">View Details →</a>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <details class="bg-white shadow rounded-lg">
+            <summary class="px-4 py-3 text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700">
+                Danger Zone
+            </summary>
+            <div class="p-3 space-y-2 border-t border-gray-100">
+                <form action="/properties/{{ property.id }}/delete" method="POST" onsubmit="return confirm('Deactivate this property? It will be hidden but can be restored.')">
+                    <button type="submit" class="w-full inline-flex items-center justify-center rounded-md bg-yellow-50 px-3 py-2 text-sm font-medium text-yellow-700 ring-1 ring-inset ring-yellow-200 hover:bg-yellow-100">
+                        Deactivate
                     </button>
                 </form>
-                <form action="/properties/{{ property.id }}/delete-permanent" method="POST" onsubmit="return confirm('⚠️ PERMANENT DELETE ⚠️\n\nThis will permanently remove this property and ALL associated data (bills, tenants, etc.).\n\nThis action CANNOT be undone.\n\nAre you absolutely sure?')">
-                    <button type="submit" class="w-full inline-flex justify-center items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700">
-                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                        </svg>
+                <form action="/properties/{{ property.id }}/delete-permanent" method="POST" onsubmit="return confirm('⚠️ PERMANENT DELETE\n\nThis removes all data and cannot be undone.\n\nContinue?')">
+                    <button type="submit" class="w-full inline-flex items-center justify-center rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-100">
                         Delete Permanently
                     </button>
                 </form>
             </div>
-        </div>
+        </details>
     </div>
 </div>
+
+<script>
+function showTab(tabName) {
+    // Hide all panels
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.add('hidden');
+    });
+
+    // Remove active state from all tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    // Show selected panel
+    document.getElementById('panel-' + tabName).classList.remove('hidden');
+
+    // Activate selected tab
+    const activeTab = document.getElementById('tab-' + tabName);
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+    activeTab.classList.add('border-blue-500', 'text-blue-600');
+}
+</script>
 {% endblock %}
