@@ -225,7 +225,7 @@ async def property_detail(request: Request, property_id: int):
             .where(Property.id == property_id)
             .options(
                 selectinload(Property.bills),
-                selectinload(Property.tenants),
+                selectinload(Property.tenants).selectinload(Tenant.pha),
                 selectinload(Property.taxes)
             )
         )
