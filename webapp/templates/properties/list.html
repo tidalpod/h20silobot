@@ -53,6 +53,7 @@
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Status</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Balance</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-16"></th>
@@ -120,6 +121,28 @@
                                 {% endif %}
                             </div>
                         </div>
+                    </div>
+                </td>
+
+                <!-- Property Details -->
+                <td class="px-4 py-4 text-center">
+                    <div class="text-xs text-gray-500 space-y-0.5">
+                        {% if item.property.bedrooms or item.property.bathrooms %}
+                        <div>
+                            {% if item.property.bedrooms %}<span class="font-medium">{{ item.property.bedrooms }}</span> bd{% endif %}
+                            {% if item.property.bedrooms and item.property.bathrooms %} · {% endif %}
+                            {% if item.property.bathrooms %}<span class="font-medium">{{ item.property.bathrooms|int if item.property.bathrooms == item.property.bathrooms|int else item.property.bathrooms }}</span> ba{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if item.property.square_feet %}
+                        <div><span class="font-medium">{{ "{:,}".format(item.property.square_feet) }}</span> sf</div>
+                        {% endif %}
+                        {% if item.property.year_built %}
+                        <div class="text-gray-400">{{ item.property.year_built }}</div>
+                        {% endif %}
+                        {% if not item.property.bedrooms and not item.property.bathrooms and not item.property.square_feet and not item.property.year_built %}
+                        <span class="text-gray-300">—</span>
+                        {% endif %}
                     </div>
                 </td>
 
