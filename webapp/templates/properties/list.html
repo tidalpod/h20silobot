@@ -75,14 +75,15 @@
                             {% endif %}
                             <!-- Status Badges -->
                             <div class="flex flex-wrap gap-1 mt-1">
-                                <!-- Vacant/Occupied -->
-                                {% if item.property.is_vacant %}
-                                <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700" title="Vacant">
-                                    🔑 Vacant
+                                <!-- Vacant/Occupied - based on active tenant records -->
+                                {% set active_tenants = item.property.tenants | selectattr('is_active', 'true') | list %}
+                                {% if active_tenants | length > 0 %}
+                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700" title="Occupied - {{ active_tenants | length }} tenant(s)">
+                                    👥 Occupied ({{ active_tenants | length }})
                                 </span>
                                 {% else %}
-                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700" title="Occupied">
-                                    👥 Occupied
+                                <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700" title="Vacant - No tenants">
+                                    🔑 Vacant
                                 </span>
                                 {% endif %}
 

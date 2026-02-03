@@ -31,7 +31,10 @@ async def list_properties(
         return RedirectResponse(url="/login", status_code=303)
 
     async with get_session() as session:
-        query = select(Property).options(selectinload(Property.bills))
+        query = select(Property).options(
+            selectinload(Property.bills),
+            selectinload(Property.tenants)
+        )
 
         if search:
             query = query.where(
