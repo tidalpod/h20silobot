@@ -403,3 +403,25 @@ async def delete_property(request: Request, property_id: int):
         await session.commit()
 
     return RedirectResponse(url="/properties", status_code=303)
+
+
+@router.post("/{property_id}/delete-permanent")
+async def delete_property_permanent(request: Request, property_id: int):
+    """Permanently delete a property and all associated data"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        await session.delete(prop)
+        await session.commit()
+
+    return RedirectResponse(url="/properties", status_code=303)
