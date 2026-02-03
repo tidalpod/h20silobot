@@ -25,6 +25,20 @@ def get_main_menu_keyboard():
     ])
 
 
+async def chatid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /chatid command - shows the chat ID for this chat"""
+    chat = update.effective_chat
+
+    await update.message.reply_text(
+        f"📍 *Chat Info*\n\n"
+        f"*Chat ID:* `{chat.id}`\n"
+        f"*Type:* {chat.type}\n"
+        f"*Title:* {chat.title or 'N/A'}\n\n"
+        f"_Add this ID to `BLUEDEER_GROUP_CHAT_ID` to receive group notifications._",
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
@@ -406,6 +420,7 @@ def setup_handlers(application):
     """Set up all bot handlers"""
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("chatid", chatid_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("recerts", recerts_command))
     application.add_handler(CommandHandler("bills", bills_command))

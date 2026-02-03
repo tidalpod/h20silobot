@@ -38,6 +38,7 @@ async def main():
     # Get configuration from environment
     token = os.getenv("BLUEDEER_BOT_TOKEN")
     admin_id = os.getenv("BLUEDEER_ADMIN_TELEGRAM_ID", "")
+    group_id = os.getenv("BLUEDEER_GROUP_CHAT_ID", "")
     water_threshold = float(os.getenv("WATER_BILL_THRESHOLD", "100"))
     recert_days = int(os.getenv("RECERT_REMINDER_DAYS", "30"))
 
@@ -47,6 +48,7 @@ async def main():
 
     logger.info(f"BLUEDEER_BOT_TOKEN set: {bool(token)}")
     logger.info(f"BLUEDEER_ADMIN_TELEGRAM_ID: {admin_id or 'Not set'}")
+    logger.info(f"BLUEDEER_GROUP_CHAT_ID: {group_id or 'Not set'}")
     logger.info(f"WATER_BILL_THRESHOLD: ${water_threshold}")
     logger.info(f"RECERT_REMINDER_DAYS: {recert_days}")
 
@@ -55,6 +57,7 @@ async def main():
     bot = BlueDeerBot(
         token=token,
         admin_chat_id=int(admin_id) if admin_id else None,
+        group_chat_id=int(group_id) if group_id else None,
         water_bill_threshold=water_threshold,
         recert_reminder_days=recert_days
     )

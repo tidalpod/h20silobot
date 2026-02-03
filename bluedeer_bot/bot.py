@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 class BlueDeerBot:
     """Blue Deer notification bot"""
 
-    def __init__(self, token: str, admin_chat_id: int = None,
+    def __init__(self, token: str, admin_chat_id: int = None, group_chat_id: int = None,
                  water_bill_threshold: float = 100, recert_reminder_days: int = 30):
         self.token = token
         self.admin_chat_id = admin_chat_id
+        self.group_chat_id = group_chat_id
         self.water_bill_threshold = water_bill_threshold
         self.recert_reminder_days = recert_reminder_days
         self.application: Optional[Application] = None
@@ -140,13 +141,17 @@ class BlueDeerBot:
 
         logger.info("Scheduled jobs configured")
 
-    async def get_admin_chat_ids(self) -> List[int]:
-        """Get list of admin Telegram IDs to send notifications to"""
+    async def get_notification_chat_ids(self) -> List[int]:
+        """Get list of chat IDs to send notifications to (admins + group)"""
         chat_ids = []
 
         # Primary admin from config
         if self.admin_chat_id:
             chat_ids.append(self.admin_chat_id)
+
+        # Group chat if configured
+        if self.group_chat_id:
+            chat_ids.append(self.group_chat_id)
 
         # Also get admins from TelegramUser table
         try:
@@ -171,11 +176,11 @@ class BlueDeerBot:
         return chat_ids
 
     async def send_notification(self, message: str, chat_id: int = None):
-        """Send notification to specified chat or all admins"""
+        """Send notification to specified chat or all configured chats"""
         if chat_id:
             chat_ids = [chat_id]
         else:
-            chat_ids = await self.get_admin_chat_ids()
+            chat_ids = await self.get_notification_chat_ids()
 
         if not chat_ids:
             logger.warning("No admin chat IDs configured for notifications")
