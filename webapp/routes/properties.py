@@ -53,16 +53,28 @@ async def list_properties(
             else:
                 bill_status = BillStatus.UNKNOWN
 
+            # Compute operational status
+            active_tenants = [t for t in prop.tenants if t.is_active]
+            is_vacant = len(active_tenants) == 0
+            no_license = not prop.has_rental_license
+            failed_inspection = prop.section8_inspection_status == 'failed'
+            needs_attention = is_vacant or no_license or failed_inspection
+
             if status:
-                if status == "overdue" and bill_status == BillStatus.OVERDUE:
+                if status == "attention" and prop.is_active and needs_attention:
+                    properties.append({"property": prop, "status": bill_status})
+                elif status == "vacant" and prop.is_active and is_vacant:
+                    properties.append({"property": prop, "status": bill_status})
+                elif status == "inactive" and not prop.is_active:
+                    properties.append({"property": prop, "status": bill_status})
+                # Legacy filters (kept for compatibility)
+                elif status == "overdue" and bill_status == BillStatus.OVERDUE:
                     properties.append({"property": prop, "status": bill_status})
                 elif status == "due_soon" and bill_status == BillStatus.DUE_SOON:
                     properties.append({"property": prop, "status": bill_status})
                 elif status == "current" and bill_status == BillStatus.CURRENT:
                     properties.append({"property": prop, "status": bill_status})
                 elif status == "paid" and bill_status == BillStatus.PAID:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "inactive" and not prop.is_active:
                     properties.append({"property": prop, "status": bill_status})
             else:
                 if prop.is_active:
