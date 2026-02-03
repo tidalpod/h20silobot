@@ -56,6 +56,7 @@
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Status</th>
+                <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Rent</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Water Bill</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-16"></th>
             </tr>
@@ -179,6 +180,29 @@
                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100" title="OK">
                         <span class="text-sm">🟢</span>
                     </span>
+                    {% endif %}
+                </td>
+
+                <!-- Rent -->
+                <td class="px-4 py-4 text-right">
+                    {% if active_tenants %}
+                    {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+                    {% set rent_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+                    {% if rent_tenant.is_section8 and (rent_tenant.voucher_amount or rent_tenant.tenant_portion) %}
+                        {% set voucher = rent_tenant.voucher_amount|float if rent_tenant.voucher_amount else 0 %}
+                        {% set portion = rent_tenant.tenant_portion|float if rent_tenant.tenant_portion else 0 %}
+                        {% set total_rent = voucher + portion %}
+                        <div class="text-sm font-semibold text-gray-900">${{ "%.0f"|format(total_rent) }}<span class="text-xs font-normal text-gray-400">/mo</span></div>
+                        <div class="text-xs text-gray-400" title="Voucher: ${{ "%.0f"|format(voucher) }} + Tenant: ${{ "%.0f"|format(portion) }}">
+                            S8: ${{ "%.0f"|format(voucher) }} + ${{ "%.0f"|format(portion) }}
+                        </div>
+                    {% elif rent_tenant.current_rent %}
+                        <div class="text-sm font-semibold text-gray-900">${{ "%.0f"|format(rent_tenant.current_rent|float) }}<span class="text-xs font-normal text-gray-400">/mo</span></div>
+                    {% else %}
+                        <span class="text-sm text-gray-300">—</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-sm text-gray-300">—</span>
                     {% endif %}
                 </td>
 
