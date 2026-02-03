@@ -2,6 +2,7 @@
 
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -107,9 +108,9 @@ async def create_tenant(
     move_in_date: str = Form(""),
     notes: str = Form(""),
     is_section8: bool = Form(False),
-    pha_id: int = Form(None),
-    voucher_amount: float = Form(None),
-    tenant_portion: float = Form(None),
+    pha_id: str = Form(""),
+    voucher_amount: str = Form(""),
+    tenant_portion: str = Form(""),
     lease_start_date: str = Form(""),
     lease_end_date: str = Form("")
 ):
@@ -162,6 +163,11 @@ async def create_tenant(
             except ValueError:
                 pass
 
+        # Parse optional numeric fields
+        parsed_pha_id = int(pha_id) if pha_id and pha_id.strip() else None
+        parsed_voucher = Decimal(voucher_amount) if voucher_amount and voucher_amount.strip() else None
+        parsed_tenant_portion = Decimal(tenant_portion) if tenant_portion and tenant_portion.strip() else None
+
         # Create tenant
         tenant = Tenant(
             property_id=property_id,
@@ -175,9 +181,9 @@ async def create_tenant(
             lease_end_date=lease_end,
             notes=notes or None,
             is_section8=is_section8,
-            pha_id=pha_id if is_section8 and pha_id else None,
-            voucher_amount=Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None,
-            tenant_portion=Decimal(str(tenant_portion)) if is_section8 and tenant_portion else None
+            pha_id=parsed_pha_id if is_section8 else None,
+            voucher_amount=parsed_voucher if is_section8 else None,
+            tenant_portion=parsed_tenant_portion if is_section8 else None
         )
         session.add(tenant)
         await session.commit()
@@ -243,9 +249,9 @@ async def update_tenant(
     move_out_date: str = Form(""),
     notes: str = Form(""),
     is_section8: bool = Form(False),
-    pha_id: int = Form(None),
-    voucher_amount: float = Form(None),
-    tenant_portion: float = Form(None),
+    pha_id: str = Form(""),
+    voucher_amount: str = Form(""),
+    tenant_portion: str = Form(""),
     lease_start_date: str = Form(""),
     lease_end_date: str = Form("")
 ):
@@ -305,6 +311,11 @@ async def update_tenant(
             except ValueError:
                 pass
 
+        # Parse optional numeric fields
+        parsed_pha_id = int(pha_id) if pha_id and pha_id.strip() else None
+        parsed_voucher = Decimal(voucher_amount) if voucher_amount and voucher_amount.strip() else None
+        parsed_tenant_portion = Decimal(tenant_portion) if tenant_portion and tenant_portion.strip() else None
+
         # Update tenant
         tenant.property_id = property_id
         tenant.name = name
@@ -318,9 +329,9 @@ async def update_tenant(
         tenant.lease_end_date = lease_end
         tenant.notes = notes or None
         tenant.is_section8 = is_section8
-        tenant.pha_id = pha_id if is_section8 and pha_id else None
-        tenant.voucher_amount = Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None
-        tenant.tenant_portion = Decimal(str(tenant_portion)) if is_section8 and tenant_portion else None
+        tenant.pha_id = parsed_pha_id if is_section8 else None
+        tenant.voucher_amount = parsed_voucher if is_section8 else None
+        tenant.tenant_portion = parsed_tenant_portion if is_section8 else None
 
         await session.commit()
 
