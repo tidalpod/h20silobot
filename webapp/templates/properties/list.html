@@ -82,39 +82,45 @@
             <tr class="hover:bg-gray-50 transition-colors">
                 <!-- Property Info -->
                 <td class="px-6 py-4">
-                    <div class="flex items-start gap-3">
-                        <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-gray-900 hover:text-blue-600">
-                            {{ item.property.address }}
-                        </a>
-                    </div>
-                    <!-- Tags: Max 3, ordered: Occupancy · Compliance · Section 8 -->
-                    <div class="flex items-center gap-1.5 mt-1.5 text-xs">
-                        {# Tag 1: Occupancy #}
-                        {% if is_vacant %}
-                        <span class="text-amber-600">Vacant</span>
-                        {% else %}
-                        <span class="text-gray-500">Occupied</span>
-                        {% endif %}
+                    <div class="flex items-start gap-2">
+                        <span class="text-lg">🏠</span>
+                        <div>
+                            <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                                {{ item.property.address }}{% if item.property.city %}, {{ item.property.city }}{% endif %}{% if item.property.state %}, {{ item.property.state }}{% endif %}{% if item.property.zip_code %} {{ item.property.zip_code }}{% endif %}
+                            </a>
+                            <!-- Tags: Max 3, ordered: Occupancy · Compliance · Section 8 -->
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                {# Tag 1: Occupancy #}
+                                {% if is_vacant %}
+                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    🔑 Vacant
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                    👥 Occupied ({{ active_tenants|length }})
+                                </span>
+                                {% endif %}
 
-                        {# Tag 2: Compliance #}
-                        {% if no_license %}
-                        <span class="text-gray-300">·</span>
-                        <span class="text-amber-600">No License</span>
-                        {% elif item.property.has_city_certification %}
-                        <span class="text-gray-300">·</span>
-                        <span class="text-gray-500">Certified</span>
-                        {% endif %}
+                                {# Tag 2: Compliance #}
+                                {% if no_license %}
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                    📜 No License
+                                </span>
+                                {% elif item.property.has_rental_license %}
+                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                    📜 Licensed
+                                </span>
+                                {% endif %}
 
-                        {# Tag 3: Section 8 (optional) #}
-                        {% if has_section8 %}
-                        <span class="text-gray-300">·</span>
-                        <span class="text-purple-600">S8</span>
-                        {% endif %}
+                                {# Tag 3: Section 8 (optional) #}
+                                {% if has_section8 %}
+                                <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                                    🏛️ Section 8
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                    <!-- Account number - muted, small -->
-                    <p class="text-[11px] text-gray-400 mt-1" title="BSA Account: {{ item.property.bsa_account_number }}">
-                        {{ item.property.bsa_account_number }}
-                    </p>
                 </td>
 
                 <!-- Computed Status Chip -->
