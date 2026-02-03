@@ -17,6 +17,54 @@
 {% endblock %}
 
 {% block content %}
+<!-- Total Rent Tracker -->
+{% set total_rent = namespace(amount=0, section8=0, regular=0, count=0) %}
+{% for item in properties %}
+    {% set active_tenants = item.property.tenants | selectattr('is_active', 'true') | list %}
+    {% if active_tenants %}
+        {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+        {% set rent_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+        {% if rent_tenant.is_section8 and (rent_tenant.voucher_amount or rent_tenant.tenant_portion) %}
+            {% set voucher = rent_tenant.voucher_amount|float if rent_tenant.voucher_amount else 0 %}
+            {% set portion = rent_tenant.tenant_portion|float if rent_tenant.tenant_portion else 0 %}
+            {% set total_rent.amount = total_rent.amount + voucher + portion %}
+            {% set total_rent.section8 = total_rent.section8 + voucher + portion %}
+            {% set total_rent.count = total_rent.count + 1 %}
+        {% elif rent_tenant.current_rent %}
+            {% set total_rent.amount = total_rent.amount + rent_tenant.current_rent|float %}
+            {% set total_rent.regular = total_rent.regular + rent_tenant.current_rent|float %}
+            {% set total_rent.count = total_rent.count + 1 %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+<div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow mb-6 px-6 py-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <p class="text-blue-100 text-sm font-medium">Total Monthly Rent</p>
+            <p class="text-white text-3xl font-bold">${{ "{:,.0f}".format(total_rent.amount) }}<span class="text-lg font-normal text-blue-200">/mo</span></p>
+        </div>
+        <div class="flex gap-6 text-right">
+            {% if total_rent.section8 > 0 %}
+            <div>
+                <p class="text-blue-200 text-xs">Section 8</p>
+                <p class="text-white text-lg font-semibold">${{ "{:,.0f}".format(total_rent.section8) }}</p>
+            </div>
+            {% endif %}
+            {% if total_rent.regular > 0 %}
+            <div>
+                <p class="text-blue-200 text-xs">Regular</p>
+                <p class="text-white text-lg font-semibold">${{ "{:,.0f}".format(total_rent.regular) }}</p>
+            </div>
+            {% endif %}
+            <div>
+                <p class="text-blue-200 text-xs">Properties</p>
+                <p class="text-white text-lg font-semibold">{{ total_rent.count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filters - Clean and minimal -->
 <div class="bg-white shadow rounded-lg mb-6 px-4 py-3">
     <form method="GET" class="flex flex-wrap gap-3 items-center">
