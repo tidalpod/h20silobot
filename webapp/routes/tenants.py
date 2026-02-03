@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Tenant, Property
+from database.models import Tenant, Property, PHA
 from webapp.auth.dependencies import get_current_user
+from decimal import Decimal
 
 router = APIRouter(tags=["tenants"])
 
@@ -75,6 +76,12 @@ async def new_tenant_form(request: Request, property_id: int = None):
         )
         properties = result.scalars().all()
 
+        # Get PHAs for dropdown
+        result = await session.execute(
+            select(PHA).order_by(PHA.name)
+        )
+        phas = result.scalars().all()
+
     return templates.TemplateResponse(
         "tenants/form.html",
         {
@@ -82,6 +89,7 @@ async def new_tenant_form(request: Request, property_id: int = None):
             "user": user,
             "tenant": None,
             "properties": properties,
+            "phas": phas,
             "selected_property_id": property_id,
             "error": None,
         }
@@ -97,7 +105,10 @@ async def create_tenant(
     email: str = Form(""),
     is_primary: bool = Form(False),
     move_in_date: str = Form(""),
-    notes: str = Form("")
+    notes: str = Form(""),
+    is_section8: bool = Form(False),
+    pha_id: int = Form(None),
+    voucher_amount: float = Form(None)
 ):
     """Create a new tenant"""
     user = await get_current_user(request)
@@ -143,7 +154,10 @@ async def create_tenant(
             is_primary=is_primary,
             is_active=True,
             move_in_date=move_in,
-            notes=notes or None
+            notes=notes or None,
+            is_section8=is_section8,
+            pha_id=pha_id if is_section8 and pha_id else None,
+            voucher_amount=Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None
         )
         session.add(tenant)
         await session.commit()
@@ -160,7 +174,9 @@ async def edit_tenant_form(request: Request, tenant_id: int):
 
     async with get_session() as session:
         result = await session.execute(
-            select(Tenant).where(Tenant.id == tenant_id)
+            select(Tenant)
+            .where(Tenant.id == tenant_id)
+            .options(selectinload(Tenant.pha))
         )
         tenant = result.scalar_one_or_none()
 
@@ -173,6 +189,12 @@ async def edit_tenant_form(request: Request, tenant_id: int):
         )
         properties = result.scalars().all()
 
+        # Get PHAs for dropdown
+        result = await session.execute(
+            select(PHA).order_by(PHA.name)
+        )
+        phas = result.scalars().all()
+
     return templates.TemplateResponse(
         "tenants/form.html",
         {
@@ -180,6 +202,7 @@ async def edit_tenant_form(request: Request, tenant_id: int):
             "user": user,
             "tenant": tenant,
             "properties": properties,
+            "phas": phas,
             "selected_property_id": tenant.property_id,
             "error": None,
         }
@@ -198,7 +221,10 @@ async def update_tenant(
     is_active: bool = Form(True),
     move_in_date: str = Form(""),
     move_out_date: str = Form(""),
-    notes: str = Form("")
+    notes: str = Form(""),
+    is_section8: bool = Form(False),
+    pha_id: int = Form(None),
+    voucher_amount: float = Form(None)
 ):
     """Update a tenant"""
     user = await get_current_user(request)
@@ -252,6 +278,9 @@ async def update_tenant(
         tenant.move_in_date = move_in
         tenant.move_out_date = move_out
         tenant.notes = notes or None
+        tenant.is_section8 = is_section8
+        tenant.pha_id = pha_id if is_section8 and pha_id else None
+        tenant.voucher_amount = Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None
 
         await session.commit()
 

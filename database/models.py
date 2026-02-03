@@ -244,6 +244,7 @@ class Tenant(Base):
 
     id = Column(Integer, primary_key=True)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    pha_id = Column(Integer, ForeignKey("phas.id", ondelete="SET NULL"), nullable=True)
 
     # Contact info
     name = Column(String(255), nullable=False)
@@ -253,6 +254,7 @@ class Tenant(Base):
     # Status
     is_primary = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    is_section8 = Column(Boolean, default=False)  # Whether tenant uses Section 8 voucher
 
     # Dates
     move_in_date = Column(Date, nullable=True)
@@ -263,6 +265,7 @@ class Tenant(Base):
     # Rent info
     current_rent = Column(Numeric(10, 2), nullable=True)
     proposed_rent = Column(Numeric(10, 2), nullable=True)
+    voucher_amount = Column(Numeric(10, 2), nullable=True)  # Section 8 voucher amount
 
     # Notes
     notes = Column(Text, nullable=True)
@@ -273,6 +276,7 @@ class Tenant(Base):
 
     # Relationships
     property_ref = relationship("Property", back_populates="tenants")
+    pha = relationship("PHA", back_populates="tenants")
     notifications = relationship("Notification", back_populates="tenant")
     recertifications = relationship("Recertification", back_populates="tenant")
 
@@ -414,6 +418,7 @@ class PHA(Base):
 
     # Relationships
     recertifications = relationship("Recertification", back_populates="pha")
+    tenants = relationship("Tenant", back_populates="pha")
 
     def __repr__(self):
         return f"<PHA {self.name}>"
