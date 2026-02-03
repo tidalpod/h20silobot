@@ -290,45 +290,6 @@
                 </div>
             </div>
 
-            <!-- Lease Dates Section -->
-            <div>
-                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span>📄</span> Lease Information
-                </h2>
-                <p class="text-sm text-gray-500 mb-4">Used for Section 8 recertification tracking. Recert eligible date is calculated as 9 months after lease start.</p>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label for="lease_start_date" class="block text-sm font-medium text-gray-700 mb-1">Lease Start Date</label>
-                        <input type="date" name="lease_start_date" id="lease_start_date"
-                               value="{{ property.lease_start_date.isoformat() if property and property.lease_start_date else '' }}"
-                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
-                    </div>
-                    <div>
-                        <label for="lease_end_date" class="block text-sm font-medium text-gray-700 mb-1">Lease End Date</label>
-                        <input type="date" name="lease_end_date" id="lease_end_date"
-                               value="{{ property.lease_end_date.isoformat() if property and property.lease_end_date else '' }}"
-                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
-                    </div>
-                </div>
-                {% if property and property.lease_start_date %}
-                <div class="mt-3 p-3 bg-purple-50 rounded-lg">
-                    <p class="text-sm text-purple-700">
-                        <span class="font-medium">📅 Recertification Eligible:</span>
-                        {{ property.recert_eligible_date.strftime('%b %d, %Y') if property.recert_eligible_date else 'N/A' }}
-                        {% if property.days_until_recert is not none %}
-                            {% if property.days_until_recert > 0 %}
-                                <span class="text-purple-500">({{ property.days_until_recert }} days away)</span>
-                            {% elif property.days_until_recert == 0 %}
-                                <span class="text-green-600 font-medium">(Today!)</span>
-                            {% else %}
-                                <span class="text-green-600 font-medium">({{ property.days_until_recert|abs }} days ago - eligible now)</span>
-                            {% endif %}
-                        {% endif %}
-                    </p>
-                </div>
-                {% endif %}
-            </div>
-
             {% if property %}
             <!-- Status Section -->
             <div>
