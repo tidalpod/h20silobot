@@ -8,263 +8,279 @@
         <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
             <span>📊</span> Dashboard
         </h1>
-        <p class="mt-1 text-sm text-gray-500">Welcome back! Here's an overview of your properties.</p>
+        <p class="mt-1 text-sm text-gray-500">Your property operations at a glance.</p>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
-<!-- Stats cards -->
-<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-    <!-- Total Properties -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100">
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+    <!-- 1. Properties -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
         <div class="p-5">
             <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-blue-100 rounded-xl">
+                <div class="flex-shrink-0 p-3 bg-blue-50 rounded-xl">
                     <span class="text-2xl">🏠</span>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Total Properties</dt>
-                        <dd class="text-2xl font-bold text-gray-900">{{ total_properties }}</dd>
-                    </dl>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Properties</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_properties }}</p>
                 </div>
             </div>
         </div>
-        <div class="bg-gray-50 px-5 py-3 border-t border-gray-100">
-            <a href="/properties" class="text-sm font-medium text-blue-600 hover:text-blue-500 flex items-center gap-1">
-                View all <span>→</span>
-            </a>
+        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
+            <p class="text-xs text-gray-500">
+                <span class="text-blue-600 font-medium">{{ occupied_count }} occupied</span>
+                <span class="mx-1">·</span>
+                <span class="{% if vacant_count > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">{{ vacant_count }} vacant</span>
+            </p>
         </div>
     </div>
 
-    <!-- Overdue Bills -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100 {% if overdue_count > 0 %}ring-2 ring-red-200{% endif %}">
+    <!-- 2. Needs Attention (Primary KPI) -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl border {% if needs_attention_count > 0 %}border-red-200 ring-2 ring-red-100{% else %}border-green-200{% endif %}">
         <div class="p-5">
             <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-red-100 rounded-xl">
-                    <span class="text-2xl">🚨</span>
+                <div class="flex-shrink-0 p-3 {% if needs_attention_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} rounded-xl">
+                    <span class="text-2xl">{% if needs_attention_count > 0 %}🚨{% else %}✅{% endif %}</span>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Overdue Bills</dt>
-                        <dd class="text-2xl font-bold {% if overdue_count > 0 %}text-red-600{% else %}text-gray-900{% endif %}">{{ overdue_count }}</dd>
-                    </dl>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Needs Attention</p>
+                    <p class="text-2xl font-bold {% if needs_attention_count > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ needs_attention_count }}</p>
                 </div>
             </div>
         </div>
-        <div class="bg-red-50 px-5 py-3 border-t border-red-100">
-            <span class="text-sm font-semibold text-red-700">💰 ${{ "%.2f"|format(total_overdue_amount) }} total</span>
+        <div class="{% if needs_attention_count > 0 %}bg-red-50{% else %}bg-green-50{% endif %} px-5 py-2.5 border-t {% if needs_attention_count > 0 %}border-red-100{% else %}border-green-100{% endif %}">
+            <p class="text-xs {% if needs_attention_count > 0 %}text-red-600{% else %}text-green-600{% endif %} font-medium">
+                {% if needs_attention_count > 0 %}
+                Properties requiring action
+                {% else %}
+                All properties OK
+                {% endif %}
+            </p>
         </div>
     </div>
 
-    <!-- Due Soon -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100 {% if due_soon_count > 0 %}ring-2 ring-yellow-200{% endif %}">
+    <!-- 3. Compliance -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
         <div class="p-5">
             <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-yellow-100 rounded-xl">
-                    <span class="text-2xl">⏰</span>
+                <div class="flex-shrink-0 p-3 {% if missing_license_count > 0 %}bg-amber-50{% else %}bg-green-50{% endif %} rounded-xl">
+                    <span class="text-2xl">📜</span>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Due Soon (7 days)</dt>
-                        <dd class="text-2xl font-bold {% if due_soon_count > 0 %}text-yellow-600{% else %}text-gray-900{% endif %}">{{ due_soon_count }}</dd>
-                    </dl>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Compliance</p>
+                    <p class="text-2xl font-bold {% if missing_license_count > 0 %}text-amber-600{% else %}text-green-600{% endif %}">
+                        {{ licensed_count }}/{{ total_properties }}
+                    </p>
                 </div>
             </div>
         </div>
-        <div class="bg-yellow-50 px-5 py-3 border-t border-yellow-100">
-            <span class="text-sm font-semibold text-yellow-700">💰 ${{ "%.2f"|format(total_due_soon_amount) }} total</span>
+        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
+            <p class="text-xs {% if missing_license_count > 0 %}text-amber-600{% else %}text-gray-500{% endif %}">
+                {% if missing_license_count > 0 %}
+                <span class="font-medium">{{ missing_license_count }} missing license{{ 's' if missing_license_count > 1 else '' }}</span>
+                {% else %}
+                All licenses current
+                {% endif %}
+            </p>
         </div>
     </div>
 
-    <!-- Total Tenants -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl card-hover border border-gray-100">
+    <!-- 4. Tenants -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
         <div class="p-5">
             <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-green-100 rounded-xl">
+                <div class="flex-shrink-0 p-3 bg-purple-50 rounded-xl">
                     <span class="text-2xl">👥</span>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Active Tenants</dt>
-                        <dd class="text-2xl font-bold text-gray-900">{{ total_tenants }}</dd>
-                    </dl>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Tenants</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_tenants }}</p>
                 </div>
             </div>
         </div>
-        <div class="bg-gray-50 px-5 py-3 border-t border-gray-100">
-            <a href="/tenants" class="text-sm font-medium text-blue-600 hover:text-blue-500 flex items-center gap-1">
-                View all <span>→</span>
-            </a>
+        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
+            <p class="text-xs text-gray-500">
+                <span class="text-purple-600 font-medium">{{ section8_tenants }} Section 8</span>
+            </p>
         </div>
     </div>
 </div>
+
+<!-- Priority Queue: Needs Attention -->
+{% if attention_items %}
+<div class="mb-6 bg-white shadow-sm rounded-xl border border-red-100">
+    <div class="px-5 py-3 border-b border-red-100 bg-red-50 rounded-t-xl">
+        <h2 class="text-sm font-semibold text-red-800 flex items-center gap-2">
+            <span>🚨</span> Needs Attention
+        </h2>
+    </div>
+    <ul class="divide-y divide-gray-100">
+        {% for item in attention_items %}
+        <li>
+            <a href="/properties/{{ item.property.id }}" class="flex items-center px-5 py-3 hover:bg-gray-50 transition-colors">
+                <span class="w-6 text-center mr-3">
+                    {% if item.severity == 'danger' %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                    {% else %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+                    {% endif %}
+                </span>
+                <span class="text-sm text-gray-900 font-medium flex-1">{{ item.property.address }}</span>
+                <span class="text-sm text-gray-500 flex items-center gap-1.5">
+                    <span>{{ item.icon }}</span>
+                    {{ item.issue }}
+                </span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if needs_attention_count > 5 %}
+    <div class="px-5 py-2.5 bg-gray-50 border-t border-gray-100 rounded-b-xl">
+        <a href="/properties?status=attention" class="text-xs font-medium text-red-600 hover:text-red-500">
+            View all {{ needs_attention_count }} properties →
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
 
 <!-- Quick Actions -->
-<div class="mb-8">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <span>⚡</span> Quick Actions
-    </h2>
+<div class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <span>⚡</span> Quick Actions
+        </h2>
+        <span class="text-xs text-gray-400">Most common actions</span>
+    </div>
     <div class="flex flex-wrap gap-3">
-        <a href="/properties/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
-            <span class="mr-2">➕</span>
-            Add Property
+        <a href="/properties/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <span class="mr-2">➕</span> Add Property
         </a>
-        <a href="/tenants/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-teal-500 hover:to-teal-400 transition-all">
-            <span class="mr-2">👤</span>
-            Add Tenant
+        <a href="/tenants/new" class="inline-flex items-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-500 transition-colors">
+            <span class="mr-2">👤</span> Add Tenant
         </a>
-        <a href="/bills/refresh" class="inline-flex items-center rounded-xl bg-gradient-to-r from-green-600 to-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-green-500 hover:to-green-400 transition-all">
-            <span class="mr-2">🔄</span>
-            Refresh All Bills
+        <a href="/bills/refresh" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+            <span class="mr-2">💧</span> Refresh All Bills
         </a>
-        <a href="/recertifications" class="inline-flex items-center rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-purple-500 hover:to-purple-400 transition-all">
-            <span class="mr-2">📋</span>
-            Recertifications
-        </a>
-        {% if overdue_count > 0 %}
-        <a href="/notifications/bulk?type=overdue" class="inline-flex items-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-red-500 hover:to-red-400 transition-all pulse-dot">
-            <span class="mr-2">📧</span>
-            Notify Overdue ({{ overdue_count }})
-        </a>
-        {% endif %}
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-    <!-- Overdue Bills List -->
-    {% if overdue_bills %}
-    <div class="bg-white shadow-sm rounded-xl border border-red-200">
-        <div class="px-5 py-4 border-b border-red-100 bg-red-50 rounded-t-xl">
-            <h3 class="text-lg font-semibold text-red-800 flex items-center gap-2">
-                <span>🚨</span> Overdue Bills
+<!-- Two Column Layout: Recerts + Recent Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Upcoming Recertifications -->
+    {% if upcoming_recerts %}
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <div class="px-5 py-3 border-b border-gray-100 bg-purple-50 rounded-t-xl">
+            <h3 class="text-sm font-semibold text-purple-800 flex items-center gap-2">
+                <span>📄</span> Upcoming Recertifications
             </h3>
         </div>
         <ul class="divide-y divide-gray-100">
-            {% for item in overdue_bills[:5] %}
+            {% for item in upcoming_recerts %}
             <li>
-                <a href="/properties/{{ item.property.id }}" class="block px-5 py-4 hover:bg-red-50 transition-colors">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-900">{{ item.property.address }}</p>
-                            <p class="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                <span>📅</span> Due: {{ item.bill.due_date.strftime('%b %d, %Y') if item.bill.due_date else 'N/A' }}
-                            </p>
+                <a href="/properties/{{ item.property.id }}" class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-sm font-medium flex-shrink-0">
+                            {{ item.tenant.name[0]|upper }}
                         </div>
-                        <div class="text-right">
-                            <p class="text-lg font-bold text-red-600">${{ "%.2f"|format(item.bill.amount_due) }}</p>
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-                                🔴 Overdue
-                            </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ item.tenant.name }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ item.property.address }}</p>
                         </div>
+                    </div>
+                    <div class="text-right flex-shrink-0 ml-3">
+                        <p class="text-sm font-medium {% if item.days_until <= 0 %}text-green-600{% elif item.days_until <= 14 %}text-amber-600{% else %}text-gray-600{% endif %}">
+                            {{ item.recert_date.strftime('%b %d') }}
+                        </p>
+                        <p class="text-xs {% if item.days_until <= 0 %}text-green-500{% elif item.days_until <= 14 %}text-amber-500{% else %}text-gray-400{% endif %}">
+                            {% if item.days_until <= 0 %}Eligible{% else %}{{ item.days_until }}d{% endif %}
+                        </p>
                     </div>
                 </a>
             </li>
             {% endfor %}
         </ul>
-        {% if overdue_count > 5 %}
-        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
-            <a href="/properties?status=overdue" class="text-sm font-medium text-red-600 hover:text-red-500">
-                View all {{ overdue_count }} overdue →
-            </a>
-        </div>
-        {% endif %}
     </div>
     {% endif %}
 
-    <!-- Due Soon Bills List -->
-    {% if due_soon_bills %}
-    <div class="bg-white shadow-sm rounded-xl border border-yellow-200">
-        <div class="px-5 py-4 border-b border-yellow-100 bg-yellow-50 rounded-t-xl">
-            <h3 class="text-lg font-semibold text-yellow-800 flex items-center gap-2">
-                <span>⏰</span> Due Soon
-            </h3>
-        </div>
-        <ul class="divide-y divide-gray-100">
-            {% for item in due_soon_bills[:5] %}
-            <li>
-                <a href="/properties/{{ item.property.id }}" class="block px-5 py-4 hover:bg-yellow-50 transition-colors">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-900">{{ item.property.address }}</p>
-                            <p class="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                <span>📅</span> Due: {{ item.bill.due_date.strftime('%b %d, %Y') if item.bill.due_date else 'N/A' }}
-                            </p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-lg font-bold text-yellow-600">${{ "%.2f"|format(item.bill.amount_due) }}</p>
-                            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
-                                🟡 Due Soon
-                            </span>
-                        </div>
-                    </div>
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-        {% if due_soon_count > 5 %}
-        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
-            <a href="/properties?status=due_soon" class="text-sm font-medium text-yellow-600 hover:text-yellow-500">
-                View all {{ due_soon_count }} due soon →
-            </a>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- Recent Notifications -->
-    <div class="bg-white shadow-sm rounded-xl border border-gray-200 {% if not overdue_bills and not due_soon_bills %}lg:col-span-2{% endif %}">
-        <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-            <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <span>📨</span> Recent Notifications
+    <!-- Recent Activity -->
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 {% if not upcoming_recerts %}lg:col-span-2{% endif %}">
+        <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <span>🕒</span> Recent Activity
             </h3>
         </div>
         {% if recent_notifications %}
         <ul class="divide-y divide-gray-100">
             {% for notification in recent_notifications %}
-            <li class="px-5 py-4">
+            <li class="px-5 py-3">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-gray-900 flex items-center gap-2">
-                            {% if notification.channel.value == 'sms' %}
-                            <span>📱</span>
-                            {% else %}
-                            <span>📧</span>
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-lg flex-shrink-0">
+                            {% if notification.channel.value == 'sms' %}📱{% else %}✉️{% endif %}
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm text-gray-900 truncate">
+                                Notification sent to {{ notification.recipient }}
+                            </p>
+                            {% if notification.property %}
+                            <p class="text-xs text-gray-500 truncate">{{ notification.property.address }}</p>
                             {% endif %}
-                            {{ notification.recipient }}
-                        </p>
-                        <p class="text-xs text-gray-500 mt-1">{{ notification.created_at.strftime('%b %d, %H:%M') }}</p>
+                        </div>
                     </div>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                        {% if notification.status.value == 'sent' or notification.status.value == 'delivered' %}bg-green-100 text-green-700
-                        {% elif notification.status.value == 'failed' %}bg-red-100 text-red-700
-                        {% else %}bg-gray-100 text-gray-700{% endif %}">
-                        {% if notification.status.value == 'sent' or notification.status.value == 'delivered' %}✅{% elif notification.status.value == 'failed' %}❌{% else %}⏳{% endif %}
-                        {{ notification.status.value|capitalize }}
-                    </span>
+                    <div class="text-right flex-shrink-0 ml-3">
+                        <p class="text-xs text-gray-400">{{ notification.created_at.strftime('%b %d') }}</p>
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium
+                            {% if notification.status.value == 'sent' or notification.status.value == 'delivered' %}text-green-700 bg-green-50
+                            {% elif notification.status.value == 'failed' %}text-red-700 bg-red-50
+                            {% else %}text-gray-600 bg-gray-100{% endif %}">
+                            {{ notification.status.value|capitalize }}
+                        </span>
+                    </div>
                 </div>
             </li>
             {% endfor %}
         </ul>
-        <div class="px-5 py-3 bg-gray-50 text-right rounded-b-xl border-t">
-            <a href="/notifications" class="text-sm font-medium text-blue-600 hover:text-blue-500">View all notifications →</a>
+        <div class="px-5 py-2.5 bg-gray-50 text-right rounded-b-xl border-t border-gray-100">
+            <a href="/notifications" class="text-xs font-medium text-blue-600 hover:text-blue-500">View all →</a>
         </div>
         {% else %}
-        <div class="px-5 py-12 text-center text-gray-500">
-            <span class="text-4xl">📭</span>
-            <p class="mt-2">No notifications sent yet</p>
+        <div class="px-5 py-10 text-center">
+            <span class="text-3xl text-gray-300">📭</span>
+            <p class="mt-2 text-sm text-gray-400">No recent activity</p>
         </div>
         {% endif %}
     </div>
+</div>
 
-    <!-- Empty state if no issues -->
-    {% if not overdue_bills and not due_soon_bills %}
-    <div class="bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm rounded-xl border border-green-200 p-8 text-center">
-        <span class="text-6xl">🎉</span>
-        <h3 class="mt-4 text-xl font-semibold text-green-800">All Caught Up!</h3>
-        <p class="mt-2 text-green-600">No overdue or upcoming bills. Great job staying on top of things!</p>
-    </div>
-    {% endif %}
+<!-- Status Message -->
+{% if all_caught_up %}
+<div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6 text-center">
+    <span class="text-4xl">🎉</span>
+    <h3 class="mt-2 text-lg font-semibold text-green-800">All Caught Up!</h3>
+    <p class="mt-1 text-sm text-green-600">No properties need attention right now.</p>
+</div>
+{% elif needs_attention_count > 0 %}
+<div class="bg-amber-50 rounded-xl border border-amber-200 p-4 text-center">
+    <p class="text-sm text-amber-700">
+        <span class="font-medium">⚠️ You have {{ needs_attention_count }} propert{{ 'y' if needs_attention_count == 1 else 'ies' }} that need{{ 's' if needs_attention_count == 1 else '' }} attention</span>
+    </p>
+</div>
+{% endif %}
+
+<!-- Portfolio Snapshot (subtle) -->
+<div class="mt-6 pt-4 border-t border-gray-100">
+    <p class="text-xs text-gray-400 text-center">
+        <span>Vacant: {{ vacant_count }}</span>
+        <span class="mx-2">·</span>
+        <span>No License: {{ missing_license_count }}</span>
+        <span class="mx-2">·</span>
+        <span>Section 8: {{ section8_properties }}</span>
+        <span class="mx-2">·</span>
+        <span>Inspections Pending: {{ pending_inspections }}</span>
+    </p>
 </div>
 {% endblock %}

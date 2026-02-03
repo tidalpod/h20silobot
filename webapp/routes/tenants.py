@@ -109,7 +109,9 @@ async def create_tenant(
     is_section8: bool = Form(False),
     pha_id: int = Form(None),
     voucher_amount: float = Form(None),
-    tenant_portion: float = Form(None)
+    tenant_portion: float = Form(None),
+    lease_start_date: str = Form(""),
+    lease_end_date: str = Form("")
 ):
     """Create a new tenant"""
     user = await get_current_user(request)
@@ -138,11 +140,25 @@ async def create_tenant(
             for t in existing_primary:
                 t.is_primary = False
 
-        # Parse move-in date
+        # Parse dates
         move_in = None
         if move_in_date:
             try:
                 move_in = date.fromisoformat(move_in_date)
+            except ValueError:
+                pass
+
+        lease_start = None
+        if lease_start_date:
+            try:
+                lease_start = date.fromisoformat(lease_start_date)
+            except ValueError:
+                pass
+
+        lease_end = None
+        if lease_end_date:
+            try:
+                lease_end = date.fromisoformat(lease_end_date)
             except ValueError:
                 pass
 
@@ -155,6 +171,8 @@ async def create_tenant(
             is_primary=is_primary,
             is_active=True,
             move_in_date=move_in,
+            lease_start_date=lease_start,
+            lease_end_date=lease_end,
             notes=notes or None,
             is_section8=is_section8,
             pha_id=pha_id if is_section8 and pha_id else None,
@@ -227,7 +245,9 @@ async def update_tenant(
     is_section8: bool = Form(False),
     pha_id: int = Form(None),
     voucher_amount: float = Form(None),
-    tenant_portion: float = Form(None)
+    tenant_portion: float = Form(None),
+    lease_start_date: str = Form(""),
+    lease_end_date: str = Form("")
 ):
     """Update a tenant"""
     user = await get_current_user(request)
@@ -271,6 +291,20 @@ async def update_tenant(
             except ValueError:
                 pass
 
+        lease_start = None
+        if lease_start_date:
+            try:
+                lease_start = date.fromisoformat(lease_start_date)
+            except ValueError:
+                pass
+
+        lease_end = None
+        if lease_end_date:
+            try:
+                lease_end = date.fromisoformat(lease_end_date)
+            except ValueError:
+                pass
+
         # Update tenant
         tenant.property_id = property_id
         tenant.name = name
@@ -280,6 +314,8 @@ async def update_tenant(
         tenant.is_active = is_active
         tenant.move_in_date = move_in
         tenant.move_out_date = move_out
+        tenant.lease_start_date = lease_start
+        tenant.lease_end_date = lease_end
         tenant.notes = notes or None
         tenant.is_section8 = is_section8
         tenant.pha_id = pha_id if is_section8 and pha_id else None

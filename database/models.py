@@ -66,6 +66,10 @@ class Property(Base):
     section8_inspection_date = Column(Date, nullable=True)
     section8_inspection_notes = Column(Text, nullable=True)
 
+    # Lease dates (for recertification tracking)
+    lease_start_date = Column(Date, nullable=True)
+    lease_end_date = Column(Date, nullable=True)
+
     # Web user ownership (optional - for web app property management)
     web_user_id = Column(Integer, ForeignKey("web_users.id", ondelete="SET NULL"), nullable=True)
 
@@ -89,6 +93,22 @@ class Property(Base):
     def latest_bill(self):
         """Get the most recent bill"""
         return self.bills[0] if self.bills else None
+
+    @property
+    def recert_eligible_date(self):
+        """Calculate when recertification can be submitted (9 months after lease start)"""
+        if self.lease_start_date:
+            from dateutil.relativedelta import relativedelta
+            return self.lease_start_date + relativedelta(months=9)
+        return None
+
+    @property
+    def days_until_recert(self):
+        """Days until recertification is eligible"""
+        if self.recert_eligible_date:
+            delta = self.recert_eligible_date - datetime.now().date()
+            return delta.days
+        return None
 
     @property
     def status_emoji(self):

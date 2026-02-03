@@ -76,7 +76,7 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
                             <a href="/" class="text-white font-bold text-xl flex items-center gap-2">
-                                <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 rounded-full bg-white/90 p-0.5">
+                                <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
                                 <span>Blue Deer</span>
                             </a>
                         </div>
@@ -90,9 +90,6 @@
                                 </a>
                                 <a href="/tenants" class="{% if '/tenants' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>👥</span> Tenants
-                                </a>
-                                <a href="/recertifications" class="{% if '/recertifications' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
-                                    <span>📋</span> Recertifications
                                 </a>
                                 <a href="/phas" class="{% if '/phas' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>🏛️</span> PHAs
@@ -146,7 +143,6 @@
                     <a href="/" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📊 Dashboard</a>
                     <a href="/properties" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏠 Properties</a>
                     <a href="/tenants" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">👥 Tenants</a>
-                    <a href="/recertifications" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📋 Recertifications</a>
                     <a href="/phas" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏛️ PHAs</a>
                     <a href="/notifications" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📨 Notifications</a>
                 </div>
@@ -178,7 +174,7 @@
         {% if user %}
         <footer class="mt-auto py-6 text-center text-sm text-gray-500">
             <p class="flex items-center justify-center gap-2">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="h-5 w-5">
+                <img src="/static/images/logo.png" alt="Blue Deer" class="h-6 w-6 object-contain">
                 Blue Deer Property Management
             </p>
         </footer>

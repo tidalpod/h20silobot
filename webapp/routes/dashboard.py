@@ -27,60 +27,176 @@ async def dashboard(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     async with get_session() as session:
-        # Get all properties with their latest bills
+        # Get all active properties with bills and tenants
         result = await session.execute(
             select(Property)
             .where(Property.is_active == True)
-            .options(selectinload(Property.bills))
+            .options(
+                selectinload(Property.bills),
+                selectinload(Property.tenants)
+            )
             .order_by(Property.address)
         )
         properties = result.scalars().all()
 
-        # Calculate dashboard stats
+        # === KPI 1: PROPERTIES ===
         total_properties = len(properties)
-        overdue_bills = []
-        due_soon_bills = []
-        total_overdue_amount = 0
-        total_due_soon_amount = 0
+        vacant_count = 0
+        occupied_count = 0
+
+        # === KPI 2: NEEDS ATTENTION ===
+        attention_items = []  # Priority queue items
+
+        # === KPI 3: COMPLIANCE ===
+        licensed_count = 0
+        missing_license_count = 0
+
+        # === Tracking for portfolio snapshot ===
+        section8_properties = 0
+        pending_inspections = 0
+        overdue_bills_count = 0
 
         for prop in properties:
+            # Get active tenants for this property
+            active_tenants = [t for t in prop.tenants if t.is_active]
+            has_section8 = any(t.is_section8 for t in active_tenants)
+
+            if has_section8:
+                section8_properties += 1
+
+            # Occupancy
+            if len(active_tenants) == 0:
+                vacant_count += 1
+                attention_items.append({
+                    "property": prop,
+                    "issue": "Vacant",
+                    "severity": "warning",  # yellow
+                    "icon": "🔑"
+                })
+            else:
+                occupied_count += 1
+
+            # License compliance
+            if prop.has_rental_license:
+                licensed_count += 1
+            else:
+                missing_license_count += 1
+                attention_items.append({
+                    "property": prop,
+                    "issue": "No Rental License",
+                    "severity": "danger",  # red
+                    "icon": "📜"
+                })
+
+            # Section 8 inspection status
+            if prop.section8_inspection_status == 'failed':
+                attention_items.append({
+                    "property": prop,
+                    "issue": "Section 8 inspection failed",
+                    "severity": "danger",
+                    "icon": "🔍"
+                })
+            elif prop.section8_inspection_status in ('pending', 'scheduled', 'reinspection'):
+                pending_inspections += 1
+
+            # Overdue utilities
             if prop.bills:
                 latest = prop.bills[0]
                 status = latest.calculate_status()
                 if status == BillStatus.OVERDUE:
-                    overdue_bills.append({"property": prop, "bill": latest})
-                    total_overdue_amount += float(latest.amount_due or 0)
-                elif status == BillStatus.DUE_SOON:
-                    due_soon_bills.append({"property": prop, "bill": latest})
-                    total_due_soon_amount += float(latest.amount_due or 0)
+                    overdue_bills_count += 1
+                    attention_items.append({
+                        "property": prop,
+                        "issue": f"Water bill overdue (${latest.amount_due:.0f})",
+                        "severity": "danger",
+                        "icon": "💧"
+                    })
 
-        # Get recent notifications
+        # Sort attention items: danger first, then warning
+        severity_order = {"danger": 0, "warning": 1}
+        attention_items.sort(key=lambda x: severity_order.get(x["severity"], 2))
+
+        # Unique properties needing attention (a property may have multiple issues)
+        properties_needing_attention = set()
+        for item in attention_items:
+            properties_needing_attention.add(item["property"].id)
+        needs_attention_count = len(properties_needing_attention)
+
+        # === KPI 4: TENANTS ===
+        result = await session.execute(
+            select(Tenant).where(Tenant.is_active == True)
+        )
+        all_tenants = result.scalars().all()
+        total_tenants = len(all_tenants)
+        section8_tenants = sum(1 for t in all_tenants if t.is_section8)
+
+        # === RECENT ACTIVITY (Notifications) ===
         result = await session.execute(
             select(Notification)
+            .options(selectinload(Notification.property))
             .order_by(Notification.created_at.desc())
             .limit(5)
         )
         recent_notifications = result.scalars().all()
 
-        # Get tenant count
+        # === UPCOMING RECERTIFICATIONS ===
         result = await session.execute(
-            select(func.count(Tenant.id)).where(Tenant.is_active == True)
+            select(Tenant)
+            .where(Tenant.is_active == True)
+            .where(Tenant.lease_start_date != None)
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.lease_start_date)
         )
-        total_tenants = result.scalar() or 0
+        tenants_with_lease = result.scalars().all()
+
+        upcoming_recerts = []
+        for tenant in tenants_with_lease:
+            if tenant.recert_eligible_date:
+                days = tenant.days_until_recert
+                if days is not None and days <= 60:
+                    upcoming_recerts.append({
+                        "tenant": tenant,
+                        "property": tenant.property_ref,
+                        "recert_date": tenant.recert_eligible_date,
+                        "days_until": days
+                    })
+
+        upcoming_recerts.sort(key=lambda x: x["recert_date"])
+
+        # === DETERMINE "ALL CAUGHT UP" STATE ===
+        all_caught_up = (
+            needs_attention_count == 0 and
+            overdue_bills_count == 0 and
+            missing_license_count == 0
+        )
 
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": user,
+            # KPI 1: Properties
             "total_properties": total_properties,
-            "overdue_count": len(overdue_bills),
-            "overdue_bills": overdue_bills,
-            "total_overdue_amount": total_overdue_amount,
-            "due_soon_count": len(due_soon_bills),
-            "due_soon_bills": due_soon_bills,
-            "total_due_soon_amount": total_due_soon_amount,
+            "vacant_count": vacant_count,
+            "occupied_count": occupied_count,
+            # KPI 2: Needs Attention
+            "needs_attention_count": needs_attention_count,
+            "attention_items": attention_items[:5],  # Top 5 for priority queue
+            # KPI 3: Compliance
+            "licensed_count": licensed_count,
+            "missing_license_count": missing_license_count,
+            # KPI 4: Tenants
             "total_tenants": total_tenants,
+            "section8_tenants": section8_tenants,
+            # Portfolio snapshot
+            "section8_properties": section8_properties,
+            "pending_inspections": pending_inspections,
+            "overdue_bills_count": overdue_bills_count,
+            # Recent activity
             "recent_notifications": recent_notifications,
+            # Recerts
+            "upcoming_recerts": upcoming_recerts[:5],
+            # State
+            "all_caught_up": all_caught_up,
         }
     )

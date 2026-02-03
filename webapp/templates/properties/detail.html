@@ -121,6 +121,100 @@
 
         <!-- TAB: Overview -->
         <div id="panel-overview" class="tab-panel space-y-6">
+            <!-- Tenant & Lease Summary Card -->
+            {% if active_tenants %}
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h3 class="text-base font-semibold text-gray-900">👥 Tenant & Lease</h3>
+                </div>
+                <div class="px-5 py-4">
+                    {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+                    {% set display_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Tenant Info -->
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg">
+                                {{ display_tenant.name[0]|upper }}
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ display_tenant.name }}</p>
+                                <div class="flex items-center gap-2 text-xs text-gray-500">
+                                    {% if display_tenant.is_primary %}
+                                    <span class="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">Primary</span>
+                                    {% endif %}
+                                    {% if display_tenant.is_section8 %}
+                                    <span class="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Section 8</span>
+                                    {% endif %}
+                                </div>
+                                {% if display_tenant.phone %}
+                                <p class="text-xs text-gray-500 mt-1">📱 {{ display_tenant.phone }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Lease Dates -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Lease Period</p>
+                            {% if display_tenant.lease_start_date %}
+                            <p class="mt-1 text-sm font-medium text-gray-900">
+                                {{ display_tenant.lease_start_date.strftime('%b %d, %Y') }}
+                                {% if display_tenant.lease_end_date %} - {{ display_tenant.lease_end_date.strftime('%b %d, %Y') }}{% endif %}
+                            </p>
+                            {% elif property.lease_start_date %}
+                            <p class="mt-1 text-sm font-medium text-gray-900">
+                                {{ property.lease_start_date.strftime('%b %d, %Y') }}
+                                {% if property.lease_end_date %} - {{ property.lease_end_date.strftime('%b %d, %Y') }}{% endif %}
+                            </p>
+                            {% else %}
+                            <p class="mt-1 text-sm text-gray-400">Not set</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Recert Date -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Recert Eligible</p>
+                            {% set recert_date = display_tenant.recert_eligible_date if display_tenant.lease_start_date else property.recert_eligible_date %}
+                            {% set days_until = display_tenant.days_until_recert if display_tenant.lease_start_date else property.days_until_recert %}
+                            {% if recert_date %}
+                            <p class="mt-1 text-sm font-semibold {% if days_until is not none and days_until <= 0 %}text-green-600{% elif days_until is not none and days_until <= 30 %}text-yellow-600{% else %}text-gray-900{% endif %}">
+                                {{ recert_date.strftime('%b %d, %Y') }}
+                            </p>
+                            {% if days_until is not none %}
+                                {% if days_until > 0 %}
+                                <p class="text-xs text-gray-500">{{ days_until }} days away</p>
+                                {% elif days_until == 0 %}
+                                <p class="text-xs text-green-600 font-medium">Eligible today!</p>
+                                {% else %}
+                                <p class="text-xs text-green-600 font-medium">Eligible now!</p>
+                                {% endif %}
+                            {% endif %}
+                            {% else %}
+                            <p class="mt-1 text-sm text-gray-400">Set lease start date</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if active_tenants|length > 1 %}
+                    <p class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                        +{{ active_tenants|length - 1 }} more tenant{{ 's' if active_tenants|length > 2 else '' }}
+                        <a href="#" onclick="showTab('tenants'); return false;" class="text-blue-600 hover:text-blue-500 ml-1">View all →</a>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <!-- No Tenants Card -->
+            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🔑</span>
+                    <div>
+                        <h4 class="text-sm font-semibold text-orange-900">Vacant Property</h4>
+                        <p class="text-sm text-orange-700">No tenants assigned. <a href="/tenants/new?property_id={{ property.id }}" class="underline hover:no-underline">Add a tenant</a></p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Property Details Card -->
             <div class="bg-white shadow rounded-lg">
                 <div class="px-5 py-4 border-b border-gray-100">
@@ -292,6 +386,50 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- Lease & Recertification Info -->
+            {% if property.lease_start_date %}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <span class="text-xl mr-3">📄</span>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-semibold text-blue-900">Lease Information</h4>
+                        <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p class="text-xs text-blue-600">Lease Start</p>
+                                <p class="font-medium text-blue-900">{{ property.lease_start_date.strftime('%b %d, %Y') }}</p>
+                            </div>
+                            {% if property.lease_end_date %}
+                            <div>
+                                <p class="text-xs text-blue-600">Lease End</p>
+                                <p class="font-medium text-blue-900">{{ property.lease_end_date.strftime('%b %d, %Y') }}</p>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <p class="text-xs text-blue-600">Recert Eligible</p>
+                                <p class="font-medium text-blue-900">{{ property.recert_eligible_date.strftime('%b %d, %Y') if property.recert_eligible_date else 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-blue-600">Status</p>
+                                {% if property.days_until_recert is not none %}
+                                    {% if property.days_until_recert > 30 %}
+                                    <p class="font-medium text-blue-700">{{ property.days_until_recert }} days away</p>
+                                    {% elif property.days_until_recert > 0 %}
+                                    <p class="font-medium text-yellow-700">{{ property.days_until_recert }} days away</p>
+                                    {% elif property.days_until_recert == 0 %}
+                                    <p class="font-medium text-green-700">Eligible Today!</p>
+                                    {% else %}
+                                    <p class="font-medium text-green-700">Eligible Now</p>
+                                    {% endif %}
+                                {% else %}
+                                <p class="font-medium text-gray-500">N/A</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- TAB: Tenants -->
@@ -334,6 +472,16 @@
                                 {% endif %}
                                 {% if tenant.move_in_date %}
                                 <p class="text-xs text-gray-400 mt-1">Move-in: {{ tenant.move_in_date.strftime('%b %d, %Y') }}</p>
+                                {% endif %}
+                                {% if tenant.lease_start_date %}
+                                <p class="text-xs text-blue-500 mt-1">📄 Lease: {{ tenant.lease_start_date.strftime('%b %d, %Y') }}{% if tenant.lease_end_date %} - {{ tenant.lease_end_date.strftime('%b %d, %Y') }}{% endif %}
+                                    {% if tenant.recert_eligible_date %}
+                                    · Recert: {{ tenant.recert_eligible_date.strftime('%b %d, %Y') }}
+                                        {% if tenant.days_until_recert is not none and tenant.days_until_recert <= 0 %}
+                                        <span class="text-green-600 font-medium">(Eligible)</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </p>
                                 {% endif %}
                             </div>
                         </div>

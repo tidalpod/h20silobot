@@ -137,7 +137,9 @@ async def create_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
-    section8_inspection_notes: str = Form("")
+    section8_inspection_notes: str = Form(""),
+    lease_start_date: str = Form(""),
+    lease_end_date: str = Form("")
 ):
     """Create a new property"""
     user = await get_current_user(request)
@@ -205,6 +207,9 @@ async def create_property(
             section8_inspection_status=section8_inspection_status or None,
             section8_inspection_date=parse_date(section8_inspection_date),
             section8_inspection_notes=section8_inspection_notes or None,
+            # Lease dates
+            lease_start_date=parse_date(lease_start_date),
+            lease_end_date=parse_date(lease_end_date),
         )
         session.add(prop)
         await session.commit()
@@ -315,7 +320,9 @@ async def update_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
-    section8_inspection_notes: str = Form("")
+    section8_inspection_notes: str = Form(""),
+    lease_start_date: str = Form(""),
+    lease_end_date: str = Form("")
 ):
     """Update a property"""
     user = await get_current_user(request)
@@ -389,6 +396,9 @@ async def update_property(
         prop.section8_inspection_status = section8_inspection_status or None
         prop.section8_inspection_date = parse_date(section8_inspection_date)
         prop.section8_inspection_notes = section8_inspection_notes or None
+        # Lease dates
+        prop.lease_start_date = parse_date(lease_start_date)
+        prop.lease_end_date = parse_date(lease_end_date)
 
         await session.commit()
 
