@@ -55,7 +55,7 @@
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Status</th>
-                <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Balance</th>
+                <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Water Bill</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-16"></th>
             </tr>
         </thead>
@@ -167,12 +167,12 @@
                     {% endif %}
                 </td>
 
-                <!-- Amount Due - De-emphasized -->
+                <!-- Water Bill -->
                 <td class="px-4 py-4 text-right">
                     {% if item.property.bills and item.property.bills[0].amount_due %}
                     {% set amount = item.property.bills[0].amount_due %}
                     <span class="text-sm {% if amount > 100 %}text-gray-700{% else %}text-gray-400{% endif %} font-light">
-                        ${{ "%.0f"|format(amount) }}
+                        💧 ${{ "%.0f"|format(amount) }}
                     </span>
                     {% else %}
                     <span class="text-sm text-gray-300">—</span>
