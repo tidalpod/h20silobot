@@ -108,7 +108,8 @@ async def create_tenant(
     notes: str = Form(""),
     is_section8: bool = Form(False),
     pha_id: int = Form(None),
-    voucher_amount: float = Form(None)
+    voucher_amount: float = Form(None),
+    tenant_portion: float = Form(None)
 ):
     """Create a new tenant"""
     user = await get_current_user(request)
@@ -157,7 +158,8 @@ async def create_tenant(
             notes=notes or None,
             is_section8=is_section8,
             pha_id=pha_id if is_section8 and pha_id else None,
-            voucher_amount=Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None
+            voucher_amount=Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None,
+            tenant_portion=Decimal(str(tenant_portion)) if is_section8 and tenant_portion else None
         )
         session.add(tenant)
         await session.commit()
@@ -224,7 +226,8 @@ async def update_tenant(
     notes: str = Form(""),
     is_section8: bool = Form(False),
     pha_id: int = Form(None),
-    voucher_amount: float = Form(None)
+    voucher_amount: float = Form(None),
+    tenant_portion: float = Form(None)
 ):
     """Update a tenant"""
     user = await get_current_user(request)
@@ -281,6 +284,7 @@ async def update_tenant(
         tenant.is_section8 = is_section8
         tenant.pha_id = pha_id if is_section8 and pha_id else None
         tenant.voucher_amount = Decimal(str(voucher_amount)) if is_section8 and voucher_amount else None
+        tenant.tenant_portion = Decimal(str(tenant_portion)) if is_section8 and tenant_portion else None
 
         await session.commit()
 

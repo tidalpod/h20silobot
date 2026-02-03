@@ -266,6 +266,7 @@ class Tenant(Base):
     current_rent = Column(Numeric(10, 2), nullable=True)
     proposed_rent = Column(Numeric(10, 2), nullable=True)
     voucher_amount = Column(Numeric(10, 2), nullable=True)  # Section 8 voucher amount
+    tenant_portion = Column(Numeric(10, 2), nullable=True)  # Tenant's portion of rent
 
     # Notes
     notes = Column(Text, nullable=True)

@@ -281,9 +281,11 @@
                         {% if tenant.pha %}
                         <p class="text-xs text-purple-600 mt-1">PHA: {{ tenant.pha.name }}</p>
                         {% endif %}
-                        {% if tenant.voucher_amount %}
-                        <p class="text-xs text-purple-600">Voucher: ${{ "%.2f"|format(tenant.voucher_amount) }}/mo</p>
-                        {% endif %}
+                        <p class="text-xs text-purple-600">
+                            {% if tenant.voucher_amount %}Voucher: ${{ "%.2f"|format(tenant.voucher_amount) }}{% endif %}
+                            {% if tenant.voucher_amount and tenant.tenant_portion %} · {% endif %}
+                            {% if tenant.tenant_portion %}Tenant: ${{ "%.2f"|format(tenant.tenant_portion) }}{% endif %}
+                        </p>
                         {% endfor %}
                     </div>
                     <a href="#" onclick="showTab('tenants'); return false;" class="text-xs text-purple-600 hover:text-purple-800 font-medium">View Details →</a>
@@ -328,7 +330,7 @@
                                     {% endif %}
                                 </div>
                                 {% if tenant.is_section8 and tenant.pha %}
-                                <p class="text-xs text-purple-600 mt-1">🏛️ {{ tenant.pha.name }}{% if tenant.voucher_amount %} · ${{ "%.2f"|format(tenant.voucher_amount) }}/mo{% endif %}</p>
+                                <p class="text-xs text-purple-600 mt-1">🏛️ {{ tenant.pha.name }}{% if tenant.voucher_amount %} · Voucher: ${{ "%.2f"|format(tenant.voucher_amount) }}{% endif %}{% if tenant.tenant_portion %} · Tenant: ${{ "%.2f"|format(tenant.tenant_portion) }}{% endif %}</p>
                                 {% endif %}
                                 {% if tenant.move_in_date %}
                                 <p class="text-xs text-gray-400 mt-1">Move-in: {{ tenant.move_in_date.strftime('%b %d, %Y') }}</p>
