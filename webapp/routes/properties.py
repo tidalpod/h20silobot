@@ -421,6 +421,17 @@ async def delete_property_permanent(request: Request, property_id: int):
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
+        # Delete related water bills first (no CASCADE set on this table)
+        await session.execute(
+            WaterBill.__table__.delete().where(WaterBill.property_id == property_id)
+        )
+
+        # Delete related tenants
+        await session.execute(
+            Tenant.__table__.delete().where(Tenant.property_id == property_id)
+        )
+
+        # Now delete the property
         await session.delete(prop)
         await session.commit()
 
