@@ -104,10 +104,10 @@ async def create_tenant(
     name: str = Form(...),
     phone: str = Form(""),
     email: str = Form(""),
-    is_primary: bool = Form(False),
+    is_primary: str = Form(""),
     move_in_date: str = Form(""),
     notes: str = Form(""),
-    is_section8: bool = Form(False),
+    is_section8: str = Form(""),
     pha_id: str = Form(""),
     voucher_amount: str = Form(""),
     tenant_portion: str = Form(""),
@@ -118,6 +118,10 @@ async def create_tenant(
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    # Convert checkbox strings to booleans
+    is_primary_bool = is_primary.lower() == "true" if is_primary else False
+    is_section8_bool = is_section8.lower() == "true" if is_section8 else False
 
     async with get_session() as session:
         # Verify property exists
@@ -130,7 +134,7 @@ async def create_tenant(
             raise HTTPException(status_code=404, detail="Property not found")
 
         # If marking as primary, unmark any existing primary
-        if is_primary:
+        if is_primary_bool:
             result = await session.execute(
                 select(Tenant).where(
                     Tenant.property_id == property_id,
@@ -174,16 +178,16 @@ async def create_tenant(
             name=name,
             phone=phone or None,
             email=email.lower() if email else None,
-            is_primary=is_primary,
+            is_primary=is_primary_bool,
             is_active=True,
             move_in_date=move_in,
             lease_start_date=lease_start,
             lease_end_date=lease_end,
             notes=notes or None,
-            is_section8=is_section8,
-            pha_id=parsed_pha_id if is_section8 else None,
-            voucher_amount=parsed_voucher if is_section8 else None,
-            tenant_portion=parsed_tenant_portion if is_section8 else None
+            is_section8=is_section8_bool,
+            pha_id=parsed_pha_id if is_section8_bool else None,
+            voucher_amount=parsed_voucher if is_section8_bool else None,
+            tenant_portion=parsed_tenant_portion if is_section8_bool else None
         )
         session.add(tenant)
         await session.commit()
@@ -243,12 +247,12 @@ async def update_tenant(
     name: str = Form(...),
     phone: str = Form(""),
     email: str = Form(""),
-    is_primary: bool = Form(False),
-    is_active: bool = Form(True),
+    is_primary: str = Form(""),
+    is_active: str = Form(""),
     move_in_date: str = Form(""),
     move_out_date: str = Form(""),
     notes: str = Form(""),
-    is_section8: bool = Form(False),
+    is_section8: str = Form(""),
     pha_id: str = Form(""),
     voucher_amount: str = Form(""),
     tenant_portion: str = Form(""),
@@ -260,6 +264,11 @@ async def update_tenant(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    # Convert checkbox strings to booleans
+    is_primary_bool = is_primary.lower() == "true" if is_primary else False
+    is_active_bool = is_active.lower() == "true" if is_active else False
+    is_section8_bool = is_section8.lower() == "true" if is_section8 else False
+
     async with get_session() as session:
         result = await session.execute(
             select(Tenant).where(Tenant.id == tenant_id)
@@ -270,7 +279,7 @@ async def update_tenant(
             raise HTTPException(status_code=404, detail="Tenant not found")
 
         # If marking as primary, unmark any existing primary
-        if is_primary and not tenant.is_primary:
+        if is_primary_bool and not tenant.is_primary:
             result = await session.execute(
                 select(Tenant).where(
                     Tenant.property_id == property_id,
@@ -321,17 +330,17 @@ async def update_tenant(
         tenant.name = name
         tenant.phone = phone or None
         tenant.email = email.lower() if email else None
-        tenant.is_primary = is_primary
-        tenant.is_active = is_active
+        tenant.is_primary = is_primary_bool
+        tenant.is_active = is_active_bool
         tenant.move_in_date = move_in
         tenant.move_out_date = move_out
         tenant.lease_start_date = lease_start
         tenant.lease_end_date = lease_end
         tenant.notes = notes or None
-        tenant.is_section8 = is_section8
-        tenant.pha_id = parsed_pha_id if is_section8 else None
-        tenant.voucher_amount = parsed_voucher if is_section8 else None
-        tenant.tenant_portion = parsed_tenant_portion if is_section8 else None
+        tenant.is_section8 = is_section8_bool
+        tenant.pha_id = parsed_pha_id if is_section8_bool else None
+        tenant.voucher_amount = parsed_voucher if is_section8_bool else None
+        tenant.tenant_portion = parsed_tenant_portion if is_section8_bool else None
 
         await session.commit()
 
