@@ -73,39 +73,83 @@ async def login(
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    """Render registration page"""
-    user = await get_current_user(request)
-    if user:
-        return RedirectResponse(url="/", status_code=303)
-
-    return templates.TemplateResponse(
-        "auth/register.html",
-        {"request": request, "error": None}
-    )
+    """Registration is disabled - redirect to login"""
+    return RedirectResponse(url="/login", status_code=303)
 
 
 @router.post("/register", response_class=HTMLResponse)
-async def register(
+async def register(request: Request):
+    """Registration is disabled"""
+    return RedirectResponse(url="/login", status_code=303)
+
+
+# ============ ADMIN USER MANAGEMENT ============
+
+@router.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_page(request: Request):
+    """Admin page to manage users"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.get("is_admin"):
+        return RedirectResponse(url="/", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WebUser).order_by(WebUser.created_at.desc())
+        )
+        users = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "auth/admin_users.html",
+        {"request": request, "user": user, "users": users}
+    )
+
+
+@router.get("/admin/users/new", response_class=HTMLResponse)
+async def admin_new_user_page(request: Request):
+    """Admin page to create new user"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.get("is_admin"):
+        return RedirectResponse(url="/", status_code=303)
+
+    return templates.TemplateResponse(
+        "auth/admin_new_user.html",
+        {"request": request, "user": user, "error": None}
+    )
+
+
+@router.post("/admin/users/new", response_class=HTMLResponse)
+async def admin_create_user(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
-    name: str = Form("")
+    name: str = Form(""),
+    is_admin: str = Form("")
 ):
-    """Handle registration form submission"""
+    """Admin creates a new user"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.get("is_admin"):
+        return RedirectResponse(url="/", status_code=303)
+
     # Validate passwords match
     if password != password_confirm:
         return templates.TemplateResponse(
-            "auth/register.html",
-            {"request": request, "error": "Passwords do not match"},
+            "auth/admin_new_user.html",
+            {"request": request, "user": user, "error": "Passwords do not match"},
             status_code=400
         )
 
     # Validate password length
     if len(password) < 8:
         return templates.TemplateResponse(
-            "auth/register.html",
-            {"request": request, "error": "Password must be at least 8 characters"},
+            "auth/admin_new_user.html",
+            {"request": request, "user": user, "error": "Password must be at least 8 characters"},
             status_code=400
         )
 
@@ -118,31 +162,23 @@ async def register(
 
         if existing:
             return templates.TemplateResponse(
-                "auth/register.html",
-                {"request": request, "error": "Email already registered"},
+                "auth/admin_new_user.html",
+                {"request": request, "user": user, "error": "Email already registered"},
                 status_code=400
             )
 
-        # Check if this is the first user (make them admin)
-        result = await session.execute(select(WebUser))
-        is_first_user = result.first() is None
-
         # Create user
-        user = WebUser(
+        new_user = WebUser(
             email=email.lower(),
             password_hash=hash_password(password),
             name=name or None,
-            is_admin=is_first_user,  # First user is admin
+            is_admin=is_admin.lower() == "true" if is_admin else False,
             is_active=True
         )
-        session.add(user)
+        session.add(new_user)
         await session.commit()
-        await session.refresh(user)
 
-        # Log them in
-        login_user(request, user)
-
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url="/admin/users", status_code=303)
 
 
 @router.get("/logout")

@@ -119,6 +119,11 @@
                                     <a href="/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                                         <span>⚙️</span> Settings
                                     </a>
+                                    {% if user.is_admin %}
+                                    <a href="/admin/users" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <span>👥</span> Manage Users
+                                    </a>
+                                    {% endif %}
                                     <div class="border-t border-gray-100 my-1"></div>
                                     <a href="/logout" class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
                                         <span>🚪</span> Logout
@@ -153,6 +158,9 @@
                     </div>
                     <div class="mt-3 space-y-1 px-2">
                         <a href="/profile" class="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-white hover:bg-white/10">⚙️ Settings</a>
+                        {% if user.is_admin %}
+                        <a href="/admin/users" class="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-white hover:bg-white/10">👥 Manage Users</a>
+                        {% endif %}
                         <a href="/logout" class="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium text-white hover:bg-white/10">🚪 Logout</a>
                     </div>
                 </div>
