@@ -192,7 +192,19 @@ async def refresh_single_property(property_id: int):
             logger.info(f"Refreshing bills for property: {prop.address}")
 
             async with BSAScraper() as scraper:
-                bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                bill_data = None
+
+                # First try by account number if we have one
+                if prop.bsa_account_number:
+                    logger.info(f"Searching by account number: {prop.bsa_account_number}")
+                    bill_data = await scraper.search_by_account(prop.bsa_account_number)
+
+                # If no result, try searching by address
+                if not bill_data:
+                    # Extract just the street address for search
+                    street_address = prop.address.split(',')[0].strip()
+                    logger.info(f"Account search failed, trying address: {street_address}")
+                    bill_data = await scraper.search_by_address(street_address)
 
                 if bill_data:
                     # Create new bill record
@@ -214,6 +226,11 @@ async def refresh_single_property(property_id: int):
                     # Update property info if available
                     if bill_data.owner_name and not prop.owner_name:
                         prop.owner_name = bill_data.owner_name
+
+                    # Auto-populate BSA account number if found via address search
+                    if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
+                        logger.info(f"Updating BSA account number: {prop.bsa_account_number} -> {bill_data.account_number}")
+                        prop.bsa_account_number = bill_data.account_number
 
                     await session.commit()
                     logger.info(f"Successfully refreshed bills for {prop.address}")
