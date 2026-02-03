@@ -27,6 +27,11 @@ class Config:
     scrape_interval_hours: int = int(os.getenv("SCRAPE_INTERVAL_HOURS", "24"))
     headless_browser: bool = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
 
+    # Blue Deer Notification Settings
+    water_bill_threshold: float = float(os.getenv("WATER_BILL_THRESHOLD", "100"))  # Alert when bill exceeds this
+    recert_reminder_days: int = int(os.getenv("RECERT_REMINDER_DAYS", "30"))  # Days before recert to remind
+    admin_telegram_id: int = int(os.getenv("ADMIN_TELEGRAM_ID", "0"))  # Primary admin to receive alerts
+
     # BSA URLs
     @property
     def bsa_base_url(self) -> str:

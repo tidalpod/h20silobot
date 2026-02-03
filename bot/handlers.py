@@ -84,9 +84,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_status = "✅ Connected" if db_available else "⚠️ Not connected"
 
     welcome_text = f"""
-👋 *Welcome to Water Bill Tracker, {user.first_name}!*
+👋 *Welcome to Blue Deer, {user.first_name}!*
 
-I help you track water bills for your properties from BSA Online (City of Warren, MI).
+I help you manage your properties and track water bills from BSA Online.
 
 *Status Indicators:*
 🟢 Current | 🟡 Due Soon | 🔴 Overdue | ✅ Paid
@@ -153,7 +153,7 @@ async def back_to_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
     db_status = "✅ Connected" if db_available else "⚠️ Not connected"
 
     welcome_text = f"""
-👋 *Water Bill Tracker*
+🦌 *Blue Deer*
 
 *Status Indicators:*
 🟢 Current | 🟡 Due Soon | 🔴 Overdue | ✅ Paid
@@ -536,7 +536,7 @@ async def do_refresh(query, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-    bot = context.bot_data.get('water_bill_bot')
+    bot = context.bot_data.get('blue_deer_bot')
 
     if bot and bot.db_available:
         try:
@@ -683,7 +683,7 @@ Bot: ✅ Running
 async def show_help(query, context: ContextTypes.DEFAULT_TYPE):
     """Show help via callback"""
     help_text = """
-*Water Bill Tracker - Help*
+*Blue Deer - Help*
 
 📋 *View Bills:*
 • Summary - Overview dashboard
@@ -833,7 +833,7 @@ async def handle_property_input(update: Update, context: ContextTypes.DEFAULT_TY
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /help command"""
     help_text = """
-*Water Bill Tracker - Commands*
+*Blue Deer - Commands*
 
 📋 *View Bills:*
 /properties - List all properties with status
@@ -1112,7 +1112,7 @@ async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /refresh command - manually trigger bill update"""
     await update.message.reply_text("🔄 *Refreshing...*\n\nFetching latest bill data from BSA Online.", parse_mode=ParseMode.MARKDOWN)
 
-    bot = context.bot_data.get('water_bill_bot')
+    bot = context.bot_data.get('blue_deer_bot')
 
     if bot and bot.db_available:
         try:

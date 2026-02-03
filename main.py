@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Water Bill Tracker Bot
+Blue Deer Bot
 
-Main entry point for the Telegram bot that tracks water bills from BSA Online.
+Telegram bot for property management notifications.
+Sends alerts for recertifications, water bills, and more.
 """
 
 import asyncio
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def main():
     """Main entry point"""
     logger.info("=" * 50)
-    logger.info("Water Bill Tracker Bot Starting...")
+    logger.info("Blue Deer Bot Starting...")
     logger.info("=" * 50)
 
     # Log environment check
@@ -37,7 +38,7 @@ async def main():
 
     # Import after logging setup
     from config import config
-    from bot.bot import WaterBillBot
+    from bot.bot import BlueDeerBot
 
     # Validate configuration
     errors = config.validate()
@@ -50,7 +51,7 @@ async def main():
 
     logger.info("Configuration validated successfully")
 
-    bot = WaterBillBot()
+    bot = BlueDeerBot()
 
     try:
         logger.info("Initializing bot...")
