@@ -131,14 +131,22 @@ async def dashboard(request: Request):
         section8_tenants = sum(1 for t in all_tenants if t.is_section8)
 
         # === KPI 5: TOTAL RENT ===
-        total_rent = sum(float(t.current_rent or 0) for t in all_tenants)
-        total_tenant_portion = sum(float(t.tenant_portion or 0) for t in all_tenants if t.is_section8)
-        # Voucher rent = current_rent - tenant_portion for Section 8 tenants
-        total_voucher_rent = sum(
-            float(t.current_rent or 0) - float(t.tenant_portion or 0)
-            for t in all_tenants if t.is_section8
-        )
-        market_rent = sum(float(t.current_rent or 0) for t in all_tenants if not t.is_section8)
+        # Match the logic from properties/list.html template
+        total_rent = 0
+        total_section8_rent = 0
+        total_regular_rent = 0
+
+        for tenant in all_tenants:
+            if tenant.is_section8 and (tenant.voucher_amount or tenant.tenant_portion):
+                # Section 8: voucher_amount + tenant_portion
+                voucher = float(tenant.voucher_amount or 0)
+                portion = float(tenant.tenant_portion or 0)
+                total_rent += voucher + portion
+                total_section8_rent += voucher + portion
+            elif tenant.current_rent:
+                # Regular tenant: current_rent
+                total_rent += float(tenant.current_rent)
+                total_regular_rent += float(tenant.current_rent)
 
         # === RECENT ACTIVITY (Notifications) ===
         result = await session.execute(
@@ -200,9 +208,8 @@ async def dashboard(request: Request):
             "section8_tenants": section8_tenants,
             # KPI 5: Total Rent
             "total_rent": total_rent,
-            "total_voucher_rent": total_voucher_rent,
-            "total_tenant_portion": total_tenant_portion,
-            "market_rent": market_rent,
+            "total_section8_rent": total_section8_rent,
+            "total_regular_rent": total_regular_rent,
             # Portfolio snapshot
             "section8_properties": section8_properties,
             "pending_inspections": pending_inspections,
