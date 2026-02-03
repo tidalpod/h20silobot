@@ -89,6 +89,11 @@
                             <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                                 {{ item.property.address }}{% if item.property.city %}, {{ item.property.city }}{% endif %}{% if item.property.state %}, {{ item.property.state }}{% endif %}{% if item.property.zip_code %} {{ item.property.zip_code }}{% endif %}
                             </a>
+                            {% if active_tenants %}
+                            {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+                            {% set display_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+                            <p class="text-xs text-gray-500 mt-0.5">{{ display_tenant.name }}{% if active_tenants|length > 1 %} +{{ active_tenants|length - 1 }}{% endif %}</p>
+                            {% endif %}
                             <!-- Tags: Max 3, ordered: Occupancy · Compliance · Section 8 -->
                             <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                 {# Tag 1: Occupancy #}
