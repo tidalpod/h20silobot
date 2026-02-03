@@ -15,7 +15,7 @@
 
 {% block content %}
 <!-- KPI Cards -->
-<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-6">
     <!-- 1. Properties -->
     <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
         <div class="p-5">
@@ -104,6 +104,32 @@
         <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
             <p class="text-xs text-gray-500">
                 <span class="text-purple-600 font-medium">{{ section8_tenants }} Section 8</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- 5. Total Rent -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 bg-green-50 rounded-xl">
+                    <span class="text-2xl">💰</span>
+                </div>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Total Rent</p>
+                    <p class="text-2xl font-bold text-green-600">${{ "{:,.0f}".format(total_rent) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
+            <p class="text-xs text-gray-500">
+                {% if total_voucher_rent > 0 %}
+                <span class="text-green-600 font-medium">${{ "{:,.0f}".format(total_voucher_rent) }} voucher</span>
+                <span class="mx-1">·</span>
+                <span>${{ "{:,.0f}".format(total_tenant_rent) }} tenant</span>
+                {% else %}
+                <span class="text-green-600 font-medium">Monthly income</span>
+                {% endif %}
             </p>
         </div>
     </div>
