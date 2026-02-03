@@ -131,22 +131,29 @@ async def dashboard(request: Request):
         section8_tenants = sum(1 for t in all_tenants if t.is_section8)
 
         # === KPI 5: TOTAL RENT ===
-        # Match the logic from properties/list.html template
+        # Match the exact logic from properties/list.html template
+        # Iterate through properties and get rent from primary/first tenant
         total_rent = 0
         total_section8_rent = 0
         total_regular_rent = 0
 
-        for tenant in all_tenants:
-            if tenant.is_section8 and (tenant.voucher_amount or tenant.tenant_portion):
-                # Section 8: voucher_amount + tenant_portion
-                voucher = float(tenant.voucher_amount or 0)
-                portion = float(tenant.tenant_portion or 0)
-                total_rent += voucher + portion
-                total_section8_rent += voucher + portion
-            elif tenant.current_rent:
-                # Regular tenant: current_rent
-                total_rent += float(tenant.current_rent)
-                total_regular_rent += float(tenant.current_rent)
+        for prop in properties:
+            active_tenants = [t for t in prop.tenants if t.is_active]
+            if active_tenants:
+                # Get primary tenant or first active tenant
+                primary = next((t for t in active_tenants if t.is_primary), None)
+                rent_tenant = primary if primary else active_tenants[0]
+
+                if rent_tenant.is_section8 and (rent_tenant.voucher_amount or rent_tenant.tenant_portion):
+                    # Section 8: voucher_amount + tenant_portion
+                    voucher = float(rent_tenant.voucher_amount or 0)
+                    portion = float(rent_tenant.tenant_portion or 0)
+                    total_rent += voucher + portion
+                    total_section8_rent += voucher + portion
+                elif rent_tenant.current_rent:
+                    # Regular tenant: current_rent
+                    total_rent += float(rent_tenant.current_rent)
+                    total_regular_rent += float(rent_tenant.current_rent)
 
         # === RECENT ACTIVITY (Notifications) ===
         result = await session.execute(
