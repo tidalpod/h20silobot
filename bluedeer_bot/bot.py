@@ -76,6 +76,7 @@ class BlueDeerBot:
         # Set up bot commands menu
         commands = [
             BotCommand("start", "🦌 Main menu"),
+            BotCommand("chatid", "📍 Get this chat's ID"),
             BotCommand("status", "📊 Property status overview"),
             BotCommand("recerts", "📅 Upcoming recertifications"),
             BotCommand("bills", "💧 Water bill alerts"),
