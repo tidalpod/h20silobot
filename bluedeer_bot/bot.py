@@ -404,21 +404,22 @@ class BlueDeerBot:
                 reminders = []
 
                 for prop in properties:
-                    # Check CO inspections
+                    # Check CO inspections (with times)
                     co_inspections = [
-                        ("Mechanical", prop.co_mechanical_date),
-                        ("Electrical", prop.co_electrical_date),
-                        ("Plumbing", prop.co_plumbing_date),
-                        ("Zoning", prop.co_zoning_date),
-                        ("Building", prop.co_building_date),
+                        ("Mechanical", prop.co_mechanical_date, prop.co_mechanical_time),
+                        ("Electrical", prop.co_electrical_date, prop.co_electrical_time),
+                        ("Plumbing", prop.co_plumbing_date, prop.co_plumbing_time),
+                        ("Zoning", prop.co_zoning_date, prop.co_zoning_time),
+                        ("Building", prop.co_building_date, prop.co_building_time),
                     ]
 
-                    for inspection_type, inspection_date in co_inspections:
+                    for inspection_type, inspection_date, inspection_time in co_inspections:
                         if inspection_date == tomorrow:
                             reminders.append({
                                 "property": prop.address,
                                 "type": f"CO {inspection_type}",
-                                "date": inspection_date
+                                "date": inspection_date,
+                                "time": inspection_time
                             })
 
                     # Check Rental inspection
@@ -426,7 +427,17 @@ class BlueDeerBot:
                         reminders.append({
                             "property": prop.address,
                             "type": "Rental Inspection",
-                            "date": prop.rental_inspection_date
+                            "date": prop.rental_inspection_date,
+                            "time": prop.rental_inspection_time
+                        })
+
+                    # Check Section 8 inspection
+                    if prop.section8_inspection_date == tomorrow and prop.section8_inspection_status in ('scheduled', 'pending', 'reinspection'):
+                        reminders.append({
+                            "property": prop.address,
+                            "type": f"Section 8 ({prop.section8_inspection_status})",
+                            "date": prop.section8_inspection_date,
+                            "time": prop.section8_inspection_time
                         })
 
                 if reminders:
@@ -436,7 +447,10 @@ class BlueDeerBot:
                     for r in reminders:
                         message += f"• *{r['property']}*\n"
                         message += f"  📋 {r['type']}\n"
-                        message += f"  📅 {r['date'].strftime('%b %d, %Y')}\n\n"
+                        message += f"  📅 {r['date'].strftime('%b %d, %Y')}"
+                        if r.get('time'):
+                            message += f" at {r['time']}"
+                        message += "\n\n"
 
                     await self.send_notification(message)
                     logger.info(f"Sent {len(reminders)} inspection reminders")

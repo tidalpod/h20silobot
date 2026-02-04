@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Inspections{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                    <span>🏗️</span> Inspections
+                </h1>
+                <p class="mt-1 text-sm text-gray-500">Track all property inspections in one place.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+                    {{ total_upcoming }} Upcoming
+                </span>
+            </div>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Tab Navigation -->
+<div class="border-b border-gray-200 mb-6">
+    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+        <button onclick="showInspectionTab('co')" id="tab-co" class="insp-tab-btn border-b-2 border-orange-500 py-3 px-1 text-sm font-medium text-orange-600">
+            🏗️ Certificate of Occupancy ({{ upcoming_co|length }})
+        </button>
+        <button onclick="showInspectionTab('rental')" id="tab-rental" class="insp-tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            🏠 Rental ({{ upcoming_rental|length }})
+        </button>
+        <button onclick="showInspectionTab('section8')" id="tab-section8" class="insp-tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            🔍 Section 8 ({{ upcoming_section8|length }})
+        </button>
+    </nav>
+</div>
+
+<!-- CO Inspections Panel -->
+<div id="panel-co" class="insp-panel">
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 mb-6">
+        <div class="px-5 py-4 border-b border-gray-100 bg-orange-50 rounded-t-xl">
+            <h2 class="text-lg font-semibold text-orange-800 flex items-center gap-2">
+                <span>🏗️</span> Upcoming CO Inspections
+            </h2>
+        </div>
+        {% if upcoming_co %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in upcoming_co %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-4">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1 text-sm text-gray-900">
+                                <span>{{ item.icon }}</span> {{ item.type }}
+                            </span>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.time or '—' }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            {% if item.days_until == 0 %}
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Today!</span>
+                            {% elif item.days_until == 1 %}
+                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">Tomorrow</span>
+                            {% elif item.days_until <= 7 %}
+                            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">{{ item.days_until }} days</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{{ item.days_until }} days</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-12 text-center">
+            <span class="text-4xl text-gray-300">🏗️</span>
+            <p class="mt-2 text-sm text-gray-500">No upcoming CO inspections scheduled</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if past_co %}
+    <details class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <summary class="px-5 py-4 cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700">
+            Past CO Inspections ({{ past_co|length }})
+        </summary>
+        <div class="overflow-x-auto border-t border-gray-100">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in past_co %}
+                    <tr class="hover:bg-gray-50 opacity-60">
+                        <td class="px-5 py-3">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm text-gray-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.icon }} {{ item.type }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-400">
+                            {{ item.time or '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</div>
+
+<!-- Rental Inspections Panel -->
+<div id="panel-rental" class="insp-panel hidden">
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 mb-6">
+        <div class="px-5 py-4 border-b border-gray-100 bg-blue-50 rounded-t-xl">
+            <h2 class="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                <span>🏠</span> Upcoming Rental Inspections
+            </h2>
+        </div>
+        {% if upcoming_rental %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in upcoming_rental %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-4">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.time or '—' }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            {% if item.days_until == 0 %}
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Today!</span>
+                            {% elif item.days_until == 1 %}
+                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">Tomorrow</span>
+                            {% elif item.days_until <= 7 %}
+                            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">{{ item.days_until }} days</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{{ item.days_until }} days</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-12 text-center">
+            <span class="text-4xl text-gray-300">🏠</span>
+            <p class="mt-2 text-sm text-gray-500">No upcoming rental inspections scheduled</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if past_rental %}
+    <details class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <summary class="px-5 py-4 cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700">
+            Past Rental Inspections ({{ past_rental|length }})
+        </summary>
+        <div class="overflow-x-auto border-t border-gray-100">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in past_rental %}
+                    <tr class="hover:bg-gray-50 opacity-60">
+                        <td class="px-5 py-3">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm text-gray-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-400">
+                            {{ item.time or '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</div>
+
+<!-- Section 8 Inspections Panel -->
+<div id="panel-section8" class="insp-panel hidden">
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 mb-6">
+        <div class="px-5 py-4 border-b border-gray-100 bg-purple-50 rounded-t-xl">
+            <h2 class="text-lg font-semibold text-purple-800 flex items-center gap-2">
+                <span>🔍</span> Upcoming Section 8 Inspections
+            </h2>
+        </div>
+        {% if upcoming_section8 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in upcoming_section8 %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-4">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.time or '—' }}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            {% if item.days_until == 0 %}
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Today!</span>
+                            {% elif item.days_until == 1 %}
+                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">Tomorrow</span>
+                            {% elif item.days_until <= 7 %}
+                            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">{{ item.days_until }} days</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{{ item.days_until }} days</span>
+                            {% endif %}
+                            <span class="ml-1 text-xs text-gray-500">({{ item.status|capitalize }})</span>
+                        </td>
+                        <td class="px-5 py-4 text-sm text-gray-500 max-w-xs truncate">
+                            {{ item.notes or '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-12 text-center">
+            <span class="text-4xl text-gray-300">🔍</span>
+            <p class="mt-2 text-sm text-gray-500">No upcoming Section 8 inspections scheduled</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if past_section8 %}
+    <details class="bg-white shadow-sm rounded-xl border border-gray-200">
+        <summary class="px-5 py-4 cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700">
+            Past Section 8 Inspections ({{ past_section8|length }})
+        </summary>
+        <div class="overflow-x-auto border-t border-gray-100">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for item in past_section8 %}
+                    <tr class="hover:bg-gray-50 opacity-60">
+                        <td class="px-5 py-3">
+                            <a href="/properties/{{ item.property.id }}" class="text-sm text-gray-600 hover:text-blue-500">
+                                {{ item.property.address }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.date.strftime('%b %d, %Y') }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-400">
+                            {{ item.time or '—' }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {{ item.status|capitalize }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</div>
+
+<script>
+function showInspectionTab(tabName) {
+    // Hide all panels
+    document.querySelectorAll('.insp-panel').forEach(panel => {
+        panel.classList.add('hidden');
+    });
+
+    // Remove active state from all tabs
+    document.querySelectorAll('.insp-tab-btn').forEach(btn => {
+        btn.classList.remove('border-orange-500', 'text-orange-600', 'border-blue-500', 'text-blue-600', 'border-purple-500', 'text-purple-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    // Show selected panel
+    document.getElementById('panel-' + tabName).classList.remove('hidden');
+
+    // Activate selected tab with appropriate color
+    const activeTab = document.getElementById('tab-' + tabName);
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+
+    if (tabName === 'co') {
+        activeTab.classList.add('border-orange-500', 'text-orange-600');
+    } else if (tabName === 'rental') {
+        activeTab.classList.add('border-blue-500', 'text-blue-600');
+    } else if (tabName === 'section8') {
+        activeTab.classList.add('border-purple-500', 'text-purple-600');
+    }
+}
+</script>
+{% endblock %}

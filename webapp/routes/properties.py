@@ -137,13 +137,20 @@ async def create_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
+    section8_inspection_time: str = Form(""),
     section8_inspection_notes: str = Form(""),
     co_mechanical_date: str = Form(""),
+    co_mechanical_time: str = Form(""),
     co_electrical_date: str = Form(""),
+    co_electrical_time: str = Form(""),
     co_plumbing_date: str = Form(""),
+    co_plumbing_time: str = Form(""),
     co_zoning_date: str = Form(""),
+    co_zoning_time: str = Form(""),
     co_building_date: str = Form(""),
-    rental_inspection_date: str = Form("")
+    co_building_time: str = Form(""),
+    rental_inspection_date: str = Form(""),
+    rental_inspection_time: str = Form("")
 ):
     """Create a new property"""
     user = await get_current_user(request)
@@ -210,15 +217,22 @@ async def create_property(
             # Section 8 inspection
             section8_inspection_status=section8_inspection_status or None,
             section8_inspection_date=parse_date(section8_inspection_date),
+            section8_inspection_time=section8_inspection_time or None,
             section8_inspection_notes=section8_inspection_notes or None,
             # Certificate of Occupancy inspections
             co_mechanical_date=parse_date(co_mechanical_date),
+            co_mechanical_time=co_mechanical_time or None,
             co_electrical_date=parse_date(co_electrical_date),
+            co_electrical_time=co_electrical_time or None,
             co_plumbing_date=parse_date(co_plumbing_date),
+            co_plumbing_time=co_plumbing_time or None,
             co_zoning_date=parse_date(co_zoning_date),
+            co_zoning_time=co_zoning_time or None,
             co_building_date=parse_date(co_building_date),
+            co_building_time=co_building_time or None,
             # Rental inspection
             rental_inspection_date=parse_date(rental_inspection_date),
+            rental_inspection_time=rental_inspection_time or None,
         )
         session.add(prop)
         await session.commit()
@@ -329,13 +343,20 @@ async def update_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
+    section8_inspection_time: str = Form(""),
     section8_inspection_notes: str = Form(""),
     co_mechanical_date: str = Form(""),
+    co_mechanical_time: str = Form(""),
     co_electrical_date: str = Form(""),
+    co_electrical_time: str = Form(""),
     co_plumbing_date: str = Form(""),
+    co_plumbing_time: str = Form(""),
     co_zoning_date: str = Form(""),
+    co_zoning_time: str = Form(""),
     co_building_date: str = Form(""),
-    rental_inspection_date: str = Form("")
+    co_building_time: str = Form(""),
+    rental_inspection_date: str = Form(""),
+    rental_inspection_time: str = Form("")
 ):
     """Update a property"""
     user = await get_current_user(request)
@@ -408,15 +429,22 @@ async def update_property(
         # Section 8 inspection
         prop.section8_inspection_status = section8_inspection_status or None
         prop.section8_inspection_date = parse_date(section8_inspection_date)
+        prop.section8_inspection_time = section8_inspection_time or None
         prop.section8_inspection_notes = section8_inspection_notes or None
         # Certificate of Occupancy inspections
         prop.co_mechanical_date = parse_date(co_mechanical_date)
+        prop.co_mechanical_time = co_mechanical_time or None
         prop.co_electrical_date = parse_date(co_electrical_date)
+        prop.co_electrical_time = co_electrical_time or None
         prop.co_plumbing_date = parse_date(co_plumbing_date)
+        prop.co_plumbing_time = co_plumbing_time or None
         prop.co_zoning_date = parse_date(co_zoning_date)
+        prop.co_zoning_time = co_zoning_time or None
         prop.co_building_date = parse_date(co_building_date)
+        prop.co_building_time = co_building_time or None
         # Rental inspection
         prop.rental_inspection_date = parse_date(rental_inspection_date)
+        prop.rental_inspection_time = rental_inspection_time or None
 
         await session.commit()
 

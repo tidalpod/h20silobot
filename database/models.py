@@ -68,13 +68,22 @@ class Property(Base):
 
     # Certificate of Occupancy (CO) inspections
     co_mechanical_date = Column(Date, nullable=True)
+    co_mechanical_time = Column(String(10), nullable=True)  # e.g., "09:00 AM"
     co_electrical_date = Column(Date, nullable=True)
+    co_electrical_time = Column(String(10), nullable=True)
     co_plumbing_date = Column(Date, nullable=True)
+    co_plumbing_time = Column(String(10), nullable=True)
     co_zoning_date = Column(Date, nullable=True)
+    co_zoning_time = Column(String(10), nullable=True)
     co_building_date = Column(Date, nullable=True)
+    co_building_time = Column(String(10), nullable=True)
 
     # Rental inspection
     rental_inspection_date = Column(Date, nullable=True)
+    rental_inspection_time = Column(String(10), nullable=True)
+
+    # Section 8 inspection time
+    section8_inspection_time = Column(String(10), nullable=True)
 
     # Lease dates (for recertification tracking)
     lease_start_date = Column(Date, nullable=True)
