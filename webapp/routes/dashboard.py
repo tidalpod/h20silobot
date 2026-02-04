@@ -56,6 +56,9 @@ async def dashboard(request: Request):
         pending_inspections = 0
         overdue_bills_count = 0
 
+        # === OUTSTANDING WATER BILLS ===
+        outstanding_bills = []
+
         for prop in properties:
             # Get active tenants for this property
             active_tenants = [t for t in prop.tenants if t.is_active]
@@ -99,18 +102,23 @@ async def dashboard(request: Request):
             elif prop.section8_inspection_status in ('pending', 'scheduled', 'reinspection'):
                 pending_inspections += 1
 
-            # Overdue utilities
+            # Water bills - check for outstanding amounts
             if prop.bills:
                 latest = prop.bills[0]
                 status = latest.calculate_status()
-                if status == BillStatus.OVERDUE:
-                    overdue_bills_count += 1
-                    attention_items.append({
+                if latest.amount_due and float(latest.amount_due) > 0:
+                    days_overdue = 0
+                    if latest.due_date:
+                        days_overdue = (datetime.now().date() - latest.due_date).days
+                    outstanding_bills.append({
                         "property": prop,
-                        "issue": f"Water bill overdue (${latest.amount_due:.0f})",
-                        "severity": "danger",
-                        "icon": "💧"
+                        "amount": float(latest.amount_due),
+                        "due_date": latest.due_date,
+                        "days_overdue": days_overdue,
+                        "is_overdue": status == BillStatus.OVERDUE
                     })
+                    if status == BillStatus.OVERDUE:
+                        overdue_bills_count += 1
 
         # Sort attention items: danger first, then warning
         severity_order = {"danger": 0, "warning": 1}
@@ -242,6 +250,12 @@ async def dashboard(request: Request):
         # Sort by date
         upcoming_inspections.sort(key=lambda x: x["date"])
 
+        # Sort outstanding bills: overdue first, then by amount descending
+        outstanding_bills.sort(key=lambda x: (not x["is_overdue"], -x["amount"]))
+
+        # Calculate total outstanding
+        total_outstanding = sum(b["amount"] for b in outstanding_bills)
+
         # === DETERMINE "ALL CAUGHT UP" STATE ===
         all_caught_up = (
             needs_attention_count == 0 and
@@ -281,6 +295,9 @@ async def dashboard(request: Request):
             "upcoming_recerts": upcoming_recerts[:5],
             # Inspections
             "upcoming_inspections": upcoming_inspections[:5],
+            # Outstanding bills
+            "outstanding_bills": outstanding_bills[:5],
+            "total_outstanding": total_outstanding,
             # State
             "all_caught_up": all_caught_up,
         }
