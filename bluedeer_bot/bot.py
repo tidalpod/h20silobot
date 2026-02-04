@@ -140,6 +140,14 @@ class BlueDeerBot:
             name="Overdue alerts"
         )
 
+        # Inspection reminders at 7 AM (day before)
+        self.scheduler.add_job(
+            self.send_inspection_reminders,
+            CronTrigger(hour=7, minute=0),
+            id="inspection_reminders",
+            name="Inspection reminders"
+        )
+
         logger.info("Scheduled jobs configured")
 
     async def get_notification_chat_ids(self) -> List[int]:
@@ -371,6 +379,72 @@ class BlueDeerBot:
 
         except Exception as e:
             logger.error(f"Error sending due date reminders: {e}")
+
+    async def send_inspection_reminders(self):
+        """Send reminders for inspections scheduled for tomorrow"""
+        if not self.db_available:
+            return
+
+        logger.info("Checking for upcoming inspections...")
+
+        try:
+            from database.connection import get_session
+            from database.models import Property
+            from sqlalchemy import select
+            from datetime import timedelta
+
+            tomorrow = date.today() + timedelta(days=1)
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(Property).where(Property.is_active == True)
+                )
+                properties = result.scalars().all()
+
+                reminders = []
+
+                for prop in properties:
+                    # Check CO inspections
+                    co_inspections = [
+                        ("Mechanical", prop.co_mechanical_date),
+                        ("Electrical", prop.co_electrical_date),
+                        ("Plumbing", prop.co_plumbing_date),
+                        ("Zoning", prop.co_zoning_date),
+                        ("Building", prop.co_building_date),
+                    ]
+
+                    for inspection_type, inspection_date in co_inspections:
+                        if inspection_date == tomorrow:
+                            reminders.append({
+                                "property": prop.address,
+                                "type": f"CO {inspection_type}",
+                                "date": inspection_date
+                            })
+
+                    # Check Rental inspection
+                    if prop.rental_inspection_date == tomorrow:
+                        reminders.append({
+                            "property": prop.address,
+                            "type": "Rental Inspection",
+                            "date": prop.rental_inspection_date
+                        })
+
+                if reminders:
+                    message = "🏗️ *Blue Deer - Inspection Reminders*\n\n"
+                    message += "⚠️ *Tomorrow's Inspections:*\n\n"
+
+                    for r in reminders:
+                        message += f"• *{r['property']}*\n"
+                        message += f"  📋 {r['type']}\n"
+                        message += f"  📅 {r['date'].strftime('%b %d, %Y')}\n\n"
+
+                    await self.send_notification(message)
+                    logger.info(f"Sent {len(reminders)} inspection reminders")
+                else:
+                    logger.info("No inspection reminders needed")
+
+        except Exception as e:
+            logger.error(f"Error sending inspection reminders: {e}")
 
     async def send_overdue_alerts(self):
         """Send alerts for overdue bills"""

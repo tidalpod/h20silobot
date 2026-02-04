@@ -290,6 +290,62 @@
                 </div>
             </div>
 
+            <!-- Certificate of Occupancy Inspections -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>🏗️</span> Certificate of Occupancy Inspections
+                </h2>
+                <p class="text-sm text-gray-500 mb-4">Schedule dates for CO inspections. You'll receive a reminder the day before each inspection.</p>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-5">
+                    <div>
+                        <label for="co_mechanical_date" class="block text-sm font-medium text-gray-700 mb-1">⚙️ Mechanical</label>
+                        <input type="date" name="co_mechanical_date" id="co_mechanical_date"
+                               value="{{ property.co_mechanical_date.isoformat() if property and property.co_mechanical_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                    <div>
+                        <label for="co_electrical_date" class="block text-sm font-medium text-gray-700 mb-1">⚡ Electrical</label>
+                        <input type="date" name="co_electrical_date" id="co_electrical_date"
+                               value="{{ property.co_electrical_date.isoformat() if property and property.co_electrical_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                    <div>
+                        <label for="co_plumbing_date" class="block text-sm font-medium text-gray-700 mb-1">🔧 Plumbing</label>
+                        <input type="date" name="co_plumbing_date" id="co_plumbing_date"
+                               value="{{ property.co_plumbing_date.isoformat() if property and property.co_plumbing_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                    <div>
+                        <label for="co_zoning_date" class="block text-sm font-medium text-gray-700 mb-1">📐 Zoning</label>
+                        <input type="date" name="co_zoning_date" id="co_zoning_date"
+                               value="{{ property.co_zoning_date.isoformat() if property and property.co_zoning_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                    <div>
+                        <label for="co_building_date" class="block text-sm font-medium text-gray-700 mb-1">🏢 Building</label>
+                        <input type="date" name="co_building_date" id="co_building_date"
+                               value="{{ property.co_building_date.isoformat() if property and property.co_building_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rental Inspection -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>🏠</span> Rental Inspection
+                </h2>
+                <p class="text-sm text-gray-500 mb-4">Schedule the rental inspection date. You'll receive a reminder the day before.</p>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label for="rental_inspection_date" class="block text-sm font-medium text-gray-700 mb-1">📅 Inspection Date</label>
+                        <input type="date" name="rental_inspection_date" id="rental_inspection_date"
+                               value="{{ property.rental_inspection_date.isoformat() if property and property.rental_inspection_date else '' }}"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                    </div>
+                </div>
+            </div>
+
             {% if property %}
             <!-- Status Section -->
             <div>

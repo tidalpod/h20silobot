@@ -638,6 +638,92 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- Certificate of Occupancy Inspections -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">🏗️ Certificate of Occupancy Inspections</h3>
+                    {% set has_any_co = property.co_mechanical_date or property.co_electrical_date or property.co_plumbing_date or property.co_zoning_date or property.co_building_date %}
+                    {% if has_any_co %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if has_any_co %}
+                    <dl class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">⚙️ Mechanical</dt>
+                            <dd class="mt-1 text-sm {% if property.co_mechanical_date %}{% if property.co_mechanical_date < today %}text-green-600{% elif (property.co_mechanical_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
+                                {{ property.co_mechanical_date.strftime('%b %d, %Y') if property.co_mechanical_date else 'Not set' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">⚡ Electrical</dt>
+                            <dd class="mt-1 text-sm {% if property.co_electrical_date %}{% if property.co_electrical_date < today %}text-green-600{% elif (property.co_electrical_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
+                                {{ property.co_electrical_date.strftime('%b %d, %Y') if property.co_electrical_date else 'Not set' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">🔧 Plumbing</dt>
+                            <dd class="mt-1 text-sm {% if property.co_plumbing_date %}{% if property.co_plumbing_date < today %}text-green-600{% elif (property.co_plumbing_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
+                                {{ property.co_plumbing_date.strftime('%b %d, %Y') if property.co_plumbing_date else 'Not set' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">📐 Zoning</dt>
+                            <dd class="mt-1 text-sm {% if property.co_zoning_date %}{% if property.co_zoning_date < today %}text-green-600{% elif (property.co_zoning_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
+                                {{ property.co_zoning_date.strftime('%b %d, %Y') if property.co_zoning_date else 'Not set' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">🏢 Building</dt>
+                            <dd class="mt-1 text-sm {% if property.co_building_date %}{% if property.co_building_date < today %}text-green-600{% elif (property.co_building_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
+                                {{ property.co_building_date.strftime('%b %d, %Y') if property.co_building_date else 'Not set' }}
+                            </dd>
+                        </div>
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No CO inspections scheduled. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Schedule inspections →</a></p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Rental Inspection -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-900">🏠 Rental Inspection</h3>
+                    {% if property.rental_inspection_date %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
+                    {% endif %}
+                </div>
+                <div class="px-5 py-4">
+                    {% if property.rental_inspection_date %}
+                    <dl class="grid grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">📅 Inspection Date</dt>
+                            <dd class="mt-1 text-sm {% if property.rental_inspection_date < today %}text-green-600{% elif (property.rental_inspection_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}">
+                                {{ property.rental_inspection_date.strftime('%b %d, %Y') }}
+                                {% if property.rental_inspection_date < today %}
+                                <span class="text-xs text-green-600">(Completed)</span>
+                                {% elif (property.rental_inspection_date - today).days == 0 %}
+                                <span class="text-xs text-orange-600 font-semibold">(Today!)</span>
+                                {% elif (property.rental_inspection_date - today).days == 1 %}
+                                <span class="text-xs text-orange-600 font-semibold">(Tomorrow!)</span>
+                                {% else %}
+                                <span class="text-xs text-gray-500">({{ (property.rental_inspection_date - today).days }} days away)</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No rental inspection scheduled. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Schedule inspection →</a></p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <!-- TAB: Utilities -->

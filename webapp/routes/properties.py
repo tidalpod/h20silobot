@@ -137,7 +137,13 @@ async def create_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
-    section8_inspection_notes: str = Form("")
+    section8_inspection_notes: str = Form(""),
+    co_mechanical_date: str = Form(""),
+    co_electrical_date: str = Form(""),
+    co_plumbing_date: str = Form(""),
+    co_zoning_date: str = Form(""),
+    co_building_date: str = Form(""),
+    rental_inspection_date: str = Form("")
 ):
     """Create a new property"""
     user = await get_current_user(request)
@@ -205,6 +211,14 @@ async def create_property(
             section8_inspection_status=section8_inspection_status or None,
             section8_inspection_date=parse_date(section8_inspection_date),
             section8_inspection_notes=section8_inspection_notes or None,
+            # Certificate of Occupancy inspections
+            co_mechanical_date=parse_date(co_mechanical_date),
+            co_electrical_date=parse_date(co_electrical_date),
+            co_plumbing_date=parse_date(co_plumbing_date),
+            co_zoning_date=parse_date(co_zoning_date),
+            co_building_date=parse_date(co_building_date),
+            # Rental inspection
+            rental_inspection_date=parse_date(rental_inspection_date),
         )
         session.add(prop)
         await session.commit()
@@ -315,7 +329,13 @@ async def update_property(
     rental_license_expiry: str = Form(""),
     section8_inspection_status: str = Form(""),
     section8_inspection_date: str = Form(""),
-    section8_inspection_notes: str = Form("")
+    section8_inspection_notes: str = Form(""),
+    co_mechanical_date: str = Form(""),
+    co_electrical_date: str = Form(""),
+    co_plumbing_date: str = Form(""),
+    co_zoning_date: str = Form(""),
+    co_building_date: str = Form(""),
+    rental_inspection_date: str = Form("")
 ):
     """Update a property"""
     user = await get_current_user(request)
@@ -389,6 +409,14 @@ async def update_property(
         prop.section8_inspection_status = section8_inspection_status or None
         prop.section8_inspection_date = parse_date(section8_inspection_date)
         prop.section8_inspection_notes = section8_inspection_notes or None
+        # Certificate of Occupancy inspections
+        prop.co_mechanical_date = parse_date(co_mechanical_date)
+        prop.co_electrical_date = parse_date(co_electrical_date)
+        prop.co_plumbing_date = parse_date(co_plumbing_date)
+        prop.co_zoning_date = parse_date(co_zoning_date)
+        prop.co_building_date = parse_date(co_building_date)
+        # Rental inspection
+        prop.rental_inspection_date = parse_date(rental_inspection_date)
 
         await session.commit()
 

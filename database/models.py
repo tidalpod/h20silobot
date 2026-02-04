@@ -66,6 +66,16 @@ class Property(Base):
     section8_inspection_date = Column(Date, nullable=True)
     section8_inspection_notes = Column(Text, nullable=True)
 
+    # Certificate of Occupancy (CO) inspections
+    co_mechanical_date = Column(Date, nullable=True)
+    co_electrical_date = Column(Date, nullable=True)
+    co_plumbing_date = Column(Date, nullable=True)
+    co_zoning_date = Column(Date, nullable=True)
+    co_building_date = Column(Date, nullable=True)
+
+    # Rental inspection
+    rental_inspection_date = Column(Date, nullable=True)
+
     # Lease dates (for recertification tracking)
     lease_start_date = Column(Date, nullable=True)
     lease_end_date = Column(Date, nullable=True)
