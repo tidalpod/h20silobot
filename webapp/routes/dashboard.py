@@ -188,6 +188,60 @@ async def dashboard(request: Request):
 
         upcoming_recerts.sort(key=lambda x: x["recert_date"])
 
+        # === UPCOMING INSPECTIONS ===
+        today = datetime.now().date()
+        upcoming_inspections = []
+
+        for prop in properties:
+            # CO Inspections
+            co_inspections = [
+                ("Mechanical", "⚙️", prop.co_mechanical_date),
+                ("Electrical", "⚡", prop.co_electrical_date),
+                ("Plumbing", "🔧", prop.co_plumbing_date),
+                ("Zoning", "📐", prop.co_zoning_date),
+                ("Building", "🏢", prop.co_building_date),
+            ]
+
+            for insp_name, icon, insp_date in co_inspections:
+                if insp_date and insp_date >= today:
+                    days_until = (insp_date - today).days
+                    if days_until <= 30:  # Show inspections within 30 days
+                        upcoming_inspections.append({
+                            "property": prop,
+                            "type": f"CO {insp_name}",
+                            "icon": icon,
+                            "date": insp_date,
+                            "days_until": days_until
+                        })
+
+            # Rental Inspection
+            if prop.rental_inspection_date and prop.rental_inspection_date >= today:
+                days_until = (prop.rental_inspection_date - today).days
+                if days_until <= 30:
+                    upcoming_inspections.append({
+                        "property": prop,
+                        "type": "Rental Inspection",
+                        "icon": "🏠",
+                        "date": prop.rental_inspection_date,
+                        "days_until": days_until
+                    })
+
+            # Section 8 Inspection
+            if prop.section8_inspection_date and prop.section8_inspection_date >= today:
+                if prop.section8_inspection_status in ('scheduled', 'pending', 'reinspection'):
+                    days_until = (prop.section8_inspection_date - today).days
+                    if days_until <= 30:
+                        upcoming_inspections.append({
+                            "property": prop,
+                            "type": "Section 8 Inspection",
+                            "icon": "🔍",
+                            "date": prop.section8_inspection_date,
+                            "days_until": days_until
+                        })
+
+        # Sort by date
+        upcoming_inspections.sort(key=lambda x: x["date"])
+
         # === DETERMINE "ALL CAUGHT UP" STATE ===
         all_caught_up = (
             needs_attention_count == 0 and
@@ -225,6 +279,8 @@ async def dashboard(request: Request):
             "recent_notifications": recent_notifications,
             # Recerts
             "upcoming_recerts": upcoming_recerts[:5],
+            # Inspections
+            "upcoming_inspections": upcoming_inspections[:5],
             # State
             "all_caught_up": all_caught_up,
         }
