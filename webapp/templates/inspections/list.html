@@ -10,12 +10,15 @@
                 <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
                     <span>🏗️</span> Inspections
                 </h1>
-                <p class="mt-1 text-sm text-gray-500">Track all property inspections in one place.</p>
+                <p class="mt-1 text-sm text-gray-500">Track and schedule all property inspections in one place.</p>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
                 <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
                     {{ total_upcoming }} Upcoming
                 </span>
+                <button onclick="openScheduleModal()" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                    <span>+</span> Schedule Inspection
+                </button>
             </div>
         </div>
     </div>
@@ -56,6 +59,7 @@
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
@@ -88,6 +92,12 @@
                             <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{{ item.days_until }} days</span>
                             {% endif %}
                         </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <button onclick="openEditCoModal({{ item.property.id }}, '{{ item.type }}', '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.property.address }}')"
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
+                            <button onclick="confirmDeleteInspection({{ item.property.id }}, 'co', '{{ item.type }}', '{{ item.property.address }}')"
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -97,6 +107,7 @@
         <div class="px-5 py-12 text-center">
             <span class="text-4xl text-gray-300">🏗️</span>
             <p class="mt-2 text-sm text-gray-500">No upcoming CO inspections scheduled</p>
+            <button onclick="openScheduleModal('co')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">+ Schedule one now</button>
         </div>
         {% endif %}
     </div>
@@ -159,6 +170,7 @@
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
@@ -186,6 +198,12 @@
                             <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{{ item.days_until }} days</span>
                             {% endif %}
                         </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <button onclick="openEditRentalModal({{ item.property.id }}, '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.property.address }}')"
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
+                            <button onclick="confirmDeleteInspection({{ item.property.id }}, 'rental', '', '{{ item.property.address }}')"
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -195,6 +213,7 @@
         <div class="px-5 py-12 text-center">
             <span class="text-4xl text-gray-300">🏠</span>
             <p class="mt-2 text-sm text-gray-500">No upcoming rental inspections scheduled</p>
+            <button onclick="openScheduleModal('rental')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">+ Schedule one now</button>
         </div>
         {% endif %}
     </div>
@@ -254,6 +273,7 @@
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                        <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
@@ -285,6 +305,12 @@
                         <td class="px-5 py-4 text-sm text-gray-500 max-w-xs truncate">
                             {{ item.notes or '—' }}
                         </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <button onclick="openEditSection8Modal({{ item.property.id }}, '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.status }}', '{{ item.notes|default('', true)|replace('\n', ' ')|replace('\'', '\\\'') }}', '{{ item.property.address }}')"
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
+                            <button onclick="confirmDeleteInspection({{ item.property.id }}, 'section8', '', '{{ item.property.address }}')"
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -294,6 +320,7 @@
         <div class="px-5 py-12 text-center">
             <span class="text-4xl text-gray-300">🔍</span>
             <p class="mt-2 text-sm text-gray-500">No upcoming Section 8 inspections scheduled</p>
+            <button onclick="openScheduleModal('section8')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">+ Schedule one now</button>
         </div>
         {% endif %}
     </div>
@@ -339,6 +366,203 @@
     {% endif %}
 </div>
 
+<!-- Schedule New Inspection Modal -->
+<div id="schedule-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Schedule New Inspection</h3>
+        </div>
+        <form id="schedule-form" method="POST">
+            <div class="px-6 py-4 space-y-4">
+                <!-- Inspection Category -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Inspection Type</label>
+                    <select id="schedule-category" name="category" onchange="updateScheduleForm()" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="co">CO Inspection</option>
+                        <option value="rental">Rental Inspection</option>
+                        <option value="section8">Section 8 Inspection</option>
+                    </select>
+                </div>
+
+                <!-- Property -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Property</label>
+                    <select id="schedule-property" name="property_id" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        {% for prop in properties %}
+                        <option value="{{ prop.id }}">{{ prop.address }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- CO Type (only shown for CO) -->
+                <div id="schedule-co-type-wrapper">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">CO Type</label>
+                    <select id="schedule-co-type" name="inspection_type" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="mechanical">Mechanical</option>
+                        <option value="electrical">Electrical</option>
+                        <option value="plumbing">Plumbing</option>
+                        <option value="zoning">Zoning</option>
+                        <option value="building">Building</option>
+                    </select>
+                </div>
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" id="schedule-date" name="date" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <!-- Time -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
+                    <input type="text" id="schedule-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <!-- Section 8 Status (only shown for Section 8) -->
+                <div id="schedule-section8-status-wrapper" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="schedule-section8-status" name="status" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="pending">Pending</option>
+                        <option value="reinspection">Reinspection</option>
+                    </select>
+                </div>
+
+                <!-- Section 8 Notes (only shown for Section 8) -->
+                <div id="schedule-section8-notes-wrapper" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                    <textarea id="schedule-section8-notes" name="notes" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">Schedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit CO Inspection Modal -->
+<div id="edit-co-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Edit CO Inspection</h3>
+            <p id="edit-co-property" class="text-sm text-gray-500"></p>
+        </div>
+        <form action="/inspections/co/update" method="POST">
+            <input type="hidden" id="edit-co-property-id" name="property_id">
+            <input type="hidden" id="edit-co-type" name="inspection_type">
+            <div class="px-6 py-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <input type="text" id="edit-co-type-display" disabled class="w-full rounded-lg border-gray-200 bg-gray-50 text-gray-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" id="edit-co-date" name="date" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
+                    <input type="text" id="edit-co-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button type="button" onclick="closeEditCoModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Rental Inspection Modal -->
+<div id="edit-rental-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Edit Rental Inspection</h3>
+            <p id="edit-rental-property" class="text-sm text-gray-500"></p>
+        </div>
+        <form action="/inspections/rental/update" method="POST">
+            <input type="hidden" id="edit-rental-property-id" name="property_id">
+            <div class="px-6 py-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" id="edit-rental-date" name="date" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
+                    <input type="text" id="edit-rental-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button type="button" onclick="closeEditRentalModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Section 8 Inspection Modal -->
+<div id="edit-section8-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Edit Section 8 Inspection</h3>
+            <p id="edit-section8-property" class="text-sm text-gray-500"></p>
+        </div>
+        <form action="/inspections/section8/update" method="POST">
+            <input type="hidden" id="edit-section8-property-id" name="property_id">
+            <div class="px-6 py-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" id="edit-section8-date" name="date" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
+                    <input type="text" id="edit-section8-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="edit-section8-status" name="status" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="pending">Pending</option>
+                        <option value="reinspection">Reinspection</option>
+                        <option value="passed">Passed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                    <textarea id="edit-section8-notes" name="notes" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button type="button" onclick="closeEditSection8Modal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Delete Inspection</h3>
+        </div>
+        <form action="/inspections/delete" method="POST">
+            <input type="hidden" id="delete-property-id" name="property_id">
+            <input type="hidden" id="delete-category" name="inspection_category">
+            <input type="hidden" id="delete-type" name="inspection_type">
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600">Are you sure you want to delete this inspection for <strong id="delete-property-name"></strong>?</p>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function showInspectionTab(tabName) {
     // Hide all panels
@@ -367,5 +591,118 @@ function showInspectionTab(tabName) {
         activeTab.classList.add('border-purple-500', 'text-purple-600');
     }
 }
+
+// Schedule Modal
+function openScheduleModal(category = 'co') {
+    document.getElementById('schedule-category').value = category;
+    updateScheduleForm();
+    document.getElementById('schedule-modal').classList.remove('hidden');
+}
+
+function closeScheduleModal() {
+    document.getElementById('schedule-modal').classList.add('hidden');
+}
+
+function updateScheduleForm() {
+    const category = document.getElementById('schedule-category').value;
+    const coTypeWrapper = document.getElementById('schedule-co-type-wrapper');
+    const section8StatusWrapper = document.getElementById('schedule-section8-status-wrapper');
+    const section8NotesWrapper = document.getElementById('schedule-section8-notes-wrapper');
+    const form = document.getElementById('schedule-form');
+
+    // Update form action based on category
+    if (category === 'co') {
+        form.action = '/inspections/co/update';
+        coTypeWrapper.classList.remove('hidden');
+        section8StatusWrapper.classList.add('hidden');
+        section8NotesWrapper.classList.add('hidden');
+    } else if (category === 'rental') {
+        form.action = '/inspections/rental/update';
+        coTypeWrapper.classList.add('hidden');
+        section8StatusWrapper.classList.add('hidden');
+        section8NotesWrapper.classList.add('hidden');
+    } else if (category === 'section8') {
+        form.action = '/inspections/section8/update';
+        coTypeWrapper.classList.add('hidden');
+        section8StatusWrapper.classList.remove('hidden');
+        section8NotesWrapper.classList.remove('hidden');
+    }
+}
+
+// Edit CO Modal
+function openEditCoModal(propertyId, type, date, time, address) {
+    document.getElementById('edit-co-property-id').value = propertyId;
+    document.getElementById('edit-co-type').value = type.toLowerCase();
+    document.getElementById('edit-co-type-display').value = type;
+    document.getElementById('edit-co-date').value = date;
+    document.getElementById('edit-co-time').value = time;
+    document.getElementById('edit-co-property').textContent = address;
+    document.getElementById('edit-co-modal').classList.remove('hidden');
+}
+
+function closeEditCoModal() {
+    document.getElementById('edit-co-modal').classList.add('hidden');
+}
+
+// Edit Rental Modal
+function openEditRentalModal(propertyId, date, time, address) {
+    document.getElementById('edit-rental-property-id').value = propertyId;
+    document.getElementById('edit-rental-date').value = date;
+    document.getElementById('edit-rental-time').value = time;
+    document.getElementById('edit-rental-property').textContent = address;
+    document.getElementById('edit-rental-modal').classList.remove('hidden');
+}
+
+function closeEditRentalModal() {
+    document.getElementById('edit-rental-modal').classList.add('hidden');
+}
+
+// Edit Section 8 Modal
+function openEditSection8Modal(propertyId, date, time, status, notes, address) {
+    document.getElementById('edit-section8-property-id').value = propertyId;
+    document.getElementById('edit-section8-date').value = date;
+    document.getElementById('edit-section8-time').value = time;
+    document.getElementById('edit-section8-status').value = status;
+    document.getElementById('edit-section8-notes').value = notes;
+    document.getElementById('edit-section8-property').textContent = address;
+    document.getElementById('edit-section8-modal').classList.remove('hidden');
+}
+
+function closeEditSection8Modal() {
+    document.getElementById('edit-section8-modal').classList.add('hidden');
+}
+
+// Delete Modal
+function confirmDeleteInspection(propertyId, category, type, address) {
+    document.getElementById('delete-property-id').value = propertyId;
+    document.getElementById('delete-category').value = category;
+    document.getElementById('delete-type').value = type;
+    document.getElementById('delete-property-name').textContent = address;
+    document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.add('hidden');
+}
+
+// Close modals on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeScheduleModal();
+        closeEditCoModal();
+        closeEditRentalModal();
+        closeEditSection8Modal();
+        closeDeleteModal();
+    }
+});
+
+// Close modals on backdrop click
+document.querySelectorAll('#schedule-modal, #edit-co-modal, #edit-rental-modal, #edit-section8-modal, #delete-modal').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.add('hidden');
+        }
+    });
+});
 </script>
 {% endblock %}
