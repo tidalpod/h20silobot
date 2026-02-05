@@ -78,6 +78,7 @@ class BlueDeerBot:
             BotCommand("start", "🦌 Main menu"),
             BotCommand("chatid", "📍 Get this chat's ID"),
             BotCommand("status", "📊 Property status overview"),
+            BotCommand("inspections", "🏗️ Upcoming inspections"),
             BotCommand("recerts", "📅 Upcoming recertifications"),
             BotCommand("bills", "💧 Water bill alerts"),
             BotCommand("notify", "🔔 Send test notification"),
@@ -380,8 +381,62 @@ class BlueDeerBot:
         except Exception as e:
             logger.error(f"Error sending due date reminders: {e}")
 
+    def _collect_all_inspections(self, properties, today):
+        """Collect all upcoming inspections from properties"""
+        inspections = []
+
+        for prop in properties:
+            # CO inspections
+            co_types = [
+                ("CO Mechanical", "⚙️", prop.co_mechanical_date, prop.co_mechanical_time),
+                ("CO Electrical", "⚡", prop.co_electrical_date, prop.co_electrical_time),
+                ("CO Plumbing", "🔧", prop.co_plumbing_date, prop.co_plumbing_time),
+                ("CO Zoning", "📐", prop.co_zoning_date, prop.co_zoning_time),
+                ("CO Building", "🏢", prop.co_building_date, prop.co_building_time),
+            ]
+
+            for insp_type, icon, insp_date, insp_time in co_types:
+                if insp_date and insp_date >= today:
+                    days_until = (insp_date - today).days
+                    inspections.append({
+                        "property": prop.address,
+                        "type": insp_type,
+                        "icon": icon,
+                        "date": insp_date,
+                        "time": insp_time,
+                        "days_until": days_until
+                    })
+
+            # Rental inspection
+            if prop.rental_inspection_date and prop.rental_inspection_date >= today:
+                days_until = (prop.rental_inspection_date - today).days
+                inspections.append({
+                    "property": prop.address,
+                    "type": "Rental Inspection",
+                    "icon": "🏠",
+                    "date": prop.rental_inspection_date,
+                    "time": prop.rental_inspection_time,
+                    "days_until": days_until
+                })
+
+            # Section 8 inspection
+            if (prop.section8_inspection_date and prop.section8_inspection_date >= today
+                    and prop.section8_inspection_status in ('scheduled', 'pending', 'reinspection')):
+                days_until = (prop.section8_inspection_date - today).days
+                inspections.append({
+                    "property": prop.address,
+                    "type": f"Section 8 ({prop.section8_inspection_status})",
+                    "icon": "🔍",
+                    "date": prop.section8_inspection_date,
+                    "time": prop.section8_inspection_time,
+                    "days_until": days_until
+                })
+
+        inspections.sort(key=lambda x: x["date"])
+        return inspections
+
     async def send_inspection_reminders(self):
-        """Send reminders for inspections scheduled for tomorrow"""
+        """Send reminders for inspections at key intervals: today, tomorrow, 3 days, 7 days"""
         if not self.db_available:
             return
 
@@ -391,9 +446,9 @@ class BlueDeerBot:
             from database.connection import get_session
             from database.models import Property
             from sqlalchemy import select
-            from datetime import timedelta
 
-            tomorrow = date.today() + timedelta(days=1)
+            today = date.today()
+            alert_days = {0: "🚨 TODAY", 1: "⚠️ TOMORROW", 3: "📋 In 3 Days", 7: "📅 In 7 Days"}
 
             async with get_session() as session:
                 result = await session.execute(
@@ -401,56 +456,25 @@ class BlueDeerBot:
                 )
                 properties = result.scalars().all()
 
-                reminders = []
+                all_inspections = self._collect_all_inspections(properties, today)
 
-                for prop in properties:
-                    # Check CO inspections (with times)
-                    co_inspections = [
-                        ("Mechanical", prop.co_mechanical_date, prop.co_mechanical_time),
-                        ("Electrical", prop.co_electrical_date, prop.co_electrical_time),
-                        ("Plumbing", prop.co_plumbing_date, prop.co_plumbing_time),
-                        ("Zoning", prop.co_zoning_date, prop.co_zoning_time),
-                        ("Building", prop.co_building_date, prop.co_building_time),
-                    ]
-
-                    for inspection_type, inspection_date, inspection_time in co_inspections:
-                        if inspection_date == tomorrow:
-                            reminders.append({
-                                "property": prop.address,
-                                "type": f"CO {inspection_type}",
-                                "date": inspection_date,
-                                "time": inspection_time
-                            })
-
-                    # Check Rental inspection
-                    if prop.rental_inspection_date == tomorrow:
-                        reminders.append({
-                            "property": prop.address,
-                            "type": "Rental Inspection",
-                            "date": prop.rental_inspection_date,
-                            "time": prop.rental_inspection_time
-                        })
-
-                    # Check Section 8 inspection
-                    if prop.section8_inspection_date == tomorrow and prop.section8_inspection_status in ('scheduled', 'pending', 'reinspection'):
-                        reminders.append({
-                            "property": prop.address,
-                            "type": f"Section 8 ({prop.section8_inspection_status})",
-                            "date": prop.section8_inspection_date,
-                            "time": prop.section8_inspection_time
-                        })
+                # Filter to only the alert days
+                reminders = [i for i in all_inspections if i["days_until"] in alert_days]
 
                 if reminders:
-                    message = "🏗️ *Blue Deer - Inspection Reminders*\n\n"
-                    message += "⚠️ *Tomorrow's Inspections:*\n\n"
+                    message = "🏗️ *Blue Deer - Inspection Alerts*\n\n"
 
-                    for r in reminders:
-                        message += f"• *{r['property']}*\n"
-                        message += f"  📋 {r['type']}\n"
-                        message += f"  📅 {r['date'].strftime('%b %d, %Y')}"
-                        if r.get('time'):
-                            message += f" at {r['time']}"
-                        message += "\n\n"
+                    for days_val in sorted(alert_days.keys()):
+                        day_items = [r for r in reminders if r["days_until"] == days_val]
+                        if day_items:
+                            message += f"*{alert_days[days_val]}:*\n"
+                            for r in day_items:
+                                message += f"• *{r['property']}*\n"
+                                message += f"  {r['icon']} {r['type']}\n"
+                                message += f"  📅 {r['date'].strftime('%b %d, %Y')}"
+                                if r.get('time'):
+                                    message += f" at {r['time']}"
+                                message += "\n\n"
 
                     await self.send_notification(message)
                     logger.info(f"Sent {len(reminders)} inspection reminders")
@@ -459,6 +483,59 @@ class BlueDeerBot:
 
         except Exception as e:
             logger.error(f"Error sending inspection reminders: {e}")
+
+    async def get_inspections_summary(self) -> str:
+        """Get summary of all upcoming inspections"""
+        if not self.db_available:
+            return "Database not available"
+
+        try:
+            from database.connection import get_session
+            from database.models import Property
+            from sqlalchemy import select
+
+            today = date.today()
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(Property).where(Property.is_active == True)
+                )
+                properties = result.scalars().all()
+
+                inspections = self._collect_all_inspections(properties, today)
+
+                if not inspections:
+                    return "🏗️ *Upcoming Inspections*\n\n_No upcoming inspections scheduled._"
+
+                message = f"🏗️ *Upcoming Inspections* ({len(inspections)})\n\n"
+
+                for i in inspections[:15]:
+                    if i["days_until"] == 0:
+                        urgency = "🚨 *TODAY*"
+                    elif i["days_until"] == 1:
+                        urgency = "⚠️ Tomorrow"
+                    elif i["days_until"] <= 7:
+                        urgency = f"🔴 {i['days_until']} days"
+                    elif i["days_until"] <= 14:
+                        urgency = f"🟡 {i['days_until']} days"
+                    else:
+                        urgency = f"🟢 {i['days_until']} days"
+
+                    message += f"• *{i['property']}*\n"
+                    message += f"  {i['icon']} {i['type']}\n"
+                    message += f"  📅 {i['date'].strftime('%b %d, %Y')}"
+                    if i.get('time'):
+                        message += f" at {i['time']}"
+                    message += f" ({urgency})\n\n"
+
+                if len(inspections) > 15:
+                    message += f"_...and {len(inspections) - 15} more_"
+
+                return message
+
+        except Exception as e:
+            logger.error(f"Error getting inspections summary: {e}")
+            return f"Error: {str(e)}"
 
     async def send_overdue_alerts(self):
         """Send alerts for overdue bills"""

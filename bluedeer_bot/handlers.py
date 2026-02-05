@@ -13,13 +13,14 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📊 Status", callback_data="menu_status"),
-            InlineKeyboardButton("📅 Recerts", callback_data="menu_recerts")
+            InlineKeyboardButton("🏗️ Inspections", callback_data="menu_inspections")
         ],
         [
-            InlineKeyboardButton("💧 Bills", callback_data="menu_bills"),
-            InlineKeyboardButton("🔔 Test Alert", callback_data="menu_test")
+            InlineKeyboardButton("📅 Recerts", callback_data="menu_recerts"),
+            InlineKeyboardButton("💧 Bills", callback_data="menu_bills")
         ],
         [
+            InlineKeyboardButton("🔔 Test Alert", callback_data="menu_test"),
             InlineKeyboardButton("❓ Help", callback_data="menu_help")
         ]
     ])
@@ -76,6 +77,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🦌 *Welcome to Blue Deer, {user.first_name}!*
 
 I send you notifications about your properties:
+• 🏗️ Inspection date alerts
 • 📅 Recertification reminders
 • 💧 Water bill alerts
 • ⚠️ Overdue bill warnings
@@ -102,6 +104,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "status":
         await show_status(query, context)
+    elif action == "inspections":
+        await show_inspections(query, context)
     elif action == "recerts":
         await show_recerts(query, context)
     elif action == "bills":
@@ -200,6 +204,7 @@ async def show_status(query, context: ContextTypes.DEFAULT_TYPE):
 💧 *Total Water Bills:* ${total_bills:,.2f}
 
 *Notification Schedule:*
+• 7:00 AM - Inspection alerts
 • 8:00 AM - Recert reminders
 • 9:00 AM - High bill alerts
 • 9:30 AM - Due soon reminders
@@ -224,6 +229,29 @@ async def show_status(query, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("« Back", callback_data="back_to_menu")
             ]])
         )
+
+
+async def show_inspections(query, context: ContextTypes.DEFAULT_TYPE):
+    """Show upcoming inspections"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await query.edit_message_text(
+            "⚠️ Bot not initialized.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("« Back", callback_data="back_to_menu")
+            ]])
+        )
+        return
+
+    message = await bot.get_inspections_summary()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Refresh", callback_data="menu_inspections")],
+        [InlineKeyboardButton("« Back", callback_data="back_to_menu")]
+    ])
+
+    await query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 
 async def show_recerts(query, context: ContextTypes.DEFAULT_TYPE):
@@ -320,13 +348,15 @@ async def show_help(query, context: ContextTypes.DEFAULT_TYPE):
 I automatically send you notifications about your properties managed in the Blue Deer web app.
 
 *Notifications:*
-📅 *Recertifications* - Reminders when Section 8 recerts are due (9 months after lease start)
+🏗️ *Inspections* - Alerts at 7 days, 3 days, 1 day before, and day-of
+📅 *Recertifications* - Reminders when Section 8 recerts are due
 💧 *Water Bills* - Alerts when bills exceed threshold
 ⚠️ *Overdue* - Warnings for past-due bills
 
 *Commands:*
 /start - Main menu
 /status - Property overview
+/inspections - View upcoming inspections
 /recerts - View upcoming recertifications
 /bills - View water bill alerts
 /notify - Send test notification
@@ -351,6 +381,18 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text, **kwargs)
 
     await show_status(FakeQuery(), context)
+
+
+async def inspections_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /inspections command"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await update.message.reply_text("⚠️ Bot not initialized.")
+        return
+
+    message = await bot.get_inspections_summary()
+    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
 
 
 async def recerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -406,6 +448,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 /start - Main menu
 /status - Property overview
+/inspections - Upcoming inspections
 /recerts - Upcoming recertifications
 /bills - Water bill alerts
 /notify - Send test notification
@@ -422,6 +465,7 @@ def setup_handlers(application):
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("chatid", chatid_command))
     application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("inspections", inspections_command))
     application.add_handler(CommandHandler("recerts", recerts_command))
     application.add_handler(CommandHandler("bills", bills_command))
     application.add_handler(CommandHandler("notify", notify_command))
