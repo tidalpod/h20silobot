@@ -192,6 +192,10 @@ async def create_property(
                     return None
             return None
 
+        # Helper to parse checkbox values
+        def parse_checkbox(val):
+            return val in ("on", "true", "1", "yes")
+
         # Create property
         prop = Property(
             address=address,
@@ -211,13 +215,13 @@ async def create_property(
             web_user_id=user["id"],
             is_active=True,
             # Occupancy
-            is_vacant=is_vacant,
+            is_vacant=parse_checkbox(is_vacant),
             # City certification
-            has_city_certification=has_city_certification,
+            has_city_certification=parse_checkbox(has_city_certification),
             city_certification_date=parse_date(city_certification_date),
             city_certification_expiry=parse_date(city_certification_expiry),
             # Rental license
-            has_rental_license=has_rental_license,
+            has_rental_license=parse_checkbox(has_rental_license),
             rental_license_number=rental_license_number or None,
             rental_license_issued=parse_date(rental_license_issued),
             rental_license_expiry=parse_date(rental_license_expiry),
@@ -412,6 +416,10 @@ async def update_property(
                     return None
             return None
 
+        # Helper to parse checkbox values
+        def parse_checkbox(val):
+            return val in ("on", "true", "1", "yes")
+
         # Update property
         prop.address = address
         prop.city = city or None
@@ -427,15 +435,15 @@ async def update_property(
         prop.year_built = year_built
         prop.lot_size = lot_size or None
         prop.property_type = property_type or None
-        prop.is_active = is_active
+        prop.is_active = parse_checkbox(is_active)
         # Occupancy
-        prop.is_vacant = is_vacant
+        prop.is_vacant = parse_checkbox(is_vacant)
         # City certification
-        prop.has_city_certification = has_city_certification
+        prop.has_city_certification = parse_checkbox(has_city_certification)
         prop.city_certification_date = parse_date(city_certification_date)
         prop.city_certification_expiry = parse_date(city_certification_expiry)
         # Rental license
-        prop.has_rental_license = has_rental_license
+        prop.has_rental_license = parse_checkbox(has_rental_license)
         prop.rental_license_number = rental_license_number or None
         prop.rental_license_issued = parse_date(rental_license_issued)
         prop.rental_license_expiry = parse_date(rental_license_expiry)
