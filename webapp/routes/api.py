@@ -401,6 +401,84 @@ async def refresh_all_property_taxes():
         logger.error(f"Error in bulk tax refresh: {e}")
 
 
+@router.post("/fill-parcel-numbers")
+async def api_fill_parcel_numbers(background_tasks: BackgroundTasks):
+    """Auto-fill parcel numbers for all properties that don't have one"""
+    background_tasks.add_task(fill_all_parcel_numbers)
+    return {"status": "started", "message": "Finding parcel numbers for all properties"}
+
+
+async def fill_all_parcel_numbers():
+    """Background task to find and fill parcel numbers for all properties"""
+    try:
+        from scraper.bsa_scraper import BSAScraper
+
+        async with get_session() as session:
+            # Get properties without parcel numbers
+            result = await session.execute(
+                select(Property).where(
+                    Property.is_active == True,
+                    (Property.parcel_number == None) | (Property.parcel_number == "")
+                )
+            )
+            properties = result.scalars().all()
+
+            logger.info(f"Finding parcel numbers for {len(properties)} properties")
+
+            async with BSAScraper() as scraper:
+                found_count = 0
+
+                for prop in properties:
+                    try:
+                        # Search by address
+                        street_address = prop.address.split(',')[0].strip()
+                        tax_data = await scraper.search_tax_by_address(street_address)
+
+                        if tax_data and tax_data.parcel_number:
+                            prop.parcel_number = tax_data.parcel_number
+                            found_count += 1
+                            logger.info(f"Found parcel for {prop.address}: {tax_data.parcel_number}")
+
+                            # Also save tax data while we're at it
+                            existing = await session.execute(
+                                select(PropertyTax)
+                                .where(PropertyTax.property_id == prop.id)
+                                .where(PropertyTax.tax_year == tax_data.tax_year)
+                            )
+                            existing_tax = existing.scalar_one_or_none()
+
+                            if not existing_tax:
+                                new_tax = PropertyTax(
+                                    property_id=prop.id,
+                                    tax_year=tax_data.tax_year,
+                                    amount_due=tax_data.amount_due,
+                                    due_date=tax_data.due_date,
+                                    status=tax_data.status,
+                                    parcel_number=tax_data.parcel_number,
+                                    scraped_at=datetime.utcnow(),
+                                    raw_data=tax_data.raw_data
+                                )
+                                session.add(new_tax)
+                        else:
+                            logger.warning(f"No parcel found for {prop.address}")
+
+                        # Rate limiting
+                        import asyncio
+                        await asyncio.sleep(2)
+
+                    except Exception as e:
+                        logger.error(f"Error finding parcel for {prop.address}: {e}")
+                        continue
+
+                await session.commit()
+                logger.info(f"Parcel number fill complete: {found_count}/{len(properties)} found")
+
+    except ImportError:
+        logger.error("BSAScraper not available")
+    except Exception as e:
+        logger.error(f"Error filling parcel numbers: {e}")
+
+
 @router.get("/property-lookup")
 async def api_property_lookup(address: str):
     """
