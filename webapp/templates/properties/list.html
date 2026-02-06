@@ -286,15 +286,15 @@
 
                 <!-- Property Tax -->
                 <td class="px-4 py-4 text-right">
-                    {% if item.property.taxes and item.property.taxes[0].amount_due %}
+                    {% if item.property.taxes and item.property.taxes[0].amount_due and item.property.taxes[0].amount_due > 0 %}
                     {% set tax_amount = item.property.taxes[0].amount_due %}
                     {% set tax_status = item.property.taxes[0].status %}
-                    <span class="text-sm {% if tax_status == 'delinquent' %}text-red-600 font-medium{% elif tax_amount > 0 %}text-gray-700{% else %}text-green-600{% endif %} font-light">
+                    <span class="text-sm {% if tax_status == 'delinquent' %}text-red-600 font-medium{% else %}text-gray-700{% endif %} font-light">
                         🏛️ ${{ "%.0f"|format(tax_amount) }}
                         {% if tax_status == 'delinquent' %}⚠️{% endif %}
                     </span>
                     {% else %}
-                    <span class="text-sm text-gray-300">—</span>
+                    <span class="text-sm text-gray-300" title="Tax data unavailable - BSA requires manual verification">—</span>
                     {% endif %}
                 </td>
 
