@@ -104,6 +104,7 @@ class Property(Base):
     taxes = relationship("PropertyTax", back_populates="property", order_by="desc(PropertyTax.tax_year)")
     recertifications = relationship("Recertification", back_populates="property_ref")
     web_user = relationship("WebUser", back_populates="properties")
+    sms_messages = relationship("SMSMessage", back_populates="property", order_by="SMSMessage.created_at")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -257,6 +258,12 @@ class NotificationStatus(PyEnum):
     DELIVERED = "delivered"
 
 
+class MessageDirection(PyEnum):
+    """SMS message direction"""
+    INBOUND = "inbound"    # From tenant to us
+    OUTBOUND = "outbound"  # From us to tenant
+
+
 class WebUser(Base):
     """Web application users (separate from Telegram users)"""
     __tablename__ = "web_users"
@@ -319,6 +326,7 @@ class Tenant(Base):
     pha = relationship("PHA", back_populates="tenants")
     notifications = relationship("Notification", back_populates="tenant")
     recertifications = relationship("Recertification", back_populates="tenant")
+    sms_messages = relationship("SMSMessage", back_populates="tenant", order_by="SMSMessage.created_at")
 
     # Indexes
     __table_args__ = (
@@ -526,3 +534,46 @@ class Recertification(Base):
         if self.current_rent and self.proposed_rent and self.current_rent > 0:
             return ((self.proposed_rent - self.current_rent) / self.current_rent) * 100
         return None
+
+
+# =============================================================================
+# SMS Conversation Models
+# =============================================================================
+
+class SMSMessage(Base):
+    """SMS message for bidirectional conversation tracking"""
+    __tablename__ = "sms_messages"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="SET NULL"), nullable=True)
+
+    # Phone numbers (E.164 format: +12481234567)
+    from_number = Column(String(20), nullable=False)
+    to_number = Column(String(20), nullable=False)
+
+    # Message content
+    body = Column(Text, nullable=False)
+    direction = Column(Enum(MessageDirection), nullable=False)
+
+    # Twilio tracking
+    twilio_sid = Column(String(50), nullable=True)  # Twilio message SID
+    status = Column(String(20), default="sent")  # sent, delivered, failed, received
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    delivered_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    tenant = relationship("Tenant", back_populates="sms_messages")
+    property = relationship("Property", back_populates="sms_messages")
+
+    # Indexes for fast conversation lookups
+    __table_args__ = (
+        Index("ix_sms_messages_tenant", "tenant_id"),
+        Index("ix_sms_messages_from_number", "from_number"),
+        Index("ix_sms_messages_created", "created_at"),
+    )
+
+    def __repr__(self):
+        return f"<SMSMessage {self.direction.value} {self.from_number} -> {self.to_number}>"

@@ -86,6 +86,7 @@ from .routes.bills import router as bills_router
 from .routes.api import router as api_router
 from .routes.phas import router as phas_router
 from .routes.inspections import router as inspections_router
+from .routes.sms import router as sms_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
 
@@ -98,6 +99,7 @@ app.include_router(bills_router, prefix="/bills")
 app.include_router(api_router, prefix="/api")
 app.include_router(phas_router, prefix="/phas")
 app.include_router(inspections_router)
+app.include_router(sms_router)
 # Recertification routes removed - dates tracked on property/tenant directly
 # app.include_router(recertifications_router, prefix="/recertifications")
 

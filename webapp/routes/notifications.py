@@ -90,6 +90,22 @@ Property Management
 }
 
 
+@router.get("/chat", response_class=HTMLResponse)
+async def sms_chat(request: Request):
+    """SMS chat conversations page"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return templates.TemplateResponse(
+        "notifications/chat.html",
+        {
+            "request": request,
+            "user": user,
+        }
+    )
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_notifications(request: Request, status: str = None):
     """List notification history"""

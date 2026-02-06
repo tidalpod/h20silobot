@@ -99,8 +99,11 @@
                                 <a href="/inspections" class="{% if '/inspections' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>📋</span> Inspections
                                 </a>
-                                <a href="/notifications" class="{% if '/notifications' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/notifications" class="{% if request.url.path == '/notifications' %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>📨</span> Notifications
+                                </a>
+                                <a href="/notifications/chat" class="{% if '/notifications/chat' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>💬</span> Messages
                                 </a>
                             </div>
                         </div>
@@ -156,6 +159,7 @@
                     <a href="/phas" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏛️ PHAs</a>
                     <a href="/inspections" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📋 Inspections</a>
                     <a href="/notifications" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📨 Notifications</a>
+                    <a href="/notifications/chat" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">💬 Messages</a>
                 </div>
                 <div class="border-t border-white/20 pb-3 pt-4">
                     <div class="flex items-center px-5 gap-2 text-white">

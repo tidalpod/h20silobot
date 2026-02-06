@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}SMS Conversations{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                <span>💬</span> SMS Conversations
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Chat with tenants via SMS</p>
+        </div>
+        <a href="/notifications" class="text-sm text-blue-600 hover:text-blue-500">
+            View Notification History →
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-[calc(100vh-220px)] min-h-[500px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <!-- Conversations List (Left Panel) -->
+    <div class="w-80 border-r border-gray-200 flex flex-col">
+        <div class="p-4 border-b border-gray-100 bg-gray-50">
+            <h2 class="text-sm font-semibold text-gray-700">Conversations</h2>
+        </div>
+        <div id="conversations-list" class="flex-1 overflow-y-auto">
+            <!-- Loading state -->
+            <div id="conversations-loading" class="p-4 text-center text-gray-500">
+                <div class="animate-pulse">Loading conversations...</div>
+            </div>
+            <!-- Conversations will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Chat Window (Right Panel) -->
+    <div class="flex-1 flex flex-col">
+        <!-- Chat Header -->
+        <div id="chat-header" class="p-4 border-b border-gray-100 bg-gray-50">
+            <div id="chat-header-content" class="hidden">
+                <h3 id="chat-tenant-name" class="text-lg font-semibold text-gray-900"></h3>
+                <p id="chat-tenant-info" class="text-sm text-gray-500"></p>
+            </div>
+            <div id="chat-header-empty" class="text-gray-400 text-sm">
+                Select a conversation to start chatting
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <!-- Empty state -->
+            <div id="messages-empty" class="h-full flex items-center justify-center">
+                <div class="text-center text-gray-400">
+                    <span class="text-4xl">💬</span>
+                    <p class="mt-2">Select a tenant to view messages</p>
+                </div>
+            </div>
+            <!-- Messages will be loaded here -->
+        </div>
+
+        <!-- Message Input -->
+        <div id="chat-input-area" class="p-4 border-t border-gray-200 bg-white hidden">
+            <form id="send-message-form" class="flex gap-3">
+                <input type="hidden" id="current-tenant-id" value="">
+                <input
+                    type="text"
+                    id="message-input"
+                    name="message"
+                    placeholder="Type your message..."
+                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    autocomplete="off"
+                >
+                <button
+                    type="submit"
+                    class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                    </svg>
+                    Send
+                </button>
+            </form>
+            <p id="send-error" class="mt-2 text-sm text-red-600 hidden"></p>
+        </div>
+    </div>
+</div>
+
+<!-- Unmatched Messages Section -->
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <span>❓</span> Unmatched Messages
+        <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
+    </h3>
+    <div id="unmatched-list" class="space-y-3">
+        <p class="text-sm text-gray-500">Messages from unknown numbers will appear here.</p>
+    </div>
+</div>
+
+<script>
+let currentTenantId = null;
+let refreshInterval = null;
+
+// Load conversations list
+async function loadConversations() {
+    try {
+        const response = await fetch('/sms/recent');
+        const data = await response.json();
+
+        const container = document.getElementById('conversations-list');
+        const loading = document.getElementById('conversations-loading');
+
+        if (data.conversations.length === 0) {
+            container.innerHTML = `
+                <div class="p-4 text-center text-gray-500 text-sm">
+                    <p>No conversations yet.</p>
+                    <p class="mt-1">Send an SMS to a tenant to start.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        for (const conv of data.conversations) {
+            const isActive = conv.tenant_id === currentTenantId ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50';
+            const lastTime = conv.last_message_time ? new Date(conv.last_message_time).toLocaleString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            }) : '';
+            const directionIcon = conv.last_direction === 'inbound' ? '←' : '→';
+
+            html += `
+                <div class="p-4 border-b border-gray-100 cursor-pointer ${isActive}"
+                     onclick="selectConversation(${conv.tenant_id})">
+                    <div class="flex justify-between items-start mb-1">
+                        <h4 class="font-medium text-gray-900 text-sm">${conv.tenant_name}</h4>
+                        <span class="text-xs text-gray-400">${lastTime}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 truncate">${conv.property_address}</p>
+                    <p class="text-sm text-gray-600 truncate mt-1">
+                        <span class="text-gray-400">${directionIcon}</span>
+                        ${conv.last_message}
+                    </p>
+                    ${conv.unread_count > 0 ? `
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 mt-1">
+                            ${conv.unread_count} new
+                        </span>
+                    ` : ''}
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading conversations:', error);
+        document.getElementById('conversations-list').innerHTML = `
+            <div class="p-4 text-center text-red-500 text-sm">Failed to load conversations</div>
+        `;
+    }
+}
+
+// Select a conversation
+async function selectConversation(tenantId) {
+    currentTenantId = tenantId;
+    document.getElementById('current-tenant-id').value = tenantId;
+
+    // Update UI states
+    document.getElementById('chat-header-content').classList.remove('hidden');
+    document.getElementById('chat-header-empty').classList.add('hidden');
+    document.getElementById('chat-input-area').classList.remove('hidden');
+    document.getElementById('messages-empty').classList.add('hidden');
+
+    // Reload conversations list to update active state
+    loadConversations();
+
+    // Load messages
+    await loadMessages(tenantId);
+
+    // Start auto-refresh
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => loadMessages(tenantId), 5000);
+}
+
+// Load messages for a tenant
+async function loadMessages(tenantId) {
+    try {
+        const response = await fetch(`/sms/conversation/${tenantId}`);
+        const data = await response.json();
+
+        // Update header
+        document.getElementById('chat-tenant-name').textContent = data.tenant.name;
+        document.getElementById('chat-tenant-info').textContent =
+            `${data.tenant.phone} • ${data.tenant.property || 'No property'}`;
+
+        // Render messages
+        const container = document.getElementById('chat-messages');
+
+        if (data.error) {
+            container.innerHTML = `
+                <div class="text-center text-amber-600 py-8">
+                    <span class="text-2xl">⚠️</span>
+                    <p class="mt-2">${data.error}</p>
+                </div>
+            `;
+            document.getElementById('chat-input-area').classList.add('hidden');
+            return;
+        }
+
+        if (data.messages.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-400 py-8">
+                    <span class="text-2xl">💬</span>
+                    <p class="mt-2">No messages yet. Send the first message!</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        for (const msg of data.messages) {
+            const isOutbound = msg.direction === 'outbound';
+            const time = msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            }) : '';
+
+            if (isOutbound) {
+                html += `
+                    <div class="flex justify-end">
+                        <div class="max-w-[70%]">
+                            <div class="bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2">
+                                <p class="text-sm">${escapeHtml(msg.body)}</p>
+                            </div>
+                            <p class="text-xs text-gray-400 text-right mt-1">${time}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="flex justify-start">
+                        <div class="max-w-[70%]">
+                            <div class="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-2 shadow-sm">
+                                <p class="text-sm text-gray-900">${escapeHtml(msg.body)}</p>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">${time}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        container.innerHTML = html;
+
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+        console.error('Error loading messages:', error);
+    }
+}
+
+// Send message
+document.getElementById('send-message-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const tenantId = document.getElementById('current-tenant-id').value;
+    const messageInput = document.getElementById('message-input');
+    const message = messageInput.value.trim();
+    const errorEl = document.getElementById('send-error');
+
+    if (!message) return;
+
+    errorEl.classList.add('hidden');
+
+    try {
+        const formData = new FormData();
+        formData.append('message', message);
+
+        const response = await fetch(`/sms/send/${tenantId}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            messageInput.value = '';
+            await loadMessages(tenantId);
+            loadConversations();
+        } else {
+            errorEl.textContent = data.error || 'Failed to send message';
+            errorEl.classList.remove('hidden');
+        }
+
+    } catch (error) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.classList.remove('hidden');
+    }
+});
+
+// Load unmatched messages
+async function loadUnmatched() {
+    try {
+        const response = await fetch('/sms/unmatched');
+        const data = await response.json();
+
+        const container = document.getElementById('unmatched-list');
+        const countEl = document.getElementById('unmatched-count');
+
+        if (data.messages.length === 0) {
+            countEl.textContent = '';
+            container.innerHTML = `<p class="text-sm text-gray-400">No unmatched messages</p>`;
+            return;
+        }
+
+        countEl.textContent = `(${data.messages.length})`;
+
+        let html = '';
+        for (const msg of data.messages) {
+            const time = msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            }) : '';
+
+            html += `
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-sm font-medium text-amber-800">${msg.from_number}</span>
+                        <span class="text-xs text-amber-600">${time}</span>
+                    </div>
+                    <p class="text-sm text-amber-900">${escapeHtml(msg.body)}</p>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading unmatched messages:', error);
+    }
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadConversations();
+    loadUnmatched();
+
+    // Refresh unmatched messages periodically
+    setInterval(loadUnmatched, 30000);
+});
+</script>
+{% endblock %}
