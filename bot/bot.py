@@ -264,6 +264,7 @@ class WaterBillBot:
         from database.models import Property, WaterBill, ScrapingLog
         from scraper.bsa_scraper import BSAScraper
         from sqlalchemy import select
+        from collections import defaultdict
 
         scrape_log = ScrapingLog(started_at=datetime.utcnow())
 
@@ -278,46 +279,57 @@ class WaterBillBot:
                     logger.info("No properties to scrape")
                     return
 
-                async with BSAScraper() as scraper:
-                    scraped_count = 0
+                # Group properties by city for efficient scraping
+                properties_by_city = defaultdict(list)
+                for prop in properties:
+                    city = (prop.city or "warren").lower().strip()
+                    properties_by_city[city].append(prop)
 
-                    for prop in properties:
-                        try:
-                            bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                scraped_count = 0
 
-                            if bill_data:
-                                if bill_data.address and prop.address.startswith("Pending"):
-                                    prop.address = bill_data.address
-                                if bill_data.owner_name:
-                                    prop.owner_name = bill_data.owner_name
+                # Process each city group with appropriate scraper
+                for city, city_properties in properties_by_city.items():
+                    municipality_uid = BSAScraper.get_uid_for_city(city)
+                    logger.info(f"Scraping {len(city_properties)} properties for {city} (uid={municipality_uid})")
 
-                                # Auto-populate parcel number if found from water bill
-                                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
-                                    prop.parcel_number = bill_data.parcel_number
-                                    logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
+                    async with BSAScraper(municipality_uid=municipality_uid) as scraper:
+                        for prop in city_properties:
+                            try:
+                                bill_data = await scraper.search_by_account(prop.bsa_account_number)
 
-                                new_bill = WaterBill(
-                                    property_id=prop.id,
-                                    amount_due=bill_data.amount_due,
-                                    due_date=bill_data.due_date,
-                                    statement_date=bill_data.statement_date,
-                                    previous_balance=bill_data.previous_balance,
-                                    current_charges=bill_data.current_charges,
-                                    late_fees=bill_data.late_fees,
-                                    payments_received=bill_data.payments_received,
-                                    water_usage_gallons=bill_data.water_usage,
-                                    raw_data=bill_data.raw_data
-                                )
-                                new_bill.status = new_bill.calculate_status()
+                                if bill_data:
+                                    if bill_data.address and prop.address.startswith("Pending"):
+                                        prop.address = bill_data.address
+                                    if bill_data.owner_name:
+                                        prop.owner_name = bill_data.owner_name
 
-                                session.add(new_bill)
-                                scraped_count += 1
-                                logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
+                                    # Auto-populate parcel number if found from water bill
+                                    if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                                        prop.parcel_number = bill_data.parcel_number
+                                        logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
 
-                        except Exception as e:
-                            logger.error(f"Failed to scrape {prop.bsa_account_number}: {e}")
+                                    new_bill = WaterBill(
+                                        property_id=prop.id,
+                                        amount_due=bill_data.amount_due,
+                                        due_date=bill_data.due_date,
+                                        statement_date=bill_data.statement_date,
+                                        previous_balance=bill_data.previous_balance,
+                                        current_charges=bill_data.current_charges,
+                                        late_fees=bill_data.late_fees,
+                                        payments_received=bill_data.payments_received,
+                                        water_usage_gallons=bill_data.water_usage,
+                                        raw_data=bill_data.raw_data
+                                    )
+                                    new_bill.status = new_bill.calculate_status()
 
-                    await session.commit()
+                                    session.add(new_bill)
+                                    scraped_count += 1
+                                    logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
+
+                            except Exception as e:
+                                logger.error(f"Failed to scrape {prop.bsa_account_number}: {e}")
+
+                await session.commit()
 
                 scrape_log.success = True
                 scrape_log.properties_scraped = scraped_count

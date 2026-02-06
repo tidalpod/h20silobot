@@ -55,17 +55,32 @@ class TaxData:
 class BSAScraper:
     """
     Scraper for BSA Online water bill portal.
-    Configured for City of Warren, Macomb County, MI (uid=305)
+    Supports multiple Macomb County municipalities.
     """
 
     BASE_URL = "https://bsaonline.com"
 
-    # City of Warren specific URLs
+    # BSA Online municipality UIDs for Macomb County cities
+    MUNICIPALITY_UIDS = {
+        "warren": "305",
+        "roseville": "327",
+        "eastpointe": "255",
+    }
+
+    # URL paths (same across municipalities)
     UTILITY_SEARCH_URL = "/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10"
     UTILITY_RESULTS_URL = "/OnlinePayment/OnlinePaymentSearchResults"
 
     # Property Tax URLs (PaymentApplicationType=2 is typically property tax)
     TAX_SEARCH_URL = "/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=2"
+
+    @classmethod
+    def get_uid_for_city(cls, city: str) -> str:
+        """Get BSA Online UID for a city name. Returns Warren UID as default."""
+        if not city:
+            return cls.MUNICIPALITY_UIDS["warren"]
+        city_lower = city.lower().strip()
+        return cls.MUNICIPALITY_UIDS.get(city_lower, cls.MUNICIPALITY_UIDS["warren"])
 
     def __init__(self, municipality_uid: str = None):
         self.municipality_uid = municipality_uid or config.bsa_municipality_uid

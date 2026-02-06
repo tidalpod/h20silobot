@@ -126,10 +126,14 @@ async def api_refresh_property(property_id: int):
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        logger.info(f"Refreshing bills for property: {prop.address}")
+        logger.info(f"Refreshing bills for property: {prop.address} (city: {prop.city})")
 
         try:
-            async with BSAScraper() as scraper:
+            # Get the correct BSA UID for this property's city
+            municipality_uid = BSAScraper.get_uid_for_city(prop.city)
+            logger.info(f"Using BSA municipality UID: {municipality_uid}")
+
+            async with BSAScraper(municipality_uid=municipality_uid) as scraper:
                 bill_data = None
 
                 # First try by account number
