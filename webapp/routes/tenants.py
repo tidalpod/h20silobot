@@ -111,6 +111,7 @@ async def create_tenant(
     pha_id: str = Form(""),
     voucher_amount: str = Form(""),
     tenant_portion: str = Form(""),
+    current_rent: str = Form(""),
     lease_start_date: str = Form(""),
     lease_end_date: str = Form("")
 ):
@@ -171,6 +172,7 @@ async def create_tenant(
         parsed_pha_id = int(pha_id) if pha_id and pha_id.strip() else None
         parsed_voucher = Decimal(voucher_amount) if voucher_amount and voucher_amount.strip() else None
         parsed_tenant_portion = Decimal(tenant_portion) if tenant_portion and tenant_portion.strip() else None
+        parsed_current_rent = Decimal(current_rent) if current_rent and current_rent.strip() else None
 
         # Create tenant
         tenant = Tenant(
@@ -187,7 +189,8 @@ async def create_tenant(
             is_section8=is_section8_bool,
             pha_id=parsed_pha_id if is_section8_bool else None,
             voucher_amount=parsed_voucher if is_section8_bool else None,
-            tenant_portion=parsed_tenant_portion if is_section8_bool else None
+            tenant_portion=parsed_tenant_portion if is_section8_bool else None,
+            current_rent=parsed_current_rent if not is_section8_bool else None
         )
         session.add(tenant)
         await session.commit()
@@ -256,6 +259,7 @@ async def update_tenant(
     pha_id: str = Form(""),
     voucher_amount: str = Form(""),
     tenant_portion: str = Form(""),
+    current_rent: str = Form(""),
     lease_start_date: str = Form(""),
     lease_end_date: str = Form("")
 ):
@@ -324,6 +328,7 @@ async def update_tenant(
         parsed_pha_id = int(pha_id) if pha_id and pha_id.strip() else None
         parsed_voucher = Decimal(voucher_amount) if voucher_amount and voucher_amount.strip() else None
         parsed_tenant_portion = Decimal(tenant_portion) if tenant_portion and tenant_portion.strip() else None
+        parsed_current_rent = Decimal(current_rent) if current_rent and current_rent.strip() else None
 
         # Update tenant
         tenant.property_id = property_id
@@ -341,6 +346,7 @@ async def update_tenant(
         tenant.pha_id = parsed_pha_id if is_section8_bool else None
         tenant.voucher_amount = parsed_voucher if is_section8_bool else None
         tenant.tenant_portion = parsed_tenant_portion if is_section8_bool else None
+        tenant.current_rent = parsed_current_rent if not is_section8_bool else None
 
         await session.commit()
 

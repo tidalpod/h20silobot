@@ -90,10 +90,10 @@
                 </div>
             </div>
 
-            <!-- Section 8 / PHA Information -->
+            <!-- Rent Information -->
             <div class="border-b border-gray-900/10 pb-6">
-                <h2 class="text-base font-semibold leading-7 text-gray-900">🏛️ Section 8 / Housing Voucher</h2>
-                <p class="mt-1 text-sm leading-6 text-gray-600">If the tenant uses a housing voucher, enter their PHA information.</p>
+                <h2 class="text-base font-semibold leading-7 text-gray-900">💰 Rent Information</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-600">Enter the tenant's monthly rent amount.</p>
 
                 <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
                     <div class="sm:col-span-6">
@@ -106,6 +106,19 @@
                         </label>
                     </div>
 
+                    <!-- Regular Rent (Non-Section 8) -->
+                    <div id="regular-rent-field" class="sm:col-span-3 {% if tenant and tenant.is_section8 %}hidden{% endif %}">
+                        <label for="current_rent" class="block text-sm font-medium leading-6 text-gray-900">Monthly Rent</label>
+                        <div class="mt-2 relative">
+                            <span class="absolute left-3 top-1.5 text-gray-500">$</span>
+                            <input type="number" name="current_rent" id="current_rent" step="0.01" min="0"
+                                   value="{{ tenant.current_rent if tenant and tenant.current_rent else '' }}"
+                                   placeholder="0.00"
+                                   class="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    <!-- Section 8 Fields -->
                     <div id="section8-fields" class="sm:col-span-6 {% if not tenant or not tenant.is_section8 %}hidden{% endif %}">
                         <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6 mt-4 p-4 bg-blue-50 rounded-lg">
                             <div class="sm:col-span-4">
@@ -297,11 +310,15 @@
 <script>
 function toggleSection8Fields() {
     const checkbox = document.getElementById('is_section8');
-    const fields = document.getElementById('section8-fields');
+    const section8Fields = document.getElementById('section8-fields');
+    const regularRentField = document.getElementById('regular-rent-field');
+
     if (checkbox.checked) {
-        fields.classList.remove('hidden');
+        section8Fields.classList.remove('hidden');
+        regularRentField.classList.add('hidden');
     } else {
-        fields.classList.add('hidden');
+        section8Fields.classList.add('hidden');
+        regularRentField.classList.remove('hidden');
     }
 }
 </script>
