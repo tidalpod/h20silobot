@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant
+from database.models import Property, WaterBill, BillStatus, Tenant, PropertyTax
 
 router = APIRouter(tags=["api"])
 logger = logging.getLogger(__name__)
@@ -270,6 +270,135 @@ async def refresh_all_properties():
         logger.error("BSAScraper not available")
     except Exception as e:
         logger.error(f"Error in bulk refresh: {e}")
+
+
+# =============================================================================
+# Property Tax Refresh Endpoints
+# =============================================================================
+
+@router.post("/properties/{property_id}/refresh-tax")
+async def api_refresh_property_tax(property_id: int, background_tasks: BackgroundTasks):
+    """Trigger property tax refresh for a specific property"""
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        # Add background task to refresh tax
+        background_tasks.add_task(refresh_single_property_tax, property_id)
+
+        return {"status": "started", "message": f"Refreshing tax for {prop.address}"}
+
+
+@router.post("/refresh-taxes")
+async def api_refresh_all_taxes(background_tasks: BackgroundTasks):
+    """Trigger property tax refresh for all active properties"""
+    background_tasks.add_task(refresh_all_property_taxes)
+    return {"status": "started", "message": "Refreshing taxes for all properties"}
+
+
+async def refresh_single_property_tax(property_id: int):
+    """Background task to refresh a single property's tax data"""
+    try:
+        from scraper.bsa_scraper import BSAScraper
+        from decimal import Decimal
+
+        async with get_session() as session:
+            result = await session.execute(
+                select(Property).where(Property.id == property_id)
+            )
+            prop = result.scalar_one_or_none()
+
+            if not prop:
+                logger.error(f"Property {property_id} not found for tax refresh")
+                return
+
+            async with BSAScraper() as scraper:
+                tax_data = None
+
+                # Try parcel number first if available
+                if prop.parcel_number:
+                    tax_data = await scraper.search_tax_by_parcel(prop.parcel_number)
+
+                # Fall back to address search
+                if not tax_data:
+                    street_address = prop.address.split(',')[0].strip()
+                    tax_data = await scraper.search_tax_by_address(street_address)
+
+                if tax_data:
+                    # Check for existing tax record for this year
+                    existing = await session.execute(
+                        select(PropertyTax)
+                        .where(PropertyTax.property_id == property_id)
+                        .where(PropertyTax.tax_year == tax_data.tax_year)
+                    )
+                    existing_tax = existing.scalar_one_or_none()
+
+                    if existing_tax:
+                        # Update existing record
+                        existing_tax.amount_due = tax_data.amount_due
+                        existing_tax.status = tax_data.status
+                        existing_tax.due_date = tax_data.due_date
+                        existing_tax.scraped_at = datetime.utcnow()
+                        existing_tax.raw_data = tax_data.raw_data
+                        logger.info(f"Updated tax for {prop.address}: ${tax_data.amount_due}")
+                    else:
+                        # Create new record
+                        new_tax = PropertyTax(
+                            property_id=property_id,
+                            tax_year=tax_data.tax_year,
+                            amount_due=tax_data.amount_due,
+                            due_date=tax_data.due_date,
+                            status=tax_data.status,
+                            parcel_number=tax_data.parcel_number or prop.parcel_number,
+                            scraped_at=datetime.utcnow(),
+                            raw_data=tax_data.raw_data
+                        )
+                        session.add(new_tax)
+                        logger.info(f"Created tax record for {prop.address}: ${tax_data.amount_due}")
+
+                    # Update parcel number on property if we found one
+                    if tax_data.parcel_number and not prop.parcel_number:
+                        prop.parcel_number = tax_data.parcel_number
+
+                else:
+                    logger.warning(f"No tax data found for {prop.address}")
+
+    except ImportError:
+        logger.error("BSAScraper not available")
+    except Exception as e:
+        logger.error(f"Error refreshing tax for property {property_id}: {e}")
+
+
+async def refresh_all_property_taxes():
+    """Background task to refresh tax data for all active properties"""
+    try:
+        from scraper.bsa_scraper import BSAScraper
+
+        async with get_session() as session:
+            result = await session.execute(
+                select(Property).where(Property.is_active == True)
+            )
+            properties = result.scalars().all()
+
+            logger.info(f"Starting tax refresh for {len(properties)} properties")
+
+            for prop in properties:
+                try:
+                    await refresh_single_property_tax(prop.id)
+                except Exception as e:
+                    logger.error(f"Error refreshing tax for {prop.address}: {e}")
+                    continue
+
+            logger.info("Completed tax refresh for all properties")
+
+    except ImportError:
+        logger.error("BSAScraper not available")
+    except Exception as e:
+        logger.error(f"Error in bulk tax refresh: {e}")
 
 
 @router.get("/property-lookup")

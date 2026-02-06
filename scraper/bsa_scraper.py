@@ -37,6 +37,20 @@ class BillData:
     raw_data: Optional[str] = None
 
 
+@dataclass
+class TaxData:
+    """Parsed property tax data from scraping"""
+    parcel_number: str
+    address: str
+    tax_year: int
+    amount_due: Decimal
+    due_date: Optional[date] = None
+    status: Optional[str] = None  # paid, due, delinquent
+    owner_name: Optional[str] = None
+    taxable_value: Optional[Decimal] = None
+    raw_data: Optional[str] = None
+
+
 class BSAScraper:
     """
     Scraper for BSA Online water bill portal.
@@ -48,6 +62,9 @@ class BSAScraper:
     # City of Warren specific URLs
     UTILITY_SEARCH_URL = "/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10"
     UTILITY_RESULTS_URL = "/OnlinePayment/OnlinePaymentSearchResults"
+
+    # Property Tax URLs (PaymentApplicationType=2 is typically property tax)
+    TAX_SEARCH_URL = "/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=2"
 
     def __init__(self, municipality_uid: str = None):
         self.municipality_uid = municipality_uid or config.bsa_municipality_uid
@@ -468,6 +485,236 @@ class BSAScraper:
         """Take a screenshot for debugging"""
         await self.page.screenshot(path=filename, full_page=True)
         logger.info(f"Screenshot saved: {filename}")
+
+    # =========================================================================
+    # Property Tax Scraping Methods
+    # =========================================================================
+
+    async def navigate_to_tax_search(self):
+        """Navigate to the property tax search page"""
+        url = self._build_url(self.TAX_SEARCH_URL)
+        await self.page.goto(url, wait_until="networkidle")
+        await asyncio.sleep(1)
+        logger.info(f"Navigated to property tax search")
+
+    async def search_tax_by_parcel(self, parcel_number: str) -> Optional[TaxData]:
+        """
+        Search for property tax by parcel number.
+        """
+        try:
+            await self.navigate_to_tax_search()
+
+            # Find the Parcel Number form
+            parcel_form = await self.page.query_selector('form[action*="Parcel"]')
+
+            if not parcel_form:
+                # Try generic form with parcel input
+                parcel_input = await self.page.query_selector('input[name="ParcelNumber"], input[name="Parcel"]')
+                if parcel_input:
+                    await parcel_input.fill(parcel_number)
+                    await parcel_input.press("Enter")
+                else:
+                    logger.error("Parcel Number form/input not found")
+                    return None
+            else:
+                # Fill parcel number in form
+                parcel_input = await parcel_form.query_selector('input[name="ParcelNumber"], input[name="Parcel"]')
+                if not parcel_input:
+                    logger.error("ParcelNumber input not found in form")
+                    return None
+
+                await parcel_input.fill(parcel_number)
+
+                # Submit form
+                submit_btn = await parcel_form.query_selector('input[type="submit"]')
+                if submit_btn:
+                    await submit_btn.click()
+                else:
+                    await parcel_input.press("Enter")
+
+            await self.page.wait_for_load_state("networkidle")
+            await asyncio.sleep(1)
+
+            return await self._parse_tax_results(parcel_number)
+
+        except Exception as e:
+            logger.error(f"Tax parcel search failed for {parcel_number}: {e}")
+            return None
+
+    async def search_tax_by_address(self, address: str) -> Optional[TaxData]:
+        """
+        Search for property tax by address.
+        """
+        try:
+            await self.navigate_to_tax_search()
+
+            # Find the Address form
+            address_form = await self.page.query_selector('form[action*="Address"]')
+
+            if not address_form:
+                # Try generic form with address input
+                address_input = await self.page.query_selector('input[name="Address"]')
+                if address_input:
+                    await address_input.fill(address)
+                    await address_input.press("Enter")
+                else:
+                    logger.error("Address form/input not found")
+                    return None
+            else:
+                address_input = await address_form.query_selector('input[name="Address"]')
+                if not address_input:
+                    logger.error("Address input not found in form")
+                    return None
+
+                await address_input.fill(address)
+
+                submit_btn = await address_form.query_selector('input[type="submit"]')
+                if submit_btn:
+                    await submit_btn.click()
+                else:
+                    await address_input.press("Enter")
+
+            await self.page.wait_for_load_state("networkidle")
+            await asyncio.sleep(1)
+
+            return await self._parse_tax_results(address)
+
+        except Exception as e:
+            logger.error(f"Tax address search failed for {address}: {e}")
+            return None
+
+    async def _parse_tax_results(self, search_term: str) -> Optional[TaxData]:
+        """
+        Parse property tax search results.
+        """
+        try:
+            content = await self.page.content()
+
+            # Check for "No records to display"
+            if "No records to display" in content or "no results" in content.lower():
+                logger.info(f"No tax records found for: {search_term}")
+                return None
+
+            # Get text content for parsing
+            body = await self.page.query_selector('body')
+            text = await body.inner_text()
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+            # Try to click on first result if we're on a results list
+            rows = await self.page.query_selector_all("table tbody tr")
+            for row in rows:
+                detail_link = await row.query_selector('a[href*="Detail"], a[href*="Payment"]')
+                if detail_link:
+                    await detail_link.click()
+                    await self.page.wait_for_load_state("networkidle")
+                    await asyncio.sleep(1)
+                    body = await self.page.query_selector('body')
+                    text = await body.inner_text()
+                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    break
+
+            # Extract parcel number
+            parcel_number = ""
+            for line in lines:
+                if "Parcel" in line and "#" in line:
+                    match = re.search(r'[\d-]+', line)
+                    if match:
+                        parcel_number = match.group()
+                        break
+                elif line.startswith("Parcel:"):
+                    parcel_number = line.replace("Parcel:", "").strip()
+                    break
+
+            # Extract address
+            address = ""
+            for i, line in enumerate(lines):
+                if re.match(r'^\d+\s+[A-Z]', line.upper()) and "Warren" not in line:
+                    address = line
+                    if i + 1 < len(lines) and ("Warren" in lines[i + 1] or "MI" in lines[i + 1]):
+                        address = f"{line}, {lines[i + 1]}"
+                    break
+
+            # Extract amount due
+            amount_due = Decimal("0")
+            for i, line in enumerate(lines):
+                if any(term in line.lower() for term in ["amount due", "total due", "balance", "amount to pay"]):
+                    match = re.search(r'\$([\d,]+\.?\d*)', line)
+                    if match:
+                        amount_due = Decimal(match.group(1).replace(',', ''))
+                    elif i + 1 < len(lines):
+                        match = re.search(r'\$([\d,]+\.?\d*)', lines[i + 1])
+                        if match:
+                            amount_due = Decimal(match.group(1).replace(',', ''))
+                    break
+
+            # Extract tax year
+            tax_year = datetime.now().year
+            for line in lines:
+                match = re.search(r'(?:Tax\s*Year|Year)[:\s]*(\d{4})', line, re.IGNORECASE)
+                if match:
+                    tax_year = int(match.group(1))
+                    break
+
+            # Extract owner name
+            owner_name = ""
+            for line in lines:
+                if "owner" in line.lower():
+                    owner_name = re.sub(r'^owner[:\s]*', '', line, flags=re.IGNORECASE).strip()
+                    break
+
+            # Determine status
+            status = "due"
+            text_lower = text.lower()
+            if "paid" in text_lower and amount_due == 0:
+                status = "paid"
+            elif "delinquent" in text_lower or "past due" in text_lower:
+                status = "delinquent"
+
+            logger.info(f"Parsed tax: Parcel={parcel_number}, Address={address}, Amount=${amount_due}, Year={tax_year}")
+
+            return TaxData(
+                parcel_number=parcel_number or search_term,
+                address=address,
+                tax_year=tax_year,
+                amount_due=amount_due,
+                due_date=None,
+                status=status,
+                owner_name=owner_name if owner_name else None,
+                raw_data=text[:5000]
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to parse tax results: {e}")
+            return None
+
+    async def scrape_all_taxes(self, identifiers: List[str], search_type: str = "parcel") -> List[TaxData]:
+        """
+        Scrape tax data for multiple properties.
+
+        Args:
+            identifiers: List of parcel numbers or addresses
+            search_type: "parcel" or "address"
+        """
+        results = []
+
+        for identifier in identifiers:
+            logger.info(f"Scraping tax {search_type}: {identifier}")
+
+            if search_type == "parcel":
+                tax_data = await self.search_tax_by_parcel(identifier)
+            else:
+                tax_data = await self.search_tax_by_address(identifier)
+
+            if tax_data:
+                results.append(tax_data)
+                logger.info(f"Found tax: {tax_data.address} - ${tax_data.amount_due} ({tax_data.status})")
+            else:
+                logger.warning(f"No tax data found for: {identifier}")
+
+            # Rate limiting
+            await asyncio.sleep(2)
+
+        return results
 
 
 # Quick test function
