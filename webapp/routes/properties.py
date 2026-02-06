@@ -129,10 +129,10 @@ async def create_property(
     parcel_number: str = Form(""),
     tenant_name: str = Form(""),
     owner_name: str = Form(""),
-    bedrooms: int = Form(None),
-    bathrooms: float = Form(None),
-    square_feet: int = Form(None),
-    year_built: int = Form(None),
+    bedrooms: str = Form(""),
+    bathrooms: str = Form(""),
+    square_feet: str = Form(""),
+    year_built: str = Form(""),
     lot_size: str = Form(""),
     property_type: str = Form(""),
     is_vacant: str = Form(""),
@@ -197,6 +197,24 @@ async def create_property(
         def parse_checkbox(val):
             return val in ("on", "true", "1", "yes")
 
+        # Helper to parse int values
+        def parse_int(val):
+            if val and val.strip():
+                try:
+                    return int(val)
+                except ValueError:
+                    return None
+            return None
+
+        # Helper to parse float values
+        def parse_float(val):
+            if val and val.strip():
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
+            return None
+
         # Create property
         prop = Property(
             address=address,
@@ -207,10 +225,10 @@ async def create_property(
             parcel_number=parcel_number or None,
             tenant_name=tenant_name or None,
             owner_name=owner_name or None,
-            bedrooms=bedrooms,
-            bathrooms=bathrooms,
-            square_feet=square_feet,
-            year_built=year_built,
+            bedrooms=parse_int(bedrooms),
+            bathrooms=parse_float(bathrooms),
+            square_feet=parse_int(square_feet),
+            year_built=parse_int(year_built),
             lot_size=lot_size or None,
             property_type=property_type or None,
             web_user_id=user["id"],
@@ -340,10 +358,10 @@ async def update_property(
     parcel_number: str = Form(""),
     tenant_name: str = Form(""),
     owner_name: str = Form(""),
-    bedrooms: int = Form(None),
-    bathrooms: float = Form(None),
-    square_feet: int = Form(None),
-    year_built: int = Form(None),
+    bedrooms: str = Form(""),
+    bathrooms: str = Form(""),
+    square_feet: str = Form(""),
+    year_built: str = Form(""),
     lot_size: str = Form(""),
     property_type: str = Form(""),
     is_active: str = Form(""),
@@ -421,6 +439,24 @@ async def update_property(
         def parse_checkbox(val):
             return val in ("on", "true", "1", "yes")
 
+        # Helper to parse int values
+        def parse_int(val):
+            if val and val.strip():
+                try:
+                    return int(val)
+                except ValueError:
+                    return None
+            return None
+
+        # Helper to parse float values
+        def parse_float(val):
+            if val and val.strip():
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
+            return None
+
         # Update property
         prop.address = address
         prop.city = city or None
@@ -430,10 +466,10 @@ async def update_property(
         prop.parcel_number = parcel_number or None
         prop.tenant_name = tenant_name or None
         prop.owner_name = owner_name or None
-        prop.bedrooms = bedrooms
-        prop.bathrooms = bathrooms
-        prop.square_feet = square_feet
-        prop.year_built = year_built
+        prop.bedrooms = parse_int(bedrooms)
+        prop.bathrooms = parse_float(bathrooms)
+        prop.square_feet = parse_int(square_feet)
+        prop.year_built = parse_int(year_built)
         prop.lot_size = lot_size or None
         prop.property_type = property_type or None
         prop.is_active = parse_checkbox(is_active)
