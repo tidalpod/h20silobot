@@ -278,6 +278,7 @@
 
                 <!-- Actions -->
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <a href="/listings/{{ item.property.id }}" target="_blank" class="text-gray-500 hover:text-blue-600 mr-3" title="View public listing">🌐</a>
                     <a href="/properties/{{ item.property.id }}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
                     <a href="/properties/{{ item.property.id }}/edit" class="text-gray-600 hover:text-gray-900 mr-3">Edit</a>
                     <form action="/properties/{{ item.property.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this property?');">
