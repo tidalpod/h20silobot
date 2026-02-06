@@ -800,7 +800,8 @@
                     <div class="text-center py-6">
                         <span class="text-3xl">💧</span>
                         <p class="mt-2 text-sm text-gray-500">No bill data available</p>
-                        <button hx-post="/api/properties/{{ property.id }}/refresh" hx-swap="none" class="inline-flex items-center mt-3 text-sm font-medium text-blue-600 hover:text-blue-500">
+                        <button onclick="refreshProperty('bill')"
+                                class="inline-flex items-center mt-3 text-sm font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50">
                             <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                             </svg>
@@ -903,10 +904,12 @@
                 <a href="/notifications/compose?property_id={{ property.id }}" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                     <span class="mr-2">📧</span> Send Notification
                 </a>
-                <button hx-post="/api/properties/{{ property.id }}/refresh" hx-swap="none" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <button onclick="refreshProperty('bill')"
+                        class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
                     <span class="mr-2">🔄</span> Refresh Bills
                 </button>
-                <button hx-post="/api/properties/{{ property.id }}/refresh-tax" hx-swap="none" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                <button onclick="refreshProperty('tax')"
+                        class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
                     <span class="mr-2">🏛️</span> Refresh Taxes
                 </button>
             </div>
@@ -1029,6 +1032,38 @@ function showTab(tabName) {
     const activeTab = document.getElementById('tab-' + tabName);
     activeTab.classList.remove('border-transparent', 'text-gray-500');
     activeTab.classList.add('border-blue-500', 'text-blue-600');
+}
+
+// Refresh button handler
+async function refreshProperty(type) {
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    const label = type === 'tax' ? '🏛️ Refreshing...' : '🔄 Fetching...';
+
+    btn.innerHTML = '<span class="animate-pulse">' + label + '</span>';
+    btn.disabled = true;
+
+    try {
+        const url = type === 'tax'
+            ? '/api/properties/{{ property.id }}/refresh-tax'
+            : '/api/properties/{{ property.id }}/refresh';
+
+        const response = await fetch(url, { method: 'POST' });
+        const data = await response.json();
+
+        btn.innerHTML = '<span class="text-green-600">✓ Done!</span>';
+
+        setTimeout(() => {
+            location.reload();
+        }, 1500);
+    } catch (error) {
+        console.error('Refresh failed:', error);
+        btn.innerHTML = '<span class="text-red-600">✗ Failed</span>';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 2000);
+    }
 }
 </script>
 {% endblock %}

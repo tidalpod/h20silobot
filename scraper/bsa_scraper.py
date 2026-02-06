@@ -34,6 +34,7 @@ class BillData:
     payments_received: Optional[Decimal] = None
     water_usage: Optional[int] = None
     owner_name: Optional[str] = None
+    parcel_number: Optional[str] = None
     raw_data: Optional[str] = None
 
 
@@ -318,7 +319,41 @@ class BSAScraper:
 
             current_charges = sum(charges.values()) if charges else None
 
-            logger.info(f"Parsed: Account={account_number}, Address={address}, Amount=${amount_due}")
+            # Try to get parcel number from "View Additional Account Information" link
+            parcel_number = None
+            try:
+                additional_info_link = await self.page.query_selector('a:has-text("Additional Account Information"), a:has-text("Additional Information")')
+                if additional_info_link:
+                    # Open in new tab or click
+                    await additional_info_link.click()
+                    await self.page.wait_for_load_state("networkidle")
+                    await asyncio.sleep(1)
+
+                    # Get the additional info page content
+                    additional_body = await self.page.query_selector('body')
+                    additional_text = await additional_body.inner_text()
+
+                    # Look for parcel number patterns
+                    parcel_patterns = [
+                        r'Parcel[:\s#]*([0-9-]+)',
+                        r'Parcel Number[:\s]*([0-9-]+)',
+                        r'Property ID[:\s]*([0-9-]+)',
+                        r'PIN[:\s]*([0-9-]+)',
+                    ]
+                    for pattern in parcel_patterns:
+                        match = re.search(pattern, additional_text, re.IGNORECASE)
+                        if match:
+                            parcel_number = match.group(1).strip()
+                            logger.info(f"Found parcel number: {parcel_number}")
+                            break
+
+                    # Go back to the payment page
+                    await self.page.go_back()
+                    await asyncio.sleep(0.5)
+            except Exception as e:
+                logger.warning(f"Could not extract parcel number: {e}")
+
+            logger.info(f"Parsed: Account={account_number}, Address={address}, Amount=${amount_due}, Parcel={parcel_number}")
 
             return BillData(
                 account_number=account_number,
@@ -327,6 +362,7 @@ class BSAScraper:
                 due_date=None,
                 statement_date=None,
                 previous_balance=None,
+                parcel_number=parcel_number,
                 current_charges=current_charges,
                 late_fees=None,
                 water_usage=None,

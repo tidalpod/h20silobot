@@ -291,6 +291,11 @@ class WaterBillBot:
                                 if bill_data.owner_name:
                                     prop.owner_name = bill_data.owner_name
 
+                                # Auto-populate parcel number if found from water bill
+                                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                                    prop.parcel_number = bill_data.parcel_number
+                                    logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
+
                                 new_bill = WaterBill(
                                     property_id=prop.id,
                                     amount_due=bill_data.amount_due,

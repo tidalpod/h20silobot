@@ -227,6 +227,11 @@ async def refresh_single_property(property_id: int):
                     if bill_data.owner_name and not prop.owner_name:
                         prop.owner_name = bill_data.owner_name
 
+                    # Auto-populate parcel number if found
+                    if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                        logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
+                        prop.parcel_number = bill_data.parcel_number
+
                     # Auto-populate BSA account number if found via address search
                     if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
                         logger.info(f"Updating BSA account number: {prop.bsa_account_number} -> {bill_data.account_number}")
