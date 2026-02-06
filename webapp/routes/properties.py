@@ -402,125 +402,142 @@ async def update_property(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(Property).where(Property.id == property_id)
-        )
-        prop = result.scalar_one_or_none()
-
-        if not prop:
-            raise HTTPException(status_code=404, detail="Property not found")
-
-        # Check for duplicate account number
-        if bsa_account_number != prop.bsa_account_number:
-            result = await session.execute(
-                select(Property).where(Property.bsa_account_number == bsa_account_number)
-            )
-            existing = result.scalar_one_or_none()
-            if existing:
-                return templates.TemplateResponse(
-                    "properties/form.html",
-                    {
-                        "request": request,
-                        "user": user,
-                        "property": prop,
-                        "error": "A property with this BSA account number already exists",
-                    },
-                    status_code=400
-                )
-
-        # Helper to parse dates
-        def parse_date(date_str):
-            if date_str:
-                try:
-                    return datetime.strptime(date_str, "%Y-%m-%d").date()
-                except ValueError:
-                    return None
-            return None
-
-        # Helper to parse checkbox values
-        def parse_checkbox(val):
-            return val in ("on", "true", "1", "yes")
-
-        # Helper to parse int values
-        def parse_int(val):
-            if val and val.strip():
-                try:
-                    return int(val)
-                except ValueError:
-                    return None
-            return None
-
-        # Helper to parse float values
-        def parse_float(val):
-            if val and val.strip():
-                try:
-                    return float(val)
-                except ValueError:
-                    return None
-            return None
-
-        # Update property
-        prop.address = address
-        prop.city = city or None
-        prop.state = state.upper() if state else None
-        prop.zip_code = zip_code or None
-        prop.bsa_account_number = bsa_account_number
-        prop.parcel_number = parcel_number or None
-        prop.tenant_name = tenant_name or None
-        prop.owner_name = owner_name or None
-        prop.bedrooms = parse_int(bedrooms)
-        prop.bathrooms = parse_float(bathrooms)
-        prop.square_feet = parse_int(square_feet)
-        prop.year_built = parse_int(year_built)
-        prop.lot_size = lot_size or None
-        prop.property_type = property_type or None
-        prop.is_active = parse_checkbox(is_active)
-        # Occupancy
-        prop.is_vacant = parse_checkbox(is_vacant)
-        # City certification
-        prop.has_city_certification = parse_checkbox(has_city_certification)
-        prop.city_certification_date = parse_date(city_certification_date)
-        prop.city_certification_expiry = parse_date(city_certification_expiry)
-        # Rental license
-        prop.has_rental_license = parse_checkbox(has_rental_license)
-        prop.rental_license_number = rental_license_number or None
-        prop.rental_license_issued = parse_date(rental_license_issued)
-        prop.rental_license_expiry = parse_date(rental_license_expiry)
-        # Section 8 inspection
-        prop.section8_inspection_status = section8_inspection_status or None
-        prop.section8_inspection_date = parse_date(section8_inspection_date)
-        prop.section8_inspection_time = section8_inspection_time or None
-        prop.section8_inspection_notes = section8_inspection_notes or None
-        # Certificate of Occupancy inspections
-        prop.co_mechanical_date = parse_date(co_mechanical_date)
-        prop.co_mechanical_time = co_mechanical_time or None
-        prop.co_electrical_date = parse_date(co_electrical_date)
-        prop.co_electrical_time = co_electrical_time or None
-        prop.co_plumbing_date = parse_date(co_plumbing_date)
-        prop.co_plumbing_time = co_plumbing_time or None
-        prop.co_zoning_date = parse_date(co_zoning_date)
-        prop.co_zoning_time = co_zoning_time or None
-        prop.co_building_date = parse_date(co_building_date)
-        prop.co_building_time = co_building_time or None
-        # Rental inspection
-        prop.rental_inspection_date = parse_date(rental_inspection_date)
-        prop.rental_inspection_time = rental_inspection_time or None
-
-        # Public listing fields
-        prop.description = description or None
-        if monthly_rent:
+    # Helper to parse dates
+    def parse_date(date_str):
+        if date_str:
             try:
-                prop.monthly_rent = Decimal(monthly_rent)
-            except:
+                return datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return None
+        return None
+
+    # Helper to parse checkbox values
+    def parse_checkbox(val):
+        return val in ("on", "true", "1", "yes")
+
+    # Helper to parse int values
+    def parse_int(val):
+        if val and val.strip():
+            try:
+                return int(val)
+            except ValueError:
+                return None
+        return None
+
+    # Helper to parse float values
+    def parse_float(val):
+        if val and val.strip():
+            try:
+                return float(val)
+            except ValueError:
+                return None
+        return None
+
+    try:
+        async with get_session() as session:
+            result = await session.execute(
+                select(Property).where(Property.id == property_id)
+            )
+            prop = result.scalar_one_or_none()
+
+            if not prop:
+                raise HTTPException(status_code=404, detail="Property not found")
+
+            # Check for duplicate account number
+            if bsa_account_number != prop.bsa_account_number:
+                result = await session.execute(
+                    select(Property).where(Property.bsa_account_number == bsa_account_number)
+                )
+                existing = result.scalar_one_or_none()
+                if existing:
+                    return templates.TemplateResponse(
+                        "properties/form.html",
+                        {
+                            "request": request,
+                            "user": user,
+                            "property": prop,
+                            "error": "A property with this BSA account number already exists",
+                        },
+                        status_code=400
+                    )
+
+            # Update property
+            prop.address = address
+            prop.city = city or None
+            prop.state = state.upper() if state else None
+            prop.zip_code = zip_code or None
+            prop.bsa_account_number = bsa_account_number
+            prop.parcel_number = parcel_number or None
+            prop.tenant_name = tenant_name or None
+            prop.owner_name = owner_name or None
+            prop.bedrooms = parse_int(bedrooms)
+            prop.bathrooms = parse_float(bathrooms)
+            prop.square_feet = parse_int(square_feet)
+            prop.year_built = parse_int(year_built)
+            prop.lot_size = lot_size or None
+            prop.property_type = property_type or None
+            prop.is_active = parse_checkbox(is_active)
+            # Occupancy
+            prop.is_vacant = parse_checkbox(is_vacant)
+            # City certification
+            prop.has_city_certification = parse_checkbox(has_city_certification)
+            prop.city_certification_date = parse_date(city_certification_date)
+            prop.city_certification_expiry = parse_date(city_certification_expiry)
+            # Rental license
+            prop.has_rental_license = parse_checkbox(has_rental_license)
+            prop.rental_license_number = rental_license_number or None
+            prop.rental_license_issued = parse_date(rental_license_issued)
+            prop.rental_license_expiry = parse_date(rental_license_expiry)
+            # Section 8 inspection
+            prop.section8_inspection_status = section8_inspection_status or None
+            prop.section8_inspection_date = parse_date(section8_inspection_date)
+            prop.section8_inspection_time = section8_inspection_time or None
+            prop.section8_inspection_notes = section8_inspection_notes or None
+            # Certificate of Occupancy inspections
+            prop.co_mechanical_date = parse_date(co_mechanical_date)
+            prop.co_mechanical_time = co_mechanical_time or None
+            prop.co_electrical_date = parse_date(co_electrical_date)
+            prop.co_electrical_time = co_electrical_time or None
+            prop.co_plumbing_date = parse_date(co_plumbing_date)
+            prop.co_plumbing_time = co_plumbing_time or None
+            prop.co_zoning_date = parse_date(co_zoning_date)
+            prop.co_zoning_time = co_zoning_time or None
+            prop.co_building_date = parse_date(co_building_date)
+            prop.co_building_time = co_building_time or None
+            # Rental inspection
+            prop.rental_inspection_date = parse_date(rental_inspection_date)
+            prop.rental_inspection_time = rental_inspection_time or None
+
+            # Public listing fields
+            prop.description = description or None
+            if monthly_rent:
+                try:
+                    prop.monthly_rent = Decimal(monthly_rent)
+                except:
+                    prop.monthly_rent = None
+            else:
                 prop.monthly_rent = None
-        else:
-            prop.monthly_rent = None
-        prop.is_listed = is_listed in ("on", "true", "1")
+            prop.is_listed = is_listed in ("on", "true", "1")
 
-        await session.commit()
+            print(f"[UPDATE] Saving property {property_id}: {address}")
 
+        # Redirect after successful save (session auto-commits on exit)
         return RedirectResponse(url=f"/properties/{property_id}", status_code=303)
+
+    except Exception as e:
+        print(f"[UPDATE] ERROR saving property {property_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return templates.TemplateResponse(
+            "properties/form.html",
+            {
+                "request": request,
+                "user": user,
+                "property": None,
+                "error": f"Error saving property: {str(e)}",
+            },
+            status_code=500
+        )
 
 
 @router.post("/{property_id}/delete")
