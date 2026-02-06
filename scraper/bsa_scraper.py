@@ -495,7 +495,69 @@ class BSAScraper:
         url = self._build_url(self.TAX_SEARCH_URL)
         await self.page.goto(url, wait_until="networkidle")
         await asyncio.sleep(1)
+
+        # Handle security verification checkbox if present
+        await self._handle_security_verification()
+
         logger.info(f"Navigated to property tax search")
+
+    async def _handle_security_verification(self):
+        """Click the security verification checkbox if present"""
+        try:
+            # Look for various checkbox selectors that might be the verification
+            selectors = [
+                'input[type="checkbox"]',
+                '.verification-checkbox',
+                '#verifyCheckbox',
+                'input[name*="verify"]',
+                'input[name*="Verify"]',
+                'input[id*="verify"]',
+                'input[id*="Verify"]',
+            ]
+
+            for selector in selectors:
+                checkbox = await self.page.query_selector(selector)
+                if checkbox:
+                    # Check if it's visible and not already checked
+                    is_visible = await checkbox.is_visible()
+                    is_checked = await checkbox.is_checked()
+
+                    if is_visible and not is_checked:
+                        logger.info(f"Found security checkbox, clicking it...")
+                        await checkbox.click()
+                        await asyncio.sleep(1)
+
+                        # Look for a submit/verify button after checking the box
+                        verify_btns = [
+                            'button:has-text("Verify")',
+                            'input[type="submit"][value*="Verify"]',
+                            'button:has-text("Continue")',
+                            'input[type="submit"]',
+                        ]
+                        for btn_selector in verify_btns:
+                            btn = await self.page.query_selector(btn_selector)
+                            if btn and await btn.is_visible():
+                                await btn.click()
+                                await self.page.wait_for_load_state("networkidle")
+                                await asyncio.sleep(1)
+                                break
+
+                        logger.info("Security verification completed")
+                        return
+
+            # Also try clicking on any iframe that might contain reCAPTCHA
+            frames = self.page.frames
+            for frame in frames:
+                if 'recaptcha' in frame.url.lower():
+                    checkbox = await frame.query_selector('.recaptcha-checkbox')
+                    if checkbox:
+                        await checkbox.click()
+                        await asyncio.sleep(2)
+                        logger.info("Clicked reCAPTCHA checkbox")
+                        return
+
+        except Exception as e:
+            logger.warning(f"Security verification handling failed: {e}")
 
     async def search_tax_by_parcel(self, parcel_number: str) -> Optional[TaxData]:
         """
