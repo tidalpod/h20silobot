@@ -21,7 +21,7 @@
 
 {% block content %}
 <div class="bg-white shadow-sm rounded-xl border border-gray-200">
-    <form action="{% if property %}/properties/{{ property.id }}/edit{% else %}/properties/new{% endif %}" method="POST" class="p-6">
+    <form id="property-form" action="{% if property %}/properties/{{ property.id }}/edit{% else %}/properties/new{% endif %}" method="POST" class="p-6">
         {% if error %}
         <div class="mb-6 rounded-xl bg-red-50 p-4 border border-red-200">
             <div class="flex items-center gap-3">
@@ -586,6 +586,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Also parse when leaving the field
     addressField.addEventListener('blur', parseAddress);
+
+    // Add form submit handler for debugging
+    const mainForm = document.getElementById('property-form');
+    if (mainForm) {
+        console.log('Form found, action:', mainForm.action);
+        mainForm.addEventListener('submit', function(e) {
+            console.log('Form submitting to:', mainForm.action);
+            // Show loading state on button
+            const submitBtn = mainForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="animate-pulse">Saving...</span>';
+            }
+            // Allow form to submit naturally
+            return true;
+        });
+    } else {
+        console.error('Property form not found!');
+    }
 });
 
 {% if property %}
