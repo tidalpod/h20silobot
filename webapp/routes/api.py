@@ -113,8 +113,10 @@ async def api_get_property_tenants(property_id: int):
 
 
 @router.post("/properties/{property_id}/refresh")
-async def api_refresh_property(property_id: int, background_tasks: BackgroundTasks):
-    """Trigger bill refresh for a specific property"""
+async def api_refresh_property(property_id: int):
+    """Refresh bill data for a specific property (runs synchronously)"""
+    from scraper.bsa_scraper import BSAScraper
+
     async with get_session() as session:
         result = await session.execute(
             select(Property).where(Property.id == property_id)
@@ -124,10 +126,58 @@ async def api_refresh_property(property_id: int, background_tasks: BackgroundTas
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        # Add background task to refresh
-        background_tasks.add_task(refresh_single_property, property_id)
+        logger.info(f"Refreshing bills for property: {prop.address}")
 
-        return {"status": "started", "message": f"Refreshing bills for {prop.address}"}
+        try:
+            async with BSAScraper() as scraper:
+                bill_data = None
+
+                # First try by account number
+                if prop.bsa_account_number:
+                    logger.info(f"Searching by account: {prop.bsa_account_number}")
+                    bill_data = await scraper.search_by_account(prop.bsa_account_number)
+
+                # Fall back to address search
+                if not bill_data:
+                    street_address = prop.address.split(',')[0].strip()
+                    logger.info(f"Trying address search: {street_address}")
+                    bill_data = await scraper.search_by_address(street_address)
+
+                if bill_data:
+                    # Create new bill record
+                    bill = WaterBill(
+                        property_id=prop.id,
+                        amount_due=bill_data.amount_due,
+                        previous_balance=bill_data.previous_balance,
+                        current_charges=bill_data.current_charges,
+                        late_fees=bill_data.late_fees,
+                        payments_received=bill_data.payments_received,
+                        statement_date=bill_data.statement_date,
+                        due_date=bill_data.due_date,
+                        water_usage_gallons=bill_data.water_usage,
+                        raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                    )
+                    bill.status = bill.calculate_status()
+                    session.add(bill)
+
+                    # Update property info
+                    if bill_data.owner_name and not prop.owner_name:
+                        prop.owner_name = bill_data.owner_name
+                    if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                        prop.parcel_number = bill_data.parcel_number
+                    if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
+                        prop.bsa_account_number = bill_data.account_number
+
+                    await session.commit()
+                    logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
+                    return {"status": "success", "message": f"Found bill: ${bill_data.amount_due}"}
+                else:
+                    logger.warning(f"No bill data found for {prop.address}")
+                    return {"status": "not_found", "message": "No bill data found on BSA Online"}
+
+        except Exception as e:
+            logger.error(f"Error refreshing {prop.address}: {e}")
+            return {"status": "error", "message": str(e)}
 
 
 @router.post("/refresh-bills")
