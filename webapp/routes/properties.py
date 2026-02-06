@@ -44,7 +44,8 @@ async def list_properties(
     async with get_session() as session:
         query = select(Property).options(
             selectinload(Property.bills),
-            selectinload(Property.tenants)
+            selectinload(Property.tenants),
+            selectinload(Property.taxes)
         )
 
         if search:

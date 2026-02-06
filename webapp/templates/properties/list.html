@@ -8,12 +8,19 @@
         <h1 class="text-3xl font-bold tracking-tight text-gray-900">Properties</h1>
         <div class="flex gap-2">
             <button hx-post="/api/refresh-bills" hx-swap="none"
-                    onclick="this.innerHTML='<svg class=\'animate-spin h-4 w-4 mr-2\' xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\'><circle class=\'opacity-25\' cx=\'12\' cy=\'12\' r=\'10\' stroke=\'currentColor\' stroke-width=\'4\'></circle><path class=\'opacity-75\' fill=\'currentColor\' d=\'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\'></path></svg>Refreshing...'; this.disabled=true; setTimeout(() => { this.innerHTML='<svg class=\'h-4 w-4 mr-2\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'1.5\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99\' /></svg>Refresh Bills'; this.disabled=false; location.reload(); }, 10000);"
+                    onclick="this.innerHTML='<span class=\'animate-pulse\'>Refreshing...</span>'; this.disabled=true; setTimeout(() => { this.innerHTML='🔄 Refresh Bills'; this.disabled=false; location.reload(); }, 15000);"
                     class="inline-flex items-center rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
-                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-                Refresh Bills
+                🔄 Refresh Bills
+            </button>
+            <button hx-post="/api/refresh-taxes" hx-swap="none"
+                    onclick="this.innerHTML='<span class=\'animate-pulse\'>Refreshing...</span>'; this.disabled=true; setTimeout(() => { this.innerHTML='🏛️ Refresh Taxes'; this.disabled=false; location.reload(); }, 30000);"
+                    class="inline-flex items-center rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                🏛️ Refresh Taxes
+            </button>
+            <button hx-post="/api/fill-parcel-numbers" hx-swap="none"
+                    onclick="this.innerHTML='<span class=\'animate-pulse\'>Finding...</span>'; this.disabled=true; setTimeout(() => { this.innerHTML='📍 Fill Parcels'; this.disabled=false; location.reload(); }, 60000);"
+                    class="inline-flex items-center rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                📍 Fill Parcels
             </button>
             <a href="/properties/new" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
                 <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -116,6 +123,7 @@
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Status</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Rent</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Water Bill</th>
+                <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Property Tax</th>
                 <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-16"></th>
             </tr>
         </thead>
@@ -270,6 +278,20 @@
                     {% set amount = item.property.bills[0].amount_due %}
                     <span class="text-sm {% if amount > 100 %}text-gray-700{% else %}text-gray-400{% endif %} font-light">
                         💧 ${{ "%.0f"|format(amount) }}
+                    </span>
+                    {% else %}
+                    <span class="text-sm text-gray-300">—</span>
+                    {% endif %}
+                </td>
+
+                <!-- Property Tax -->
+                <td class="px-4 py-4 text-right">
+                    {% if item.property.taxes and item.property.taxes[0].amount_due %}
+                    {% set tax_amount = item.property.taxes[0].amount_due %}
+                    {% set tax_status = item.property.taxes[0].status %}
+                    <span class="text-sm {% if tax_status == 'delinquent' %}text-red-600 font-medium{% elif tax_amount > 0 %}text-gray-700{% else %}text-green-600{% endif %} font-light">
+                        🏛️ ${{ "%.0f"|format(tax_amount) }}
+                        {% if tax_status == 'delinquent' %}⚠️{% endif %}
                     </span>
                     {% else %}
                     <span class="text-sm text-gray-300">—</span>
