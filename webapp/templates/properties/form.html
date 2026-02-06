@@ -402,23 +402,17 @@
                             {% endif %}
                         </div>
                         <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                            <form action="/properties/{{ property.id }}/photos/{{ photo.id }}/toggle-star" method="POST" class="inline">
-                                <button type="submit" class="{% if photo.is_starred %}bg-yellow-500{% else %}bg-gray-600{% endif %} text-white text-xs px-2 py-1 rounded hover:bg-yellow-400" title="{% if photo.is_starred %}Remove from featured{% else %}Mark as featured{% endif %}">
-                                    {% if photo.is_starred %}★{% else %}☆{% endif %}
-                                </button>
-                            </form>
+                            <button type="button" onclick="photoAction('toggle-star', {{ photo.id }})" class="{% if photo.is_starred %}bg-yellow-500{% else %}bg-gray-600{% endif %} text-white text-xs px-2 py-1 rounded hover:bg-yellow-400" title="{% if photo.is_starred %}Remove from featured{% else %}Mark as featured{% endif %}">
+                                {% if photo.is_starred %}★{% else %}☆{% endif %}
+                            </button>
                             {% if not photo.is_primary %}
-                            <form action="/properties/{{ property.id }}/photos/{{ photo.id }}/set-primary" method="POST" class="inline">
-                                <button type="submit" class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-500" title="Set as primary">
-                                    🏠
-                                </button>
-                            </form>
+                            <button type="button" onclick="photoAction('set-primary', {{ photo.id }})" class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-500" title="Set as primary">
+                                🏠
+                            </button>
                             {% endif %}
-                            <form action="/properties/{{ property.id }}/photos/{{ photo.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Delete this photo?')">
-                                <button type="submit" class="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-500" title="Delete">
-                                    🗑️
-                                </button>
-                            </form>
+                            <button type="button" onclick="deletePhoto({{ photo.id }})" class="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-500" title="Delete">
+                                🗑️
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
@@ -686,6 +680,29 @@ async function clearAllPhotos() {
         console.error('Error:', error);
         alert('Error clearing photos: ' + error.message);
     }
+}
+
+async function photoAction(action, photoId) {
+    try {
+        const response = await fetch(`/properties/{{ property.id }}/photos/${photoId}/${action}`, {
+            method: 'POST'
+        });
+        if (response.ok || response.redirected) {
+            window.location.reload();
+        } else {
+            alert('Error performing action');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deletePhoto(photoId) {
+    if (!confirm('Delete this photo?')) {
+        return;
+    }
+    await photoAction('delete', photoId);
 }
 {% endif %}
 
