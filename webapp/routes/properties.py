@@ -650,6 +650,45 @@ async def upload_photo(
         })
 
 
+@router.post("/{property_id}/photos/clear-all")
+async def clear_all_photos(request: Request, property_id: int):
+    """Delete all photo records for a property (useful for clearing orphaned records)"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        # Get all photos for this property
+        result = await session.execute(
+            select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+        )
+        photos = result.scalars().all()
+
+        # Delete files from disk (if they exist)
+        for photo in photos:
+            filename = photo.url.split("/")[-1]
+            filepath = UPLOAD_DIR / filename
+            if filepath.exists():
+                filepath.unlink()
+
+        # Delete all photo records from database
+        await session.execute(
+            PropertyPhoto.__table__.delete().where(PropertyPhoto.property_id == property_id)
+        )
+
+        # Clear featured photo on property
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if prop:
+            prop.featured_photo_url = None
+
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
+
+
 @router.post("/{property_id}/photos/{photo_id}/delete")
 async def delete_photo(request: Request, property_id: int, photo_id: int):
     """Delete a property photo"""
@@ -776,45 +815,6 @@ async def update_listing_settings(
         prop.description = description or None
         prop.monthly_rent = Decimal(monthly_rent) if monthly_rent and monthly_rent.strip() else None
         prop.is_listed = is_listed.lower() == "true" if is_listed else False
-
-        await session.commit()
-
-    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
-
-
-@router.post("/{property_id}/photos/clear-all")
-async def clear_all_photos(request: Request, property_id: int):
-    """Delete all photo records for a property (useful for clearing orphaned records)"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    async with get_session() as session:
-        # Get all photos for this property
-        result = await session.execute(
-            select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
-        )
-        photos = result.scalars().all()
-
-        # Delete files from disk (if they exist)
-        for photo in photos:
-            filename = photo.url.split("/")[-1]
-            filepath = UPLOAD_DIR / filename
-            if filepath.exists():
-                filepath.unlink()
-
-        # Delete all photo records from database
-        await session.execute(
-            PropertyPhoto.__table__.delete().where(PropertyPhoto.property_id == property_id)
-        )
-
-        # Clear featured photo on property
-        result = await session.execute(
-            select(Property).where(Property.id == property_id)
-        )
-        prop = result.scalar_one_or_none()
-        if prop:
-            prop.featured_photo_url = None
 
         await session.commit()
 
