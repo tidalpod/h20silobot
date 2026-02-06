@@ -602,6 +602,7 @@ class PropertyPhoto(Base):
     caption = Column(String(255), nullable=True)
     display_order = Column(Integer, default=0)  # For ordering photos
     is_primary = Column(Boolean, default=False)  # Main photo for listings
+    is_starred = Column(Boolean, default=False)  # Featured/favorite photos
 
     # Tracking
     created_at = Column(DateTime, default=datetime.utcnow)

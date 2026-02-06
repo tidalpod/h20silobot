@@ -385,24 +385,32 @@
                 {% if property.photos %}
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-gray-500">{{ property.photos|length }} photo(s)</span>
-                    <form action="/properties/{{ property.id }}/photos/clear-all" method="POST" class="inline" onsubmit="return confirm('Delete ALL photos for this property? This cannot be undone.')">
-                        <button type="submit" class="text-red-600 text-sm hover:text-red-800 hover:underline">
-                            Clear All Photos
-                        </button>
-                    </form>
+                    <button type="button" onclick="clearAllPhotos()" class="text-red-600 text-sm hover:text-red-800 hover:underline">
+                        Clear All Photos
+                    </button>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     {% for photo in property.photos %}
                     <div class="relative group">
-                        <img src="{{ photo.url }}" alt="Property photo" class="w-full h-32 object-cover rounded-lg border border-gray-200">
-                        {% if photo.is_primary %}
-                        <span class="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Primary</span>
-                        {% endif %}
+                        <img src="{{ photo.url }}" alt="Property photo" class="w-full h-32 object-cover rounded-lg border border-gray-200 {% if photo.is_starred %}ring-2 ring-yellow-400{% endif %}">
+                        <div class="absolute top-2 left-2 flex gap-1">
+                            {% if photo.is_primary %}
+                            <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Primary</span>
+                            {% endif %}
+                            {% if photo.is_starred %}
+                            <span class="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">Featured</span>
+                            {% endif %}
+                        </div>
                         <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                            <form action="/properties/{{ property.id }}/photos/{{ photo.id }}/toggle-star" method="POST" class="inline">
+                                <button type="submit" class="{% if photo.is_starred %}bg-yellow-500{% else %}bg-gray-600{% endif %} text-white text-xs px-2 py-1 rounded hover:bg-yellow-400" title="{% if photo.is_starred %}Remove from featured{% else %}Mark as featured{% endif %}">
+                                    {% if photo.is_starred %}★{% else %}☆{% endif %}
+                                </button>
+                            </form>
                             {% if not photo.is_primary %}
                             <form action="/properties/{{ property.id }}/photos/{{ photo.id }}/set-primary" method="POST" class="inline">
                                 <button type="submit" class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-500" title="Set as primary">
-                                    ⭐
+                                    🏠
                                 </button>
                             </form>
                             {% endif %}
@@ -626,6 +634,38 @@ function deletePropertyPermanent() {
         form.action = '/properties/{{ property.id }}/delete-permanent';
         document.body.appendChild(form);
         form.submit();
+    }
+}
+
+async function clearAllPhotos() {
+    if (!confirm('Delete ALL photos for this property? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/properties/{{ property.id }}/photos/clear-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
+        }
+
+        if (!response.ok) {
+            const text = await response.text();
+            alert('Error clearing photos: ' + text);
+            return;
+        }
+
+        // Reload the page
+        window.location.reload();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error clearing photos: ' + error.message);
     }
 }
 {% endif %}

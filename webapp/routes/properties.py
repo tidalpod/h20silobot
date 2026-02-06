@@ -737,34 +737,40 @@ async def clear_all_photos(request: Request, property_id: int):
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    async with get_session() as session:
-        # Get all photos for this property
-        result = await session.execute(
-            select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
-        )
-        photos = result.scalars().all()
+    try:
+        async with get_session() as session:
+            # Get all photos for this property
+            result = await session.execute(
+                select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+            )
+            photos = result.scalars().all()
+            print(f"[CLEAR-ALL] Found {len(photos)} photos for property {property_id}")
 
-        # Delete files from disk (if they exist)
-        for photo in photos:
-            filename = photo.url.split("/")[-1]
-            filepath = UPLOAD_DIR / filename
-            if filepath.exists():
-                filepath.unlink()
+            # Delete files from disk (if they exist)
+            for photo in photos:
+                filename = photo.url.split("/")[-1]
+                filepath = UPLOAD_DIR / filename
+                if filepath.exists():
+                    filepath.unlink()
+                    print(f"[CLEAR-ALL] Deleted file: {filepath}")
+                # Delete each photo record individually
+                await session.delete(photo)
 
-        # Delete all photo records from database
-        await session.execute(
-            PropertyPhoto.__table__.delete().where(PropertyPhoto.property_id == property_id)
-        )
+            # Clear featured photo on property
+            result = await session.execute(
+                select(Property).where(Property.id == property_id)
+            )
+            prop = result.scalar_one_or_none()
+            if prop:
+                prop.featured_photo_url = None
+                print(f"[CLEAR-ALL] Cleared featured_photo_url for property {property_id}")
 
-        # Clear featured photo on property
-        result = await session.execute(
-            select(Property).where(Property.id == property_id)
-        )
-        prop = result.scalar_one_or_none()
-        if prop:
-            prop.featured_photo_url = None
-
-        await session.commit()
+        print(f"[CLEAR-ALL] Successfully cleared all photos for property {property_id}")
+    except Exception as e:
+        print(f"[CLEAR-ALL] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
     return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
 
@@ -860,6 +866,32 @@ async def set_primary_photo(request: Request, property_id: int, photo_id: int):
             prop = result.scalar_one_or_none()
             if prop:
                 prop.featured_photo_url = photo.url
+
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
+
+
+@router.post("/{property_id}/photos/{photo_id}/toggle-star")
+async def toggle_star_photo(request: Request, property_id: int, photo_id: int):
+    """Toggle the starred/featured status of a photo"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(PropertyPhoto)
+            .where(PropertyPhoto.id == photo_id)
+            .where(PropertyPhoto.property_id == property_id)
+        )
+        photo = result.scalar_one_or_none()
+
+        if not photo:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        # Toggle the starred status
+        photo.is_starred = not photo.is_starred
 
         await session.commit()
 
