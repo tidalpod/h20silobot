@@ -30,6 +30,23 @@ UPLOAD_PATH = os.environ.get("UPLOAD_PATH", str(BASE_DIR / "static" / "uploads")
 UPLOAD_DIR = Path(UPLOAD_PATH)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Debug logging for upload path configuration
+logger.info(f"=== UPLOAD PATH DEBUG ===")
+logger.info(f"UPLOAD_PATH env var: {os.environ.get('UPLOAD_PATH', 'NOT SET')}")
+logger.info(f"Using upload path: {UPLOAD_PATH}")
+logger.info(f"Upload directory exists: {UPLOAD_DIR.exists()}")
+logger.info(f"Upload directory is dir: {UPLOAD_DIR.is_dir()}")
+# Check properties subdirectory
+props_dir = UPLOAD_DIR / "properties"
+if props_dir.exists():
+    files = list(props_dir.iterdir())
+    logger.info(f"Properties folder has {len(files)} files")
+    if files:
+        logger.info(f"Sample files: {[f.name for f in files[:5]]}")
+else:
+    logger.info(f"Properties folder does not exist yet")
+logger.info(f"===========================")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -124,4 +141,23 @@ async def health_check():
     return {
         "status": "healthy",
         "database": "connected" if is_connected() else "disconnected"
+    }
+
+
+@app.get("/debug/uploads")
+async def debug_uploads():
+    """Debug endpoint to check upload configuration"""
+    props_dir = UPLOAD_DIR / "properties"
+    files = []
+    if props_dir.exists():
+        files = [f.name for f in props_dir.iterdir()][:20]
+
+    return {
+        "upload_path_env": os.environ.get("UPLOAD_PATH", "NOT SET (using default)"),
+        "actual_upload_path": str(UPLOAD_PATH),
+        "upload_dir_exists": UPLOAD_DIR.exists(),
+        "properties_dir_exists": props_dir.exists(),
+        "file_count": len(list(props_dir.iterdir())) if props_dir.exists() else 0,
+        "sample_files": files,
+        "is_volume": not str(UPLOAD_PATH).startswith(str(BASE_DIR))
     }
