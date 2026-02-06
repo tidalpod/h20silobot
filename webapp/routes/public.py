@@ -30,9 +30,8 @@ async def public_listings(request: Request, available_only: bool = False):
             .order_by(Property.is_vacant.desc(), Property.address)
         )
 
-        # Optionally filter to only vacant/available properties
-        if available_only:
-            query = query.where(Property.is_vacant == True)
+        # Note: We filter available properties after fetching since availability
+        # is determined by active tenants, not the is_vacant field
 
         result = await session.execute(query)
         properties = result.scalars().all()
@@ -40,18 +39,20 @@ async def public_listings(request: Request, available_only: bool = False):
         # Build listing data with rent info
         listings = []
         for prop in properties:
+            # Determine vacancy based on active tenants (same as admin side)
+            active_tenants = [t for t in prop.tenants if t.is_active]
+            is_available = len(active_tenants) == 0
+
             # Get rent from tenant or monthly_rent field
             rent = None
             if prop.monthly_rent:
                 rent = float(prop.monthly_rent)
-            else:
-                active_tenants = [t for t in prop.tenants if t.is_active]
-                if active_tenants:
-                    tenant = active_tenants[0]
-                    if tenant.is_section8 and tenant.voucher_amount:
-                        rent = float(tenant.voucher_amount) + float(tenant.tenant_portion or 0)
-                    elif tenant.current_rent:
-                        rent = float(tenant.current_rent)
+            elif active_tenants:
+                tenant = active_tenants[0]
+                if tenant.is_section8 and tenant.voucher_amount:
+                    rent = float(tenant.voucher_amount) + float(tenant.tenant_portion or 0)
+                elif tenant.current_rent:
+                    rent = float(tenant.current_rent)
 
             # Get primary photo
             primary_photo = None
@@ -65,8 +66,16 @@ async def public_listings(request: Request, available_only: bool = False):
                 "property": prop,
                 "rent": rent,
                 "photo": primary_photo,
-                "photo_count": len(prop.photos)
+                "photo_count": len(prop.photos),
+                "is_available": is_available
             })
+
+    # Filter to available only if requested
+    all_listings = listings
+    available_count = sum(1 for l in listings if l["is_available"])
+
+    if available_only:
+        listings = [l for l in listings if l["is_available"]]
 
     return templates.TemplateResponse(
         "public/listings.html",
@@ -74,8 +83,8 @@ async def public_listings(request: Request, available_only: bool = False):
             "request": request,
             "listings": listings,
             "available_only": available_only,
-            "total_count": len(listings),
-            "available_count": sum(1 for l in listings if l["property"].is_vacant)
+            "total_count": len(all_listings),
+            "available_count": available_count
         }
     )
 
@@ -98,18 +107,20 @@ async def public_property_detail(request: Request, property_id: int):
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
+        # Determine availability based on active tenants
+        active_tenants = [t for t in prop.tenants if t.is_active]
+        is_available = len(active_tenants) == 0
+
         # Get rent
         rent = None
         if prop.monthly_rent:
             rent = float(prop.monthly_rent)
-        else:
-            active_tenants = [t for t in prop.tenants if t.is_active]
-            if active_tenants:
-                tenant = active_tenants[0]
-                if tenant.is_section8 and tenant.voucher_amount:
-                    rent = float(tenant.voucher_amount) + float(tenant.tenant_portion or 0)
-                elif tenant.current_rent:
-                    rent = float(tenant.current_rent)
+        elif active_tenants:
+            tenant = active_tenants[0]
+            if tenant.is_section8 and tenant.voucher_amount:
+                rent = float(tenant.voucher_amount) + float(tenant.tenant_portion or 0)
+            elif tenant.current_rent:
+                rent = float(tenant.current_rent)
 
         # Sort photos by display_order
         photos = sorted(prop.photos, key=lambda p: (not p.is_primary, p.display_order))
@@ -120,6 +131,7 @@ async def public_property_detail(request: Request, property_id: int):
             "request": request,
             "property": prop,
             "rent": rent,
-            "photos": photos
+            "photos": photos,
+            "is_available": is_available
         }
     )
