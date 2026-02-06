@@ -50,6 +50,12 @@ class Property(Base):
     # Occupancy status
     is_vacant = Column(Boolean, default=False)
 
+    # Public listing fields
+    description = Column(Text, nullable=True)  # Property description for public listing
+    monthly_rent = Column(Numeric(10, 2), nullable=True)  # Advertised rent for vacant units
+    is_listed = Column(Boolean, default=False)  # Show on public website
+    featured_photo_url = Column(String(500), nullable=True)  # Main photo URL
+
     # City certification
     has_city_certification = Column(Boolean, default=False)
     city_certification_date = Column(Date, nullable=True)
@@ -105,6 +111,7 @@ class Property(Base):
     recertifications = relationship("Recertification", back_populates="property_ref")
     web_user = relationship("WebUser", back_populates="properties")
     sms_messages = relationship("SMSMessage", back_populates="property", order_by="SMSMessage.created_at")
+    photos = relationship("PropertyPhoto", back_populates="property", order_by="PropertyPhoto.display_order")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -577,3 +584,30 @@ class SMSMessage(Base):
 
     def __repr__(self):
         return f"<SMSMessage {self.direction.value} {self.from_number} -> {self.to_number}>"
+
+
+# =============================================================================
+# Property Photos
+# =============================================================================
+
+class PropertyPhoto(Base):
+    """Photos for property listings"""
+    __tablename__ = "property_photos"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    # Photo details
+    url = Column(String(500), nullable=False)  # URL or file path
+    caption = Column(String(255), nullable=True)
+    display_order = Column(Integer, default=0)  # For ordering photos
+    is_primary = Column(Boolean, default=False)  # Main photo for listings
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    property = relationship("Property", back_populates="photos")
+
+    def __repr__(self):
+        return f"<PropertyPhoto {self.id} for Property {self.property_id}>"

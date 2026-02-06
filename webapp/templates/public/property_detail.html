@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ property.address }} | Blue Deer Rentals</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+        }
+        .gallery-thumb {
+            transition: all 0.2s ease;
+        }
+        .gallery-thumb:hover, .gallery-thumb.active {
+            ring: 3px;
+            ring-color: #3b82f6;
+        }
+        .badge-available {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        .badge-occupied {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/listings" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
+                    <div>
+                        <h1 class="text-xl font-bold">Blue Deer Rentals</h1>
+                    </div>
+                </a>
+                <a href="/listings" class="text-sm text-blue-100 hover:text-white transition-colors flex items-center gap-1">
+                    <span>←</span> Back to Listings
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Photo Gallery -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+            {% if photos %}
+            <!-- Main Photo -->
+            <div class="relative h-96 md:h-[500px] bg-gray-200">
+                <img id="main-photo" src="{{ photos[0].url }}" alt="{{ property.address }}"
+                     class="w-full h-full object-cover">
+
+                <!-- Availability Badge -->
+                <div class="absolute top-6 left-6">
+                    {% if property.is_vacant %}
+                    <span class="badge-available text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">
+                        Available Now
+                    </span>
+                    {% else %}
+                    <span class="badge-occupied text-white text-sm font-medium px-4 py-2 rounded-full">
+                        Currently Occupied
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Thumbnail Strip -->
+            {% if photos|length > 1 %}
+            <div class="p-4 border-t border-gray-100 bg-gray-50">
+                <div class="flex gap-3 overflow-x-auto pb-2">
+                    {% for photo in photos %}
+                    <button onclick="setMainPhoto('{{ photo.url }}')"
+                            class="gallery-thumb flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none">
+                        <img src="{{ photo.url }}" alt="Photo {{ loop.index }}"
+                             class="w-full h-full object-cover">
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <!-- No Photos -->
+            <div class="h-96 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                <div class="text-center">
+                    <span class="text-8xl text-gray-300">🏠</span>
+                    <p class="mt-4 text-gray-400">Photos coming soon</p>
+                </div>
+
+                <!-- Availability Badge -->
+                <div class="absolute top-6 left-6">
+                    {% if property.is_vacant %}
+                    <span class="badge-available text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">
+                        Available Now
+                    </span>
+                    {% else %}
+                    <span class="badge-occupied text-white text-sm font-medium px-4 py-2 rounded-full">
+                        Currently Occupied
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Content -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Header -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            {% if rent %}
+                            <div class="flex items-baseline gap-2 mb-2">
+                                <span class="text-3xl font-bold text-gray-900">${{ "{:,.0f}".format(rent) }}</span>
+                                <span class="text-gray-500">/month</span>
+                            </div>
+                            {% endif %}
+                            <h1 class="text-2xl font-bold text-gray-900">{{ property.address }}</h1>
+                            <p class="text-gray-500 mt-1">
+                                {{ property.city or 'Detroit' }}, {{ property.state or 'MI' }} {{ property.zip_code or '' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="flex flex-wrap gap-6 pt-4 border-t border-gray-100">
+                        {% if property.bedrooms %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">🛏️</span>
+                            <div>
+                                <p class="text-lg font-bold text-gray-900">{{ property.bedrooms }}</p>
+                                <p class="text-xs text-gray-500">Bedrooms</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if property.bathrooms %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">🚿</span>
+                            <div>
+                                <p class="text-lg font-bold text-gray-900">{{ property.bathrooms }}</p>
+                                <p class="text-xs text-gray-500">Bathrooms</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if property.square_feet %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">📐</span>
+                            <div>
+                                <p class="text-lg font-bold text-gray-900">{{ "{:,}".format(property.square_feet) }}</p>
+                                <p class="text-xs text-gray-500">Sq Ft</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if property.year_built %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">🏗️</span>
+                            <div>
+                                <p class="text-lg font-bold text-gray-900">{{ property.year_built }}</p>
+                                <p class="text-xs text-gray-500">Year Built</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Description -->
+                {% if property.description %}
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">About This Property</h2>
+                    <div class="prose prose-gray max-w-none">
+                        <p class="text-gray-600 whitespace-pre-line">{{ property.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Property Details -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Property Details</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        {% if property.property_type %}
+                        <div>
+                            <p class="text-sm text-gray-500">Property Type</p>
+                            <p class="font-medium text-gray-900">{{ property.property_type }}</p>
+                        </div>
+                        {% endif %}
+                        {% if property.lot_size %}
+                        <div>
+                            <p class="text-sm text-gray-500">Lot Size</p>
+                            <p class="font-medium text-gray-900">{{ property.lot_size }}</p>
+                        </div>
+                        {% endif %}
+                        {% if property.bedrooms %}
+                        <div>
+                            <p class="text-sm text-gray-500">Bedrooms</p>
+                            <p class="font-medium text-gray-900">{{ property.bedrooms }}</p>
+                        </div>
+                        {% endif %}
+                        {% if property.bathrooms %}
+                        <div>
+                            <p class="text-sm text-gray-500">Bathrooms</p>
+                            <p class="font-medium text-gray-900">{{ property.bathrooms }}</p>
+                        </div>
+                        {% endif %}
+                        {% if property.square_feet %}
+                        <div>
+                            <p class="text-sm text-gray-500">Living Area</p>
+                            <p class="font-medium text-gray-900">{{ "{:,}".format(property.square_feet) }} sq ft</p>
+                        </div>
+                        {% endif %}
+                        {% if property.year_built %}
+                        <div>
+                            <p class="text-sm text-gray-500">Year Built</p>
+                            <p class="font-medium text-gray-900">{{ property.year_built }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Contact Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 sticky top-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Interested in this property?</h3>
+
+                    {% if property.is_vacant %}
+                    <p class="text-green-600 font-medium mb-4 flex items-center gap-2">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        Available for immediate move-in
+                    </p>
+                    {% else %}
+                    <p class="text-gray-500 mb-4">
+                        This property is currently occupied. Contact us to be notified when it becomes available.
+                    </p>
+                    {% endif %}
+
+                    <div class="space-y-3">
+                        <a href="tel:+12484958759"
+                           class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-500 transition-colors">
+                            <span>📞</span> Call (248) 495-8759
+                        </a>
+                        <a href="mailto:rentals@bluedeer.space?subject=Inquiry: {{ property.address }}"
+                           class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                            <span>✉️</span> Send Email
+                        </a>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <p class="text-xs text-gray-500 text-center">
+                            Managed by Blue Deer Property Management
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 8 Badge -->
+                <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-6 border border-purple-100">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl">🏛️</span>
+                        <h3 class="font-bold text-gray-900">Section 8 Accepted</h3>
+                    </div>
+                    <p class="text-sm text-gray-600">
+                        We accept Housing Choice Vouchers. Contact us to discuss your voucher amount.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain opacity-50">
+                    <span class="font-medium text-white">Blue Deer</span>
+                </div>
+                <div class="flex items-center gap-6 text-sm">
+                    <a href="/listings" class="hover:text-white transition-colors">All Properties</a>
+                    <a href="/privacy" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="/terms" class="hover:text-white transition-colors">Terms</a>
+                </div>
+                <p class="text-sm">&copy; 2025 Blue Deer Property Management</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function setMainPhoto(url) {
+            document.getElementById('main-photo').src = url;
+        }
+    </script>
+</body>
+</html>

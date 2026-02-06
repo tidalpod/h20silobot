@@ -1,17 +1,24 @@
 """Property management routes"""
 
+import os
+import uuid
 from datetime import datetime
 from pathlib import Path
+from decimal import Decimal
 
-from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Request, Form, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant
+from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto
 from webapp.auth.dependencies import get_current_user
+
+# Upload directory
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "properties"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(tags=["properties"])
 
@@ -296,7 +303,9 @@ async def edit_property_form(request: Request, property_id: int):
 
     async with get_session() as session:
         result = await session.execute(
-            select(Property).where(Property.id == property_id)
+            select(Property)
+            .where(Property.id == property_id)
+            .options(selectinload(Property.photos))
         )
         prop = result.scalar_one_or_none()
 
@@ -356,7 +365,11 @@ async def update_property(
     co_building_date: str = Form(""),
     co_building_time: str = Form(""),
     rental_inspection_date: str = Form(""),
-    rental_inspection_time: str = Form("")
+    rental_inspection_time: str = Form(""),
+    # Public listing fields
+    description: str = Form(""),
+    monthly_rent: str = Form(""),
+    is_listed: str = Form("")
 ):
     """Update a property"""
     user = await get_current_user(request)
@@ -446,6 +459,17 @@ async def update_property(
         prop.rental_inspection_date = parse_date(rental_inspection_date)
         prop.rental_inspection_time = rental_inspection_time or None
 
+        # Public listing fields
+        prop.description = description or None
+        if monthly_rent:
+            try:
+                prop.monthly_rent = Decimal(monthly_rent)
+            except:
+                prop.monthly_rent = None
+        else:
+            prop.monthly_rent = None
+        prop.is_listed = is_listed in ("on", "true", "1")
+
         await session.commit()
 
         return RedirectResponse(url=f"/properties/{property_id}", status_code=303)
@@ -504,3 +528,207 @@ async def delete_property_permanent(request: Request, property_id: int):
         await session.commit()
 
     return RedirectResponse(url="/properties", status_code=303)
+
+
+# =============================================================================
+# Photo Management
+# =============================================================================
+
+@router.post("/{property_id}/photos/upload")
+async def upload_photo(
+    request: Request,
+    property_id: int,
+    photo: UploadFile = File(...)
+):
+    """Upload a photo for a property"""
+    user = await get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if photo.content_type not in allowed_types:
+        return JSONResponse({"error": "Invalid file type. Use JPG, PNG, WebP, or GIF."}, status_code=400)
+
+    # Validate file size (max 10MB)
+    contents = await photo.read()
+    if len(contents) > 10 * 1024 * 1024:
+        return JSONResponse({"error": "File too large. Max 10MB."}, status_code=400)
+
+    async with get_session() as session:
+        # Verify property exists
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return JSONResponse({"error": "Property not found"}, status_code=404)
+
+        # Generate unique filename
+        ext = Path(photo.filename).suffix.lower() or ".jpg"
+        filename = f"{property_id}_{uuid.uuid4().hex[:8]}{ext}"
+        filepath = UPLOAD_DIR / filename
+
+        # Save file
+        with open(filepath, "wb") as f:
+            f.write(contents)
+
+        # Get current photo count to determine if this is primary
+        result = await session.execute(
+            select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+        )
+        existing_photos = result.scalars().all()
+        is_primary = len(existing_photos) == 0
+
+        # Create database record
+        photo_record = PropertyPhoto(
+            property_id=property_id,
+            url=f"/static/uploads/properties/{filename}",
+            is_primary=is_primary,
+            display_order=len(existing_photos)
+        )
+        session.add(photo_record)
+
+        # Update featured photo if this is primary
+        if is_primary:
+            prop.featured_photo_url = f"/static/uploads/properties/{filename}"
+
+        await session.commit()
+
+        return JSONResponse({
+            "success": True,
+            "photo_id": photo_record.id,
+            "url": photo_record.url
+        })
+
+
+@router.post("/{property_id}/photos/{photo_id}/delete")
+async def delete_photo(request: Request, property_id: int, photo_id: int):
+    """Delete a property photo"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(PropertyPhoto)
+            .where(PropertyPhoto.id == photo_id)
+            .where(PropertyPhoto.property_id == property_id)
+        )
+        photo = result.scalar_one_or_none()
+
+        if not photo:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        # Delete file from disk
+        filename = photo.url.split("/")[-1]
+        filepath = UPLOAD_DIR / filename
+        if filepath.exists():
+            filepath.unlink()
+
+        was_primary = photo.is_primary
+
+        # Delete from database
+        await session.delete(photo)
+
+        # If this was primary, set another photo as primary
+        if was_primary:
+            result = await session.execute(
+                select(PropertyPhoto)
+                .where(PropertyPhoto.property_id == property_id)
+                .order_by(PropertyPhoto.display_order)
+                .limit(1)
+            )
+            new_primary = result.scalar_one_or_none()
+            if new_primary:
+                new_primary.is_primary = True
+                # Update property featured photo
+                result = await session.execute(
+                    select(Property).where(Property.id == property_id)
+                )
+                prop = result.scalar_one_or_none()
+                if prop:
+                    prop.featured_photo_url = new_primary.url
+            else:
+                # No photos left, clear featured photo
+                result = await session.execute(
+                    select(Property).where(Property.id == property_id)
+                )
+                prop = result.scalar_one_or_none()
+                if prop:
+                    prop.featured_photo_url = None
+
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
+
+
+@router.post("/{property_id}/photos/{photo_id}/set-primary")
+async def set_primary_photo(request: Request, property_id: int, photo_id: int):
+    """Set a photo as the primary photo"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        # Unset all other primary photos
+        result = await session.execute(
+            select(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+        )
+        photos = result.scalars().all()
+        for p in photos:
+            p.is_primary = (p.id == photo_id)
+
+        # Update property featured photo
+        result = await session.execute(
+            select(PropertyPhoto)
+            .where(PropertyPhoto.id == photo_id)
+            .where(PropertyPhoto.property_id == property_id)
+        )
+        photo = result.scalar_one_or_none()
+        if photo:
+            result = await session.execute(
+                select(Property).where(Property.id == property_id)
+            )
+            prop = result.scalar_one_or_none()
+            if prop:
+                prop.featured_photo_url = photo.url
+
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
+
+
+# =============================================================================
+# Listing Settings
+# =============================================================================
+
+@router.post("/{property_id}/listing")
+async def update_listing_settings(
+    request: Request,
+    property_id: int,
+    description: str = Form(""),
+    monthly_rent: str = Form(""),
+    is_listed: str = Form("")
+):
+    """Update property listing settings"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        prop.description = description or None
+        prop.monthly_rent = Decimal(monthly_rent) if monthly_rent and monthly_rent.strip() else None
+        prop.is_listed = is_listed.lower() == "true" if is_listed else False
+
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
