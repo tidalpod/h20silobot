@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Refresh Bills{% endblock %}
+{% block title %}Refresh Data{% endblock %}
 
 {% block header %}
 <header class="bg-white shadow">
@@ -12,43 +12,63 @@
                 <li class="text-sm text-gray-900">Refresh</li>
             </ol>
         </nav>
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Refresh Bills</h1>
-        <p class="mt-1 text-sm text-gray-500">Trigger a manual refresh of water bill data from BSA Online</p>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Refresh Property Data</h1>
+        <p class="mt-1 text-sm text-gray-500">Scrape water bills, property taxes, and parcel numbers from BSA Online</p>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Refresh All -->
-    <div class="bg-white shadow rounded-lg">
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 class="text-lg font-medium leading-6 text-gray-900">Refresh All Properties</h3>
-            <p class="mt-1 text-sm text-gray-500">Scrape bill data for all active properties</p>
-        </div>
-        <div class="px-4 py-5 sm:p-6">
-            <p class="text-sm text-gray-600 mb-4">
-                This will scrape the latest bill data from BSA Online for all {{ properties|length }} active properties.
-                This process runs in the background and may take several minutes.
-            </p>
-            <button hx-post="/api/refresh-bills"
-                    hx-swap="innerHTML"
-                    hx-target="#refresh-all-status"
-                    class="w-full inline-flex justify-center items-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
-                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-                Refresh All Bills
-            </button>
-            <div id="refresh-all-status" class="mt-4"></div>
-        </div>
+<!-- Refresh All Data - Main Action -->
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Refresh All Property Data</h3>
+        <p class="mt-1 text-sm text-gray-500">One-click refresh of water bills, property taxes, and parcel numbers for all {{ properties|length }} active properties</p>
     </div>
+    <div class="px-4 py-5 sm:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                <span class="text-2xl">💧</span>
+                <div>
+                    <p class="font-medium text-gray-900">Water Bills</p>
+                    <p class="text-xs text-gray-500">Latest amounts due</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                <span class="text-2xl">🏛️</span>
+                <div>
+                    <p class="font-medium text-gray-900">Property Taxes</p>
+                    <p class="text-xs text-gray-500">Outstanding tax balances</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <span class="text-2xl">📍</span>
+                <div>
+                    <p class="font-medium text-gray-900">Parcel Numbers</p>
+                    <p class="text-xs text-gray-500">Auto-discover missing parcels</p>
+                </div>
+            </div>
+        </div>
 
+        <button id="refresh-all-btn"
+                onclick="refreshAllData()"
+                class="w-full inline-flex justify-center items-center rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:from-blue-500 hover:to-purple-500">
+            <svg class="h-5 w-5 mr-2 animate-none" id="refresh-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span id="refresh-btn-text">Refresh All Data</span>
+        </button>
+
+        <div id="refresh-all-status" class="mt-4 space-y-2"></div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Refresh Single Property -->
     <div class="bg-white shadow rounded-lg">
         <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
             <h3 class="text-lg font-medium leading-6 text-gray-900">Refresh Single Property</h3>
-            <p class="mt-1 text-sm text-gray-500">Scrape bill data for a specific property</p>
+            <p class="mt-1 text-sm text-gray-500">Update data for a specific property</p>
         </div>
         <div class="px-4 py-5 sm:p-6">
             <div class="mb-4">
@@ -75,6 +95,26 @@
             <div id="refresh-single-status" class="mt-4"></div>
         </div>
     </div>
+
+    <!-- Individual Actions -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">Individual Actions</h3>
+            <p class="mt-1 text-sm text-gray-500">Run specific refresh tasks separately</p>
+        </div>
+        <div class="px-4 py-5 sm:p-6 space-y-3">
+            <button onclick="refreshWaterOnly()" class="w-full inline-flex justify-center items-center rounded-md bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-200">
+                💧 Refresh Water Bills Only
+            </button>
+            <button onclick="refreshTaxesOnly()" class="w-full inline-flex justify-center items-center rounded-md bg-purple-100 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-200">
+                🏛️ Refresh Property Taxes Only
+            </button>
+            <button onclick="fillParcelsOnly()" class="w-full inline-flex justify-center items-center rounded-md bg-green-100 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-200">
+                📍 Find Missing Parcel Numbers Only
+            </button>
+            <div id="individual-status" class="mt-2"></div>
+        </div>
+    </div>
 </div>
 
 <!-- Info Section -->
@@ -86,13 +126,15 @@
             </svg>
         </div>
         <div class="ml-3">
-            <h3 class="text-sm font-medium text-blue-800">About Bill Refresh</h3>
+            <h3 class="text-sm font-medium text-blue-800">About Data Refresh</h3>
             <div class="mt-2 text-sm text-blue-700">
                 <ul class="list-disc pl-5 space-y-1">
-                    <li>Bills are automatically refreshed daily at 6 AM by the Telegram bot scheduler</li>
-                    <li>Manual refresh connects to BSA Online and scrapes the latest bill data</li>
-                    <li>Each property refresh takes a few seconds due to browser automation</li>
-                    <li>Refreshing all properties runs in the background - check back in a few minutes</li>
+                    <li><strong>Water Bills</strong> are automatically refreshed daily at 6 AM</li>
+                    <li><strong>Property Taxes</strong> are automatically refreshed weekly on Mondays at 7 AM</li>
+                    <li><strong>Parcel Numbers</strong> are discovered automatically when refreshing taxes</li>
+                    <li>Manual refresh connects to BSA Online and scrapes the latest data using browser automation</li>
+                    <li>Each property takes a few seconds to process - refreshing all properties runs in the background</li>
+                    <li>Check back in a few minutes after starting a full refresh</li>
                 </ul>
             </div>
         </div>
@@ -104,6 +146,107 @@
         document.getElementById('refresh-single-btn').disabled = !this.value;
     });
 
+    function setButtonLoading(isLoading) {
+        const btn = document.getElementById('refresh-all-btn');
+        const icon = document.getElementById('refresh-icon');
+        const text = document.getElementById('refresh-btn-text');
+
+        if (isLoading) {
+            btn.disabled = true;
+            icon.classList.add('animate-spin');
+            text.textContent = 'Refreshing...';
+        } else {
+            btn.disabled = false;
+            icon.classList.remove('animate-spin');
+            text.textContent = 'Refresh All Data';
+        }
+    }
+
+    function addStatus(message, type = 'info') {
+        const statusDiv = document.getElementById('refresh-all-status');
+        const colors = {
+            info: 'text-blue-600',
+            success: 'text-green-600',
+            error: 'text-red-600'
+        };
+        statusDiv.innerHTML += `<div class="text-sm ${colors[type]} flex items-center gap-2">
+            <span>${type === 'success' ? '✓' : type === 'error' ? '✗' : '→'}</span>
+            ${message}
+        </div>`;
+    }
+
+    async function refreshAllData() {
+        const statusDiv = document.getElementById('refresh-all-status');
+        statusDiv.innerHTML = '';
+        setButtonLoading(true);
+
+        try {
+            // Start water bills refresh
+            addStatus('Starting water bills refresh...', 'info');
+            const billsResp = await fetch('/api/refresh-bills', { method: 'POST' });
+            const billsData = await billsResp.json();
+            addStatus('Water bills refresh started', 'success');
+
+            // Start property taxes refresh
+            addStatus('Starting property taxes refresh...', 'info');
+            const taxesResp = await fetch('/api/refresh-taxes', { method: 'POST' });
+            const taxesData = await taxesResp.json();
+            addStatus('Property taxes refresh started', 'success');
+
+            // Start parcel number discovery
+            addStatus('Starting parcel number discovery...', 'info');
+            const parcelsResp = await fetch('/api/fill-parcel-numbers', { method: 'POST' });
+            const parcelsData = await parcelsResp.json();
+            addStatus('Parcel number discovery started', 'success');
+
+            addStatus('All refresh tasks started! Check back in a few minutes.', 'success');
+
+            setTimeout(() => {
+                setButtonLoading(false);
+            }, 3000);
+
+        } catch (error) {
+            addStatus('Error: ' + error.message, 'error');
+            setButtonLoading(false);
+        }
+    }
+
+    async function refreshWaterOnly() {
+        const statusDiv = document.getElementById('individual-status');
+        statusDiv.innerHTML = '<div class="text-sm text-blue-600">Starting water bills refresh...</div>';
+        try {
+            const resp = await fetch('/api/refresh-bills', { method: 'POST' });
+            const data = await resp.json();
+            statusDiv.innerHTML = '<div class="text-sm text-green-600">✓ ' + data.message + '</div>';
+        } catch (error) {
+            statusDiv.innerHTML = '<div class="text-sm text-red-600">✗ Error: ' + error.message + '</div>';
+        }
+    }
+
+    async function refreshTaxesOnly() {
+        const statusDiv = document.getElementById('individual-status');
+        statusDiv.innerHTML = '<div class="text-sm text-purple-600">Starting property taxes refresh...</div>';
+        try {
+            const resp = await fetch('/api/refresh-taxes', { method: 'POST' });
+            const data = await resp.json();
+            statusDiv.innerHTML = '<div class="text-sm text-green-600">✓ ' + data.message + '</div>';
+        } catch (error) {
+            statusDiv.innerHTML = '<div class="text-sm text-red-600">✗ Error: ' + error.message + '</div>';
+        }
+    }
+
+    async function fillParcelsOnly() {
+        const statusDiv = document.getElementById('individual-status');
+        statusDiv.innerHTML = '<div class="text-sm text-green-600">Starting parcel number discovery...</div>';
+        try {
+            const resp = await fetch('/api/fill-parcel-numbers', { method: 'POST' });
+            const data = await resp.json();
+            statusDiv.innerHTML = '<div class="text-sm text-green-600">✓ ' + data.message + '</div>';
+        } catch (error) {
+            statusDiv.innerHTML = '<div class="text-sm text-red-600">✗ Error: ' + error.message + '</div>';
+        }
+    }
+
     function refreshSingleProperty() {
         const propertyId = document.getElementById('property_select').value;
         if (!propertyId) return;
@@ -111,22 +254,21 @@
         const statusDiv = document.getElementById('refresh-single-status');
         statusDiv.innerHTML = '<div class="text-sm text-blue-600">Starting refresh...</div>';
 
-        fetch(`/api/properties/${propertyId}/refresh`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                statusDiv.innerHTML = `<div class="text-sm text-green-600">${data.message}</div>`;
-            })
-            .catch(error => {
-                statusDiv.innerHTML = `<div class="text-sm text-red-600">Error: ${error.message}</div>`;
-            });
+        // Refresh both water and tax for single property
+        Promise.all([
+            fetch(`/api/properties/${propertyId}/refresh`, { method: 'POST' }),
+            fetch(`/api/properties/${propertyId}/refresh-tax`, { method: 'POST' })
+        ])
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(([billData, taxData]) => {
+            statusDiv.innerHTML = `
+                <div class="text-sm text-green-600">✓ Water bills: ${billData.message}</div>
+                <div class="text-sm text-green-600">✓ Property tax: ${taxData.message}</div>
+            `;
+        })
+        .catch(error => {
+            statusDiv.innerHTML = `<div class="text-sm text-red-600">✗ Error: ${error.message}</div>`;
+        });
     }
-
-    // Handle HTMX response for refresh all
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.detail.target.id === 'refresh-all-status') {
-            const data = JSON.parse(evt.detail.xhr.responseText);
-            evt.detail.target.innerHTML = `<div class="text-sm text-green-600">${data.message}</div>`;
-        }
-    });
 </script>
 {% endblock %}
