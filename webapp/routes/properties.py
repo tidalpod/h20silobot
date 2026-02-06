@@ -351,7 +351,7 @@ async def update_property(
     has_city_certification: str = Form(""),
     city_certification_date: str = Form(""),
     city_certification_expiry: str = Form(""),
-    has_rental_license: bool = Form(False),
+    has_rental_license: str = Form(""),
     rental_license_number: str = Form(""),
     rental_license_issued: str = Form(""),
     rental_license_expiry: str = Form(""),
