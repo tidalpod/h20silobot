@@ -11,6 +11,9 @@
             </h1>
             <p class="mt-1 text-sm text-gray-500">Chat with tenants via SMS</p>
         </div>
+        <button onclick="openNewConversationModal()" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <span class="mr-2">➕</span> New Conversation
+        </button>
     </div>
 </header>
 {% endblock %}
@@ -91,6 +94,45 @@
     </h3>
     <div id="unmatched-list" class="space-y-3">
         <p class="text-sm text-gray-500">Messages from unknown numbers will appear here.</p>
+    </div>
+</div>
+
+<!-- New Conversation Modal -->
+<div id="new-conversation-modal" class="fixed inset-0 z-50 hidden">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-black/50 transition-opacity" onclick="closeNewConversationModal()"></div>
+
+    <!-- Modal Content -->
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900">Start New Conversation</h3>
+                <button onclick="closeNewConversationModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="p-4 border-b border-gray-100">
+                <input
+                    type="text"
+                    id="tenant-search"
+                    placeholder="Search tenants by name, address, or phone..."
+                    class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    oninput="searchTenants(this.value)"
+                >
+            </div>
+
+            <!-- Tenant List -->
+            <div id="tenant-list" class="flex-1 overflow-y-auto p-2 min-h-[200px] max-h-[400px]">
+                <div class="text-center text-gray-400 py-8">
+                    <div class="animate-pulse">Loading tenants...</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -347,6 +389,99 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Refresh unmatched messages periodically
     setInterval(loadUnmatched, 30000);
+});
+
+// =============================================================================
+// New Conversation Modal
+// =============================================================================
+
+let allTenants = [];
+
+function openNewConversationModal() {
+    document.getElementById('new-conversation-modal').classList.remove('hidden');
+    document.getElementById('tenant-search').value = '';
+    loadTenantsForModal();
+}
+
+function closeNewConversationModal() {
+    document.getElementById('new-conversation-modal').classList.add('hidden');
+}
+
+async function loadTenantsForModal() {
+    try {
+        const response = await fetch('/sms/tenants-with-phone');
+        const data = await response.json();
+        allTenants = data.tenants;
+        renderTenantList(allTenants);
+    } catch (error) {
+        console.error('Error loading tenants:', error);
+        document.getElementById('tenant-list').innerHTML = `
+            <div class="text-center text-red-500 py-8">Failed to load tenants</div>
+        `;
+    }
+}
+
+function searchTenants(query) {
+    const search = query.toLowerCase().trim();
+    if (!search) {
+        renderTenantList(allTenants);
+        return;
+    }
+    const filtered = allTenants.filter(t =>
+        t.name.toLowerCase().includes(search) ||
+        t.property_address.toLowerCase().includes(search) ||
+        t.phone.includes(search)
+    );
+    renderTenantList(filtered);
+}
+
+function renderTenantList(tenants) {
+    const container = document.getElementById('tenant-list');
+
+    if (tenants.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-gray-400 py-8">
+                <span class="text-3xl">📱</span>
+                <p class="mt-2">No tenants with phone numbers found</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    for (const tenant of tenants) {
+        html += `
+            <div class="p-3 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors border border-transparent hover:border-blue-200"
+                 onclick="startConversationWith(${tenant.id})">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
+                        ${tenant.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-medium text-gray-900 text-sm">${escapeHtml(tenant.name)}</h4>
+                        <p class="text-xs text-gray-500 truncate">${escapeHtml(tenant.property_address)}</p>
+                        <p class="text-xs text-gray-400">${escapeHtml(tenant.phone)}</p>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function startConversationWith(tenantId) {
+    closeNewConversationModal();
+    selectConversation(tenantId);
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeNewConversationModal();
+    }
 });
 </script>
 {% endblock %}

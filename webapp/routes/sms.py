@@ -338,3 +338,50 @@ async def get_unmatched_messages(request: Request):
                 for msg in messages
             ]
         })
+
+
+# =============================================================================
+# Tenants with Phone Numbers (for new conversation)
+# =============================================================================
+
+@router.get("/tenants-with-phone")
+async def get_tenants_with_phone(request: Request, search: str = ""):
+    """Get all active tenants with phone numbers for starting new conversations"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with get_session() as session:
+        query = (
+            select(Tenant)
+            .where(Tenant.is_active == True)
+            .where(Tenant.phone != None)
+            .where(Tenant.phone != "")
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
+        )
+
+        result = await session.execute(query)
+        tenants = result.scalars().all()
+
+        # Filter by search term if provided
+        if search:
+            search_lower = search.lower()
+            tenants = [
+                t for t in tenants
+                if search_lower in t.name.lower()
+                or (t.property_ref and search_lower in t.property_ref.address.lower())
+                or search_lower in (t.phone or "")
+            ]
+
+        return JSONResponse({
+            "tenants": [
+                {
+                    "id": tenant.id,
+                    "name": tenant.name,
+                    "phone": tenant.phone,
+                    "property_address": tenant.property_ref.address if tenant.property_ref else "No property"
+                }
+                for tenant in tenants
+            ]
+        })
