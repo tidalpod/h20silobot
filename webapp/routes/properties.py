@@ -436,7 +436,9 @@ async def update_property(
     try:
         async with get_session() as session:
             result = await session.execute(
-                select(Property).where(Property.id == property_id)
+                select(Property)
+                .where(Property.id == property_id)
+                .options(selectinload(Property.photos))
             )
             prop = result.scalar_one_or_none()
 
