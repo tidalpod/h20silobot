@@ -17,7 +17,10 @@ from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPho
 from webapp.auth.dependencies import get_current_user
 
 # Upload directory - use UPLOAD_PATH env var for Railway volume, fallback to local
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH", str(Path(__file__).resolve().parent.parent / "static" / "uploads"))
+# Try env var first, then Railway volume at /app/uploads, then local fallback
+UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
+    "/app/uploads" if Path("/app/uploads").exists() else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
+)
 UPLOAD_DIR = Path(UPLOAD_BASE) / "properties"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

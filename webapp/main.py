@@ -26,7 +26,10 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 # Upload directory - Railway volume or local fallback
-UPLOAD_PATH = os.environ.get("UPLOAD_PATH", str(BASE_DIR / "static" / "uploads"))
+# Try env var first, then Railway volume at /app/uploads, then local fallback
+UPLOAD_PATH = os.environ.get("UPLOAD_PATH") or (
+    "/app/uploads" if Path("/app/uploads").exists() else str(BASE_DIR / "static" / "uploads")
+)
 UPLOAD_DIR = Path(UPLOAD_PATH)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
