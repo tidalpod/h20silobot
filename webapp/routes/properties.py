@@ -650,6 +650,86 @@ async def upload_photo(
         })
 
 
+@router.get("/admin/clear-orphaned-photos")
+async def clear_orphaned_photos_page(request: Request):
+    """Admin page to clear all orphaned photo records"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        # Get all photos
+        result = await session.execute(
+            select(PropertyPhoto).options(selectinload(PropertyPhoto.property))
+        )
+        all_photos = result.scalars().all()
+
+        # Check which files exist
+        orphaned = []
+        for photo in all_photos:
+            filename = photo.url.split("/")[-1]
+            filepath = UPLOAD_DIR / filename
+            if not filepath.exists():
+                orphaned.append({
+                    "id": photo.id,
+                    "property_id": photo.property_id,
+                    "url": photo.url,
+                    "property_address": photo.property.address if photo.property else "Unknown"
+                })
+
+        return JSONResponse({
+            "total_photos": len(all_photos),
+            "orphaned_count": len(orphaned),
+            "orphaned": orphaned[:50]  # Limit to first 50
+        })
+
+
+@router.post("/admin/clear-orphaned-photos")
+async def clear_orphaned_photos(request: Request):
+    """Delete all orphaned photo records (where file doesn't exist)"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        # Get all photos
+        result = await session.execute(select(PropertyPhoto))
+        all_photos = result.scalars().all()
+
+        deleted_count = 0
+        affected_properties = set()
+
+        for photo in all_photos:
+            filename = photo.url.split("/")[-1]
+            filepath = UPLOAD_DIR / filename
+            if not filepath.exists():
+                affected_properties.add(photo.property_id)
+                await session.delete(photo)
+                deleted_count += 1
+
+        # Clear featured_photo_url for affected properties
+        for prop_id in affected_properties:
+            result = await session.execute(
+                select(Property).where(Property.id == prop_id)
+            )
+            prop = result.scalar_one_or_none()
+            if prop:
+                # Check if featured photo still exists
+                if prop.featured_photo_url:
+                    filename = prop.featured_photo_url.split("/")[-1]
+                    filepath = UPLOAD_DIR / filename
+                    if not filepath.exists():
+                        prop.featured_photo_url = None
+
+        await session.commit()
+
+        return JSONResponse({
+            "success": True,
+            "deleted_count": deleted_count,
+            "affected_properties": len(affected_properties)
+        })
+
+
 @router.post("/{property_id}/photos/clear-all")
 async def clear_all_photos(request: Request, property_id: int):
     """Delete all photo records for a property (useful for clearing orphaned records)"""
