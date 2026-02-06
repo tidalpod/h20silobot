@@ -16,8 +16,9 @@ from database.connection import get_session
 from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto
 from webapp.auth.dependencies import get_current_user
 
-# Upload directory
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "properties"
+# Upload directory - use UPLOAD_PATH env var for Railway volume, fallback to local
+UPLOAD_BASE = os.environ.get("UPLOAD_PATH", str(Path(__file__).resolve().parent.parent / "static" / "uploads"))
+UPLOAD_DIR = Path(UPLOAD_BASE) / "properties"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(tags=["properties"])
@@ -591,7 +592,7 @@ async def upload_photo(
         # Create database record
         photo_record = PropertyPhoto(
             property_id=property_id,
-            url=f"/static/uploads/properties/{filename}",
+            url=f"/uploads/properties/{filename}",
             is_primary=is_primary,
             display_order=len(existing_photos)
         )
@@ -599,7 +600,7 @@ async def upload_photo(
 
         # Update featured photo if this is primary
         if is_primary:
-            prop.featured_photo_url = f"/static/uploads/properties/{filename}"
+            prop.featured_photo_url = f"/uploads/properties/{filename}"
 
         await session.commit()
 

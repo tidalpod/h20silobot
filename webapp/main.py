@@ -1,6 +1,7 @@
 """FastAPI application entry point"""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
+
+# Upload directory - Railway volume or local fallback
+UPLOAD_PATH = os.environ.get("UPLOAD_PATH", str(BASE_DIR / "static" / "uploads"))
+UPLOAD_DIR = Path(UPLOAD_PATH)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -61,6 +67,9 @@ app.add_middleware(
 # Mount static files
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Mount uploads directory (Railway volume or local)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # Templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
