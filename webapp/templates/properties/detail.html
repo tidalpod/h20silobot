@@ -908,10 +908,6 @@
                         class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
                     <span class="mr-2">🔄</span> Refresh Bills
                 </button>
-                <button onclick="refreshProperty('tax')"
-                        class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
-                    <span class="mr-2">🏛️</span> Refresh Taxes
-                </button>
             </div>
         </div>
 
@@ -1038,15 +1034,12 @@ function showTab(tabName) {
 async function refreshProperty(type) {
     const btn = event.target.closest('button');
     const originalHTML = btn.innerHTML;
-    const label = type === 'tax' ? '🏛️ Fetching taxes...' : '🔄 Fetching bill...';
 
-    btn.innerHTML = '<span class="animate-pulse">' + label + '</span>';
+    btn.innerHTML = '<span class="animate-pulse">🔄 Fetching bill...</span>';
     btn.disabled = true;
 
     try {
-        const url = type === 'tax'
-            ? '/api/properties/{{ property.id }}/refresh-tax'
-            : '/api/properties/{{ property.id }}/refresh';
+        const url = '/api/properties/{{ property.id }}/refresh';
 
         const response = await fetch(url, { method: 'POST' });
         const data = await response.json();

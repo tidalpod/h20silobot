@@ -141,14 +141,6 @@ class WaterBillBot:
             name="Overdue alerts"
         )
 
-        # Weekly tax scrape on Mondays at 7 AM
-        self.scheduler.add_job(
-            self.scheduled_tax_scrape,
-            CronTrigger(day_of_week='mon', hour=7, minute=0),
-            id="weekly_tax_scrape",
-            name="Weekly property tax scrape"
-        )
-
         logger.info("Scheduled jobs configured")
 
     async def scheduled_scrape(self):
@@ -160,99 +152,6 @@ class WaterBillBot:
             await self.refresh_all_bills()
         except Exception as e:
             logger.error(f"Scheduled scrape failed: {e}")
-
-    async def scheduled_tax_scrape(self):
-        """Run scheduled property tax scraping"""
-        if not self.db_available:
-            return
-        logger.info("Running scheduled tax scrape...")
-        try:
-            await self.refresh_all_taxes()
-        except Exception as e:
-            logger.error(f"Scheduled tax scrape failed: {e}")
-
-    async def refresh_all_taxes(self):
-        """Refresh property tax data for all active properties"""
-        if not self.db_available:
-            logger.warning("Cannot refresh taxes - database not available")
-            return
-
-        from database.connection import get_session
-        from database.models import Property, PropertyTax
-        from scraper.bsa_scraper import BSAScraper
-        from sqlalchemy import select
-
-        try:
-            async with get_session() as session:
-                result = await session.execute(
-                    select(Property).where(Property.is_active == True)
-                )
-                properties = result.scalars().all()
-
-                if not properties:
-                    logger.info("No properties to scrape for taxes")
-                    return
-
-                async with BSAScraper() as scraper:
-                    scraped_count = 0
-
-                    for prop in properties:
-                        try:
-                            tax_data = None
-
-                            # Try parcel number first
-                            if prop.parcel_number:
-                                tax_data = await scraper.search_tax_by_parcel(prop.parcel_number)
-
-                            # Fall back to address
-                            if not tax_data:
-                                street_address = prop.address.split(',')[0].strip()
-                                tax_data = await scraper.search_tax_by_address(street_address)
-
-                            if tax_data:
-                                # Check for existing record
-                                existing = await session.execute(
-                                    select(PropertyTax)
-                                    .where(PropertyTax.property_id == prop.id)
-                                    .where(PropertyTax.tax_year == tax_data.tax_year)
-                                )
-                                existing_tax = existing.scalar_one_or_none()
-
-                                if existing_tax:
-                                    existing_tax.amount_due = tax_data.amount_due
-                                    existing_tax.status = tax_data.status
-                                    existing_tax.due_date = tax_data.due_date
-                                    existing_tax.scraped_at = datetime.utcnow()
-                                    existing_tax.raw_data = tax_data.raw_data
-                                else:
-                                    new_tax = PropertyTax(
-                                        property_id=prop.id,
-                                        tax_year=tax_data.tax_year,
-                                        amount_due=tax_data.amount_due,
-                                        due_date=tax_data.due_date,
-                                        status=tax_data.status,
-                                        parcel_number=tax_data.parcel_number or prop.parcel_number,
-                                        scraped_at=datetime.utcnow(),
-                                        raw_data=tax_data.raw_data
-                                    )
-                                    session.add(new_tax)
-
-                                # Update parcel on property if found
-                                if tax_data.parcel_number and not prop.parcel_number:
-                                    prop.parcel_number = tax_data.parcel_number
-
-                                scraped_count += 1
-                                logger.info(f"Tax scraped: {prop.address} - ${tax_data.amount_due} ({tax_data.status})")
-
-                        except Exception as e:
-                            logger.error(f"Failed to scrape tax for {prop.address}: {e}")
-
-                    await session.commit()
-                    logger.info(f"Tax scrape complete: {scraped_count} properties updated")
-
-        except Exception as e:
-            logger.error(f"Tax refresh failed: {e}")
-            raise
 
     async def refresh_all_bills(self):
         """Refresh bill data for all active properties"""
