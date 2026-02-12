@@ -127,6 +127,27 @@
                 </div>
             </div>
 
+            <!-- Entity / Portfolio Section -->
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span>🏢</span> Entity / Portfolio
+                </h2>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="entity" class="block text-sm font-medium text-gray-700 mb-1">Owning Entity</label>
+                        <select name="entity" id="entity"
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">Select Entity...</option>
+                            <option value="Silo Capital LLC" {% if property and property.entity == 'Silo Capital LLC' %}selected{% endif %}>Silo Capital LLC</option>
+                            <option value="Silo Partners LLC" {% if property and property.entity == 'Silo Partners LLC' %}selected{% endif %}>Silo Partners LLC</option>
+                            <option value="Homes for America LLC" {% if property and property.entity == 'Homes for America LLC' %}selected{% endif %}>Homes for America LLC</option>
+                            <option value="Casa Sicura LLC" {% if property and property.entity == 'Casa Sicura LLC' %}selected{% endif %}>Casa Sicura LLC</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">The LLC or entity that owns this property</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Account Numbers Section -->
             <div>
                 <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">

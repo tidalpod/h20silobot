@@ -3,8 +3,34 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+
+async def run_migrations(engine):
+    """Run pending migrations to add new columns"""
+    migrations = [
+        # (table, column, type)
+        ("properties", "entity", "VARCHAR(100)"),
+    ]
+
+    async with engine.begin() as conn:
+        for table, column, col_type in migrations:
+            result = await conn.execute(text(f"""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = '{table}' AND column_name = '{column}'
+            """))
+            exists = result.fetchone()
+
+            if not exists:
+                print(f"[DB] Adding column '{column}' to '{table}'...")
+                await conn.execute(text(f"""
+                    ALTER TABLE {table}
+                    ADD COLUMN {column} {col_type}
+                """))
+                print(f"[DB] Column '{column}' added successfully")
 
 # Global variables
 engine = None
@@ -53,9 +79,12 @@ async def init_db():
         )
 
         print("[DB] Testing connection...")
-        # Test the connection
+        # Test the connection and create tables
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+        # Run migrations for new columns
+        await run_migrations(engine)
 
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")

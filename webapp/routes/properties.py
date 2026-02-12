@@ -34,7 +34,8 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def list_properties(
     request: Request,
     status: str = None,
-    search: str = None
+    search: str = None,
+    entity: str = None
 ):
     """List all properties"""
     user = await get_current_user(request)
@@ -53,6 +54,10 @@ async def list_properties(
                 Property.address.ilike(f"%{search}%") |
                 Property.bsa_account_number.ilike(f"%{search}%")
             )
+
+        # Filter by entity if specified
+        if entity:
+            query = query.where(Property.entity == entity)
 
         result = await session.execute(query.order_by(Property.address))
         all_properties = result.scalars().all()
@@ -92,6 +97,9 @@ async def list_properties(
                 if prop.is_active:
                     properties.append({"property": prop, "status": bill_status})
 
+    # Get list of unique entities for the dropdown
+    entities = ["Silo Capital LLC", "Silo Partners LLC", "Homes for America LLC", "Casa Sicura LLC"]
+
     return templates.TemplateResponse(
         "properties/list.html",
         {
@@ -100,6 +108,8 @@ async def list_properties(
             "properties": properties,
             "status_filter": status,
             "search": search or "",
+            "entity_filter": entity or "",
+            "entities": entities,
         }
     )
 
@@ -139,6 +149,7 @@ async def create_property(
     year_built: str = Form(""),
     lot_size: str = Form(""),
     property_type: str = Form(""),
+    entity: str = Form(""),
     is_vacant: str = Form(""),
     has_city_certification: str = Form(""),
     city_certification_date: str = Form(""),
@@ -235,6 +246,7 @@ async def create_property(
             year_built=parse_int(year_built),
             lot_size=lot_size or None,
             property_type=property_type or None,
+            entity=entity or None,
             web_user_id=user["id"],
             is_active=True,
             # Occupancy
@@ -368,6 +380,7 @@ async def update_property(
     year_built: str = Form(""),
     lot_size: str = Form(""),
     property_type: str = Form(""),
+    entity: str = Form(""),
     is_active: str = Form(""),
     is_vacant: str = Form(""),
     has_city_certification: str = Form(""),
@@ -479,6 +492,7 @@ async def update_property(
             prop.year_built = parse_int(year_built)
             prop.lot_size = lot_size or None
             prop.property_type = property_type or None
+            prop.entity = entity or None
             prop.is_active = parse_checkbox(is_active)
             # Occupancy
             prop.is_vacant = parse_checkbox(is_vacant)

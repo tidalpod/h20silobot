@@ -24,8 +24,25 @@
 {% endblock %}
 
 {% block content %}
+<!-- Entity Filter Dropdown -->
+<div class="bg-white shadow rounded-lg mb-4 px-4 py-3">
+    <div class="flex items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">Portfolio:</label>
+        <select id="entity-filter" onchange="filterByEntity(this.value)"
+                class="rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 text-sm font-medium">
+            <option value="">All Entities</option>
+            {% for ent in entities %}
+            <option value="{{ ent }}" {% if entity_filter == ent %}selected{% endif %}>{{ ent }}</option>
+            {% endfor %}
+        </select>
+        {% if entity_filter %}
+        <a href="/properties" class="text-sm text-gray-500 hover:text-gray-700">Clear filter</a>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Total Rent Tracker -->
-{% set total_rent = namespace(amount=0, section8=0, regular=0, count=0) %}
+{% set total_rent = namespace(amount=0, section8=0, regular=0, count=0, vacant=0, water_total=0) %}
 {% for item in properties %}
     {% set active_tenants = item.property.tenants | selectattr('is_active', 'true') | list %}
     {% if active_tenants %}
@@ -42,13 +59,20 @@
             {% set total_rent.regular = total_rent.regular + rent_tenant.current_rent|float %}
             {% set total_rent.count = total_rent.count + 1 %}
         {% endif %}
+    {% else %}
+        {% set total_rent.vacant = total_rent.vacant + 1 %}
+    {% endif %}
+    {% if item.property.bills and item.property.bills[0].amount_due %}
+        {% set total_rent.water_total = total_rent.water_total + item.property.bills[0].amount_due|float %}
     {% endif %}
 {% endfor %}
 
 <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow mb-6 px-6 py-4">
     <div class="flex items-center justify-between">
         <div>
-            <p class="text-blue-100 text-sm font-medium">Total Monthly Rent</p>
+            <p class="text-blue-100 text-sm font-medium">
+                {% if entity_filter %}{{ entity_filter }}{% else %}All Portfolios{% endif %} - Monthly Rent
+            </p>
             <p class="text-white text-3xl font-bold">${{ "{:,.0f}".format(total_rent.amount) }}<span class="text-lg font-normal text-blue-200">/mo</span></p>
         </div>
         <div class="flex gap-6 text-right">
@@ -65,12 +89,32 @@
             </div>
             {% endif %}
             <div>
-                <p class="text-blue-200 text-xs">Properties</p>
+                <p class="text-blue-200 text-xs">Occupied</p>
                 <p class="text-white text-lg font-semibold">{{ total_rent.count }}</p>
+            </div>
+            <div>
+                <p class="text-blue-200 text-xs">Vacant</p>
+                <p class="text-white text-lg font-semibold">{{ total_rent.vacant }}</p>
+            </div>
+            <div>
+                <p class="text-blue-200 text-xs">Water Bills</p>
+                <p class="text-white text-lg font-semibold">${{ "{:,.0f}".format(total_rent.water_total) }}</p>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function filterByEntity(entity) {
+    const url = new URL(window.location.href);
+    if (entity) {
+        url.searchParams.set('entity', entity);
+    } else {
+        url.searchParams.delete('entity');
+    }
+    window.location.href = url.toString();
+}
+</script>
 
 <!-- Filters - Clean and minimal -->
 <div class="bg-white shadow rounded-lg mb-6 px-4 py-3">
@@ -170,7 +214,14 @@
                                 </span>
                                 {% endif %}
 
-                                {# Tag 3: Section 8 (optional) #}
+                                {# Tag 3: Entity (optional) #}
+                                {% if item.property.entity %}
+                                <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700" title="{{ item.property.entity }}">
+                                    🏢 {{ item.property.entity.split(' ')[0] }}
+                                </span>
+                                {% endif %}
+
+                                {# Tag 4: Section 8 (optional) #}
                                 {% if has_section8 %}
                                 <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
                                     🏛️ Section 8

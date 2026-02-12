@@ -47,6 +47,9 @@ class Property(Base):
     lot_size = Column(String(50), nullable=True)
     property_type = Column(String(50), nullable=True)  # Single Family, Multi-Family, etc.
 
+    # Entity/Portfolio ownership
+    entity = Column(String(100), nullable=True)  # Silo Capital LLC, Silo Partners LLC, etc.
+
     # Occupancy status
     is_vacant = Column(Boolean, default=False)
 

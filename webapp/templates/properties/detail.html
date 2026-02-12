@@ -258,6 +258,14 @@
                             <dd class="mt-1 text-sm font-medium text-gray-900">{{ property.owner_name }}</dd>
                         </div>
                         {% endif %}
+                        {% if property.entity %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Entity</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">
+                                <a href="/properties?entity={{ property.entity|urlencode }}" class="text-blue-600 hover:underline">{{ property.entity }}</a>
+                            </dd>
+                        </div>
+                        {% endif %}
                         {% if property.lot_size %}
                         <div>
                             <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Lot Size</dt>
