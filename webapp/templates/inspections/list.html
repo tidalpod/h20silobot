@@ -366,6 +366,16 @@
     {% endif %}
 </div>
 
+<!-- Tom Select CSS -->
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+<style>
+    .ts-wrapper { width: 100%; }
+    .ts-control { border-radius: 0.5rem !important; border-color: #d1d5db !important; padding: 0.5rem 0.75rem !important; }
+    .ts-control:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6 !important; }
+    .ts-dropdown { border-radius: 0.5rem !important; }
+    .ts-dropdown-content { max-height: 250px; }
+</style>
+
 <!-- Schedule New Inspection Modal -->
 <div id="schedule-modal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
@@ -384,12 +394,13 @@
                     </select>
                 </div>
 
-                <!-- Property -->
+                <!-- Property (Searchable) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                    <select id="schedule-property" name="property_id" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select id="schedule-property" name="property_id" required class="property-search">
+                        <option value="">Type to search...</option>
                         {% for prop in properties %}
-                        <option value="{{ prop.id }}">{{ prop.address }}</option>
+                        <option value="{{ prop.id }}">{{ prop.address }}{% if prop.city %}, {{ prop.city }}{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -415,7 +426,11 @@
                 <!-- Time -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
-                    <input type="text" id="schedule-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="flex gap-2">
+                        <input type="time" id="schedule-time-picker" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" id="schedule-time" name="time">
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Select time from dropdown or leave blank</p>
                 </div>
 
                 <!-- Section 8 Status (only shown for Section 8) -->
@@ -463,7 +478,10 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
-                    <input type="text" id="edit-co-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="flex gap-2">
+                        <input type="time" id="edit-co-time-picker" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" id="edit-co-time" name="time">
+                    </div>
                 </div>
             </div>
             <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
@@ -490,7 +508,10 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
-                    <input type="text" id="edit-rental-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="flex gap-2">
+                        <input type="time" id="edit-rental-time-picker" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" id="edit-rental-time" name="time">
+                    </div>
                 </div>
             </div>
             <div class="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3">
@@ -517,7 +538,10 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Time (optional)</label>
-                    <input type="text" id="edit-section8-time" name="time" placeholder="e.g., 9:00 AM" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="flex gap-2">
+                        <input type="time" id="edit-section8-time-picker" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" id="edit-section8-time" name="time">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -563,7 +587,65 @@
     </div>
 </div>
 
+<!-- Tom Select JS -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
+// Initialize Tom Select for property dropdowns
+let propertySelect = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize searchable property dropdown
+    propertySelect = new TomSelect('#schedule-property', {
+        placeholder: 'Type to search for a property...',
+        allowEmptyOption: true,
+        create: false,
+        maxOptions: null,
+        sortField: { field: 'text', direction: 'asc' }
+    });
+});
+
+// Time format helpers
+function formatTimeFor12Hour(time24) {
+    if (!time24) return '';
+    const [hours, minutes] = time24.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${ampm}`;
+}
+
+function parseTimeTo24Hour(time12) {
+    if (!time12) return '';
+    // Handle various formats like "10:30 AM", "10:30AM", "10:30 am"
+    const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?/i);
+    if (!match) return '';
+    let hours = parseInt(match[1]);
+    const minutes = match[2];
+    const ampm = (match[3] || '').toUpperCase();
+    if (ampm === 'PM' && hours !== 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+}
+
+// Sync time picker to hidden field
+function setupTimePicker(pickerId, hiddenId) {
+    const picker = document.getElementById(pickerId);
+    const hidden = document.getElementById(hiddenId);
+    if (picker && hidden) {
+        picker.addEventListener('change', function() {
+            hidden.value = this.value ? formatTimeFor12Hour(this.value) : '';
+        });
+    }
+}
+
+// Setup all time pickers
+document.addEventListener('DOMContentLoaded', function() {
+    setupTimePicker('schedule-time-picker', 'schedule-time');
+    setupTimePicker('edit-co-time-picker', 'edit-co-time');
+    setupTimePicker('edit-rental-time-picker', 'edit-rental-time');
+    setupTimePicker('edit-section8-time-picker', 'edit-section8-time');
+});
+
 function showInspectionTab(tabName) {
     // Hide all panels
     document.querySelectorAll('.insp-panel').forEach(panel => {
@@ -595,6 +677,13 @@ function showInspectionTab(tabName) {
 // Schedule Modal
 function openScheduleModal(category = 'co') {
     document.getElementById('schedule-category').value = category;
+    document.getElementById('schedule-date').value = '';
+    document.getElementById('schedule-time').value = '';
+    document.getElementById('schedule-time-picker').value = '';
+    // Reset property select
+    if (propertySelect) {
+        propertySelect.clear();
+    }
     updateScheduleForm();
     document.getElementById('schedule-modal').classList.remove('hidden');
 }
@@ -636,6 +725,9 @@ function openEditCoModal(propertyId, type, date, time, address) {
     document.getElementById('edit-co-type-display').value = type;
     document.getElementById('edit-co-date').value = date;
     document.getElementById('edit-co-time').value = time;
+    // Set time picker value
+    const time24 = parseTimeTo24Hour(time);
+    document.getElementById('edit-co-time-picker').value = time24;
     document.getElementById('edit-co-property').textContent = address;
     document.getElementById('edit-co-modal').classList.remove('hidden');
 }
@@ -649,6 +741,9 @@ function openEditRentalModal(propertyId, date, time, address) {
     document.getElementById('edit-rental-property-id').value = propertyId;
     document.getElementById('edit-rental-date').value = date;
     document.getElementById('edit-rental-time').value = time;
+    // Set time picker value
+    const time24 = parseTimeTo24Hour(time);
+    document.getElementById('edit-rental-time-picker').value = time24;
     document.getElementById('edit-rental-property').textContent = address;
     document.getElementById('edit-rental-modal').classList.remove('hidden');
 }
@@ -662,6 +757,9 @@ function openEditSection8Modal(propertyId, date, time, status, notes, address) {
     document.getElementById('edit-section8-property-id').value = propertyId;
     document.getElementById('edit-section8-date').value = date;
     document.getElementById('edit-section8-time').value = time;
+    // Set time picker value
+    const time24 = parseTimeTo24Hour(time);
+    document.getElementById('edit-section8-time-picker').value = time24;
     document.getElementById('edit-section8-status').value = status;
     document.getElementById('edit-section8-notes').value = notes;
     document.getElementById('edit-section8-property').textContent = address;
