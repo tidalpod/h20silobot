@@ -234,9 +234,10 @@ async def create_property(
                     return None
             return None
 
-        # Check if this is an apartment building with multiple units
+        # Check if this is a multi-unit property (apartment, multi-family, or duplex)
         num_units_int = parse_int(num_units)
-        is_apartment = property_type == "Apartment" and num_units_int and num_units_int > 0
+        multi_unit_types = ["Apartment", "Multi-Family", "Duplex"]
+        is_multi_unit = property_type in multi_unit_types and num_units_int and num_units_int > 0
         start_num = parse_int(start_number) or 1
 
         # Generate unit labels
@@ -249,12 +250,12 @@ async def create_property(
                 return f"{unit_prefix} {start_num + index}"
 
         # Determine how many properties to create
-        units_to_create = num_units_int if is_apartment else 1
+        units_to_create = num_units_int if is_multi_unit else 1
         created_props = []
 
         for i in range(units_to_create):
             # Generate address with unit label for apartments
-            if is_apartment:
+            if is_multi_unit:
                 unit_label = generate_unit_label(i)
                 unit_address = f"{address} {unit_label}"
                 # Each unit needs a unique BSA account number - append unit number
@@ -291,7 +292,7 @@ async def create_property(
                 web_user_id=user["id"],
                 is_active=True,
                 # Occupancy - apartments start vacant
-                is_vacant=True if is_apartment else parse_checkbox(is_vacant),
+                is_vacant=True if is_multi_unit else parse_checkbox(is_vacant),
                 # City certification
                 has_city_certification=parse_checkbox(has_city_certification),
                 city_certification_date=parse_date(city_certification_date),

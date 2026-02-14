@@ -128,13 +128,13 @@
                 </div>
             </div>
 
-            <!-- Apartment Units Section (only for new properties) -->
+            <!-- Multi-Unit Section (only for new properties) -->
             {% if not property %}
             <div id="apartment-units-section" class="hidden bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
                 <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span>🏢</span> Apartment Units
+                    <span>🏢</span> Multiple Units
                 </h2>
-                <p class="text-sm text-gray-600 mb-4">Create multiple units at once. Each unit will be added as a separate property entry.</p>
+                <p class="text-sm text-gray-600 mb-4"><strong>Create multiple units at once!</strong> Each unit will be added as a separate property entry.</p>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
@@ -594,7 +594,8 @@ function toggleApartmentOptions() {
     const propertyType = document.getElementById('property_type').value;
     const apartmentSection = document.getElementById('apartment-units-section');
     if (apartmentSection) {
-        if (propertyType === 'Apartment') {
+        // Show for Apartment, Multi-Family, or Duplex
+        if (propertyType === 'Apartment' || propertyType === 'Multi-Family' || propertyType === 'Duplex') {
             apartmentSection.classList.remove('hidden');
         } else {
             apartmentSection.classList.add('hidden');
