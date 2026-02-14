@@ -173,9 +173,13 @@ async def create_property(
     co_building_date: str = Form(""),
     co_building_time: str = Form(""),
     rental_inspection_date: str = Form(""),
-    rental_inspection_time: str = Form("")
+    rental_inspection_time: str = Form(""),
+    # Apartment building fields
+    num_units: str = Form(""),
+    unit_prefix: str = Form("Unit"),
+    start_number: str = Form("1")
 ):
-    """Create a new property"""
+    """Create a new property (or multiple units for apartment buildings)"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
@@ -230,60 +234,106 @@ async def create_property(
                     return None
             return None
 
-        # Create property
-        prop = Property(
-            address=address,
-            city=city or None,
-            state=state.upper() if state else None,
-            zip_code=zip_code or None,
-            bsa_account_number=bsa_account_number,
-            parcel_number=parcel_number or None,
-            tenant_name=tenant_name or None,
-            owner_name=owner_name or None,
-            bedrooms=parse_int(bedrooms),
-            bathrooms=parse_float(bathrooms),
-            square_feet=parse_int(square_feet),
-            year_built=parse_int(year_built),
-            lot_size=lot_size or None,
-            property_type=property_type or None,
-            entity=entity or None,
-            web_user_id=user["id"],
-            is_active=True,
-            # Occupancy
-            is_vacant=parse_checkbox(is_vacant),
-            # City certification
-            has_city_certification=parse_checkbox(has_city_certification),
-            city_certification_date=parse_date(city_certification_date),
-            city_certification_expiry=parse_date(city_certification_expiry),
-            # Rental license
-            has_rental_license=parse_checkbox(has_rental_license),
-            rental_license_number=rental_license_number or None,
-            rental_license_issued=parse_date(rental_license_issued),
-            rental_license_expiry=parse_date(rental_license_expiry),
-            # Section 8 inspection
-            section8_inspection_status=section8_inspection_status or None,
-            section8_inspection_date=parse_date(section8_inspection_date),
-            section8_inspection_time=section8_inspection_time or None,
-            section8_inspection_notes=section8_inspection_notes or None,
-            # Certificate of Occupancy inspections
-            co_mechanical_date=parse_date(co_mechanical_date),
-            co_mechanical_time=co_mechanical_time or None,
-            co_electrical_date=parse_date(co_electrical_date),
-            co_electrical_time=co_electrical_time or None,
-            co_plumbing_date=parse_date(co_plumbing_date),
-            co_plumbing_time=co_plumbing_time or None,
-            co_zoning_date=parse_date(co_zoning_date),
-            co_zoning_time=co_zoning_time or None,
-            co_building_date=parse_date(co_building_date),
-            co_building_time=co_building_time or None,
-            # Rental inspection
-            rental_inspection_date=parse_date(rental_inspection_date),
-            rental_inspection_time=rental_inspection_time or None,
-        )
-        session.add(prop)
+        # Check if this is an apartment building with multiple units
+        num_units_int = parse_int(num_units)
+        is_apartment = property_type == "Apartment" and num_units_int and num_units_int > 0
+        start_num = parse_int(start_number) or 1
+
+        # Generate unit labels
+        def generate_unit_label(index):
+            if unit_prefix == "letter":
+                return chr(65 + index)  # A, B, C, D...
+            elif unit_prefix == "#":
+                return f"#{start_num + index}"
+            else:
+                return f"{unit_prefix} {start_num + index}"
+
+        # Determine how many properties to create
+        units_to_create = num_units_int if is_apartment else 1
+        created_props = []
+
+        for i in range(units_to_create):
+            # Generate address with unit label for apartments
+            if is_apartment:
+                unit_label = generate_unit_label(i)
+                unit_address = f"{address} {unit_label}"
+                # Each unit needs a unique BSA account number - append unit number
+                unit_bsa = f"{bsa_account_number}-{start_num + i}" if bsa_account_number else ""
+            else:
+                unit_address = address
+                unit_bsa = bsa_account_number
+
+            # Check for duplicate BSA account number
+            if unit_bsa:
+                result = await session.execute(
+                    select(Property).where(Property.bsa_account_number == unit_bsa)
+                )
+                if result.scalar_one_or_none():
+                    # Skip this unit if BSA already exists
+                    continue
+
+            prop = Property(
+                address=unit_address,
+                city=city or None,
+                state=state.upper() if state else None,
+                zip_code=zip_code or None,
+                bsa_account_number=unit_bsa or f"PENDING-{unit_address[:20]}",
+                parcel_number=parcel_number or None,
+                tenant_name=tenant_name or None,
+                owner_name=owner_name or None,
+                bedrooms=parse_int(bedrooms),
+                bathrooms=parse_float(bathrooms),
+                square_feet=parse_int(square_feet),
+                year_built=parse_int(year_built),
+                lot_size=lot_size or None,
+                property_type=property_type or None,
+                entity=entity or None,
+                web_user_id=user["id"],
+                is_active=True,
+                # Occupancy - apartments start vacant
+                is_vacant=True if is_apartment else parse_checkbox(is_vacant),
+                # City certification
+                has_city_certification=parse_checkbox(has_city_certification),
+                city_certification_date=parse_date(city_certification_date),
+                city_certification_expiry=parse_date(city_certification_expiry),
+                # Rental license
+                has_rental_license=parse_checkbox(has_rental_license),
+                rental_license_number=rental_license_number or None,
+                rental_license_issued=parse_date(rental_license_issued),
+                rental_license_expiry=parse_date(rental_license_expiry),
+                # Section 8 inspection
+                section8_inspection_status=section8_inspection_status or None,
+                section8_inspection_date=parse_date(section8_inspection_date),
+                section8_inspection_time=section8_inspection_time or None,
+                section8_inspection_notes=section8_inspection_notes or None,
+                # Certificate of Occupancy inspections
+                co_mechanical_date=parse_date(co_mechanical_date),
+                co_mechanical_time=co_mechanical_time or None,
+                co_electrical_date=parse_date(co_electrical_date),
+                co_electrical_time=co_electrical_time or None,
+                co_plumbing_date=parse_date(co_plumbing_date),
+                co_plumbing_time=co_plumbing_time or None,
+                co_zoning_date=parse_date(co_zoning_date),
+                co_zoning_time=co_zoning_time or None,
+                co_building_date=parse_date(co_building_date),
+                co_building_time=co_building_time or None,
+                # Rental inspection
+                rental_inspection_date=parse_date(rental_inspection_date),
+                rental_inspection_time=rental_inspection_time or None,
+            )
+            session.add(prop)
+            created_props.append(prop)
+
         await session.commit()
 
-        return RedirectResponse(url=f"/properties/{prop.id}", status_code=303)
+        # Redirect to first property or properties list if multiple created
+        if len(created_props) == 1:
+            return RedirectResponse(url=f"/properties/{created_props[0].id}", status_code=303)
+        else:
+            # Redirect to properties list filtered by entity if set
+            if entity:
+                return RedirectResponse(url=f"/properties?entity={entity}", status_code=303)
+            return RedirectResponse(url="/properties", status_code=303)
 
 
 @router.get("/{property_id}", response_class=HTMLResponse)
