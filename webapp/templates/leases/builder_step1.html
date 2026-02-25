@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Lease Builder - Step 1{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-2 mb-2">
+            <a href="/leases/builder" class="text-sm text-blue-600 hover:text-blue-500">&larr; All Drafts</a>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Lease Specifics</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ property.address if property else '' }}</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Step Indicator -->
+<div class="mb-8 flex items-center gap-2">
+    {% for i in range(1, total_steps + 1) %}
+    <div class="flex items-center">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium {% if i == step %}bg-blue-600 text-white{% elif i < step %}bg-green-500 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+            {% if i < step %}&#10003;{% else %}{{ i }}{% endif %}
+        </div>
+        {% if i < total_steps %}
+        <div class="w-8 h-0.5 {% if i < step %}bg-green-500{% else %}bg-gray-200{% endif %}"></div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<form method="POST" action="/leases/builder/{{ builder.id }}/step/1">
+    <div class="max-w-2xl bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <!-- Property Address (read-only) -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Property Address</label>
+            <div class="px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 border border-gray-200">
+                {{ property.address }}{% if property.city %}, {{ property.city }}, {{ property.state }} {{ property.zip_code }}{% endif %}
+            </div>
+        </div>
+
+        <!-- Lease Type -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Lease Type *</label>
+            <div class="grid grid-cols-2 gap-3">
+                <label class="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover:bg-gray-50 {% if data.get('lease_type', 'fixed') == 'fixed' %}border-blue-300 bg-blue-50{% else %}border-gray-200{% endif %}">
+                    <input type="radio" name="lease_type" value="fixed" {% if data.get('lease_type', 'fixed') == 'fixed' %}checked{% endif %} onchange="toggleLeaseType()">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Fixed Term</p>
+                        <p class="text-xs text-gray-500">Set start and end dates</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover:bg-gray-50 {% if data.get('lease_type') == 'month_to_month' %}border-blue-300 bg-blue-50{% else %}border-gray-200{% endif %}">
+                    <input type="radio" name="lease_type" value="month_to_month" {% if data.get('lease_type') == 'month_to_month' %}checked{% endif %} onchange="toggleLeaseType()">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Month-to-Month</p>
+                        <p class="text-xs text-gray-500">No fixed end date</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Start Date -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Lease Start Date *</label>
+            <input type="date" name="start_date" value="{{ data.get('start_date', '') }}" required class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <!-- End Date (fixed only) -->
+        <div id="end-date-section" {% if data.get('lease_type') == 'month_to_month' %}style="display:none"{% endif %}>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Lease End Date *</label>
+            <input type="date" name="end_date" value="{{ data.get('end_date', '') }}" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <!-- Expiration Action (fixed only) -->
+        <div id="expiration-section" {% if data.get('lease_type') == 'month_to_month' %}style="display:none"{% endif %}>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Upon Lease Expiration</label>
+            <select name="expiration_action" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+                <option value="continue_mtm" {% if data.get('expiration_action', 'continue_mtm') == 'continue_mtm' %}selected{% endif %}>Continue as month-to-month</option>
+                <option value="terminate" {% if data.get('expiration_action') == 'terminate' %}selected{% endif %}>Lease terminates</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="mt-6 flex justify-between max-w-2xl">
+        <a href="/leases/builder" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">Cancel</a>
+        <div class="flex gap-3">
+            <button type="submit" name="action" value="save" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">Save</button>
+            <button type="submit" name="action" value="continue" class="px-6 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-sm">Save & Continue &rarr;</button>
+        </div>
+    </div>
+</form>
+
+<script>
+function toggleLeaseType() {
+    const isFixed = document.querySelector('input[name="lease_type"][value="fixed"]').checked;
+    document.getElementById('end-date-section').style.display = isFixed ? '' : 'none';
+    document.getElementById('expiration-section').style.display = isFixed ? '' : 'none';
+}
+</script>
+{% endblock %}

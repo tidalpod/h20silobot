@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Lease Builder - Step 6{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-2 mb-2">
+            <a href="/leases/builder" class="text-sm text-blue-600 hover:text-blue-500">&larr; All Drafts</a>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Provisions & Attachments</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ property.address if property else '' }}</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Step Indicator -->
+<div class="mb-8 flex items-center gap-2">
+    {% for i in range(1, total_steps + 1) %}
+    <div class="flex items-center">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium {% if i == step %}bg-blue-600 text-white{% elif i < step %}bg-green-500 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+            {% if i < step %}&#10003;{% else %}{{ i }}{% endif %}
+        </div>
+        {% if i < total_steps %}<div class="w-8 h-0.5 {% if i < step %}bg-green-500{% else %}bg-gray-200{% endif %}"></div>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<form method="POST" action="/leases/builder/{{ builder.id }}/step/6">
+    <div class="max-w-2xl space-y-6">
+        <!-- Early Termination -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Early Termination Clause</h2>
+            <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" name="early_termination" value="true" {% if data.get('early_termination') %}checked{% endif %} class="text-blue-600 rounded">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">Include Early Termination Clause</p>
+                    <p class="text-xs text-gray-500">Tenant may terminate early with 60 days notice + 2 months' rent penalty</p>
+                </div>
+            </label>
+        </div>
+
+        <!-- Additional Terms -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Additional Terms</h2>
+            <p class="text-xs text-gray-500">Any additional lease provisions not covered in previous steps</p>
+            <textarea name="additional_terms" rows="6" placeholder="Enter any additional terms, rules, or provisions..." class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">{{ data.get('additional_terms', '') }}</textarea>
+        </div>
+
+        <!-- Lead Paint Disclosure -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Lead-Based Paint Disclosure</h2>
+            {% if property and property.year_built and property.year_built < 1978 %}
+            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <p class="text-xs text-amber-700">This property was built in {{ property.year_built }}, before 1978. Federal law requires lead-based paint disclosure.</p>
+            </div>
+            {% endif %}
+            <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" name="lead_paint_disclosure" value="true" {% if data.get('lead_paint_disclosure') %}checked{% endif %} class="text-blue-600 rounded">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">Include Lead-Based Paint Disclosure</p>
+                    <p class="text-xs text-gray-500">Required for properties built before 1978</p>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="mt-6 flex justify-between max-w-2xl">
+        <a href="/leases/builder/{{ builder.id }}/step/5" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">&larr; Back</a>
+        <div class="flex gap-3">
+            <button type="submit" name="action" value="save" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">Save</button>
+            <button type="submit" name="action" value="continue" class="px-6 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-sm">Review &rarr;</button>
+        </div>
+    </div>
+</form>
+{% endblock %}

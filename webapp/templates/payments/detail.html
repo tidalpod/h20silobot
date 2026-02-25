@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Payment #{{ payment.id }}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-2 mb-2">
+            <a href="/payments" class="text-sm text-blue-600 hover:text-blue-500">&larr; All Payments</a>
+        </div>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Payment #{{ payment.id }}</h1>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Info -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Amount Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Payment Details</h2>
+                {% if payment.status.value == 'completed' %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">Completed</span>
+                {% elif payment.status.value == 'processing' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">Processing</span>
+                {% elif payment.status.value == 'pending' %}
+                <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">Pending</span>
+                {% elif payment.status.value == 'failed' %}
+                <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">Failed</span>
+                {% elif payment.status.value == 'returned' %}
+                <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">Returned</span>
+                {% elif payment.status.value == 'cancelled' %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600">Cancelled</span>
+                {% endif %}
+            </div>
+
+            <div class="text-center py-4 border-b border-gray-100 mb-4">
+                <p class="text-4xl font-bold text-gray-900">${{ "{:,.2f}".format(payment.total_amount) }}</p>
+                <p class="text-sm text-gray-500 mt-1">{{ payment.payment_month.strftime('%B %Y') }}</p>
+                {% if payment.is_autopay %}
+                <span class="inline-flex items-center mt-2 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">Autopay</span>
+                {% endif %}
+            </div>
+
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">Rent Amount</dt>
+                    <dd class="font-medium text-gray-900">${{ "{:,.2f}".format(payment.amount) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Late Fee</dt>
+                    <dd class="font-medium {% if payment.late_fee and payment.late_fee > 0 %}text-red-600{% else %}text-gray-900{% endif %}">${{ "{:,.2f}".format(payment.late_fee or 0) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Tenant</dt>
+                    <dd class="font-medium text-gray-900">{{ payment.tenant_ref.name if payment.tenant_ref else '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Property</dt>
+                    <dd class="font-medium text-gray-900">{{ payment.property_ref.address if payment.property_ref else '—' }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Bank Info -->
+        {% if payment.bank_account_ref %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">Bank Account</h2>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span class="text-blue-600">&#127974;</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-900">{{ payment.bank_account_ref.institution_name }}</p>
+                    <p class="text-xs text-gray-500">{{ payment.bank_account_ref.account_name }} ...{{ payment.bank_account_ref.account_mask }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Failure Info -->
+        {% if payment.failure_reason %}
+        <div class="bg-red-50 rounded-xl border border-red-200 p-6">
+            <h2 class="text-lg font-semibold text-red-800 mb-2">Failure Details</h2>
+            <p class="text-sm text-red-700">{{ payment.failure_reason }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Timeline Sidebar -->
+    <div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Timeline</h2>
+            <div class="space-y-4">
+                <div class="flex gap-3">
+                    <div class="w-2 h-2 mt-1.5 rounded-full bg-blue-500 ring-4 ring-blue-100"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Initiated</p>
+                        <p class="text-xs text-gray-500">{{ payment.initiated_at.strftime('%b %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                </div>
+                {% if payment.status.value in ('processing', 'completed') %}
+                <div class="flex gap-3">
+                    <div class="w-2 h-2 mt-1.5 rounded-full bg-blue-500 ring-4 ring-blue-100"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Processing</p>
+                        <p class="text-xs text-gray-500">Transfer sent to bank</p>
+                    </div>
+                </div>
+                {% endif %}
+                {% if payment.completed_at %}
+                <div class="flex gap-3">
+                    <div class="w-2 h-2 mt-1.5 rounded-full bg-green-500 ring-4 ring-green-100"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Completed</p>
+                        <p class="text-xs text-gray-500">{{ payment.completed_at.strftime('%b %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                {% if payment.failed_at %}
+                <div class="flex gap-3">
+                    <div class="w-2 h-2 mt-1.5 rounded-full bg-red-500 ring-4 ring-red-100"></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ 'Returned' if payment.status.value == 'returned' else 'Failed' }}</p>
+                        <p class="text-xs text-gray-500">{{ payment.failed_at.strftime('%b %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if payment.plaid_transfer_id %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-4">
+            <h2 class="text-sm font-semibold text-gray-900 mb-2">Plaid Transfer</h2>
+            <dl class="text-xs space-y-1">
+                <div>
+                    <dt class="text-gray-500 inline">ID:</dt>
+                    <dd class="text-gray-700 inline font-mono">{{ payment.plaid_transfer_id[:20] }}...</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500 inline">Status:</dt>
+                    <dd class="text-gray-700 inline">{{ payment.plaid_transfer_status or '—' }}</dd>
+                </div>
+            </dl>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

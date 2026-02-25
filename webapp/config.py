@@ -40,6 +40,17 @@ class WebConfig:
     # Database (shared with bot)
     database_url: str = os.getenv("DATABASE_URL", "")
 
+    # Plaid ACH Payments
+    plaid_client_id: str = os.getenv("PLAID_CLIENT_ID", "")
+    plaid_secret: str = os.getenv("PLAID_SECRET", "")
+    plaid_env: str = os.getenv("PLAID_ENV", "sandbox")
+    plaid_webhook_url: str = os.getenv("PLAID_WEBHOOK_URL", "")
+
+    @property
+    def has_plaid(self) -> bool:
+        """Check if Plaid is configured"""
+        return bool(self.plaid_client_id and self.plaid_secret)
+
     @property
     def has_twilio(self) -> bool:
         """Check if Twilio is configured"""

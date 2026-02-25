@@ -11,9 +11,14 @@
             </h1>
             <p class="mt-1 text-sm text-gray-500">Lease document management</p>
         </div>
-        <a href="/leases/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
-            <span class="mr-2">➕</span> Upload Lease
-        </a>
+        <div class="flex gap-2">
+            <a href="/leases/builder" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors">
+                <span class="mr-2">&#128221;</span> Build Lease
+            </a>
+            <a href="/leases/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+                <span class="mr-2">➕</span> Upload Lease
+            </a>
+        </div>
     </div>
 </header>
 {% endblock %}

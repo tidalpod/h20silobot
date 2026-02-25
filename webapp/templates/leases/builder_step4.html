@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Lease Builder - Step 4{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-2 mb-2">
+            <a href="/leases/builder" class="text-sm text-blue-600 hover:text-blue-500">&larr; All Drafts</a>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Pets, Smoking, & Other</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ property.address if property else '' }}</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Step Indicator -->
+<div class="mb-8 flex items-center gap-2">
+    {% for i in range(1, total_steps + 1) %}
+    <div class="flex items-center">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium {% if i == step %}bg-blue-600 text-white{% elif i < step %}bg-green-500 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+            {% if i < step %}&#10003;{% else %}{{ i }}{% endif %}
+        </div>
+        {% if i < total_steps %}<div class="w-8 h-0.5 {% if i < step %}bg-green-500{% else %}bg-gray-200{% endif %}"></div>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<form method="POST" action="/leases/builder/{{ builder.id }}/step/4">
+    <div class="max-w-2xl space-y-6">
+        <!-- Pets -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Pet Policy</h2>
+            <div class="flex gap-4">
+                <label class="flex items-center gap-2 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 {% if data.get('pets_allowed') %}border-blue-300 bg-blue-50{% else %}border-gray-200{% endif %}">
+                    <input type="radio" name="pets_allowed" value="true" {% if data.get('pets_allowed') %}checked{% endif %} onchange="togglePets()">
+                    <span class="text-sm">Pets Allowed</span>
+                </label>
+                <label class="flex items-center gap-2 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 {% if not data.get('pets_allowed') %}border-blue-300 bg-blue-50{% else %}border-gray-200{% endif %}">
+                    <input type="radio" name="pets_allowed" value="false" {% if not data.get('pets_allowed') %}checked{% endif %} onchange="togglePets()">
+                    <span class="text-sm">No Pets</span>
+                </label>
+            </div>
+
+            <div id="pets-section" {% if not data.get('pets_allowed') %}style="display:none"{% endif %}>
+                <div id="pets-container">
+                    {% for p in data.get('pets', []) %}
+                    <div class="pet-row grid grid-cols-4 gap-3 mb-2">
+                        <select name="pet_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                            <option value="dog" {% if p.type == 'dog' %}selected{% endif %}>Dog</option>
+                            <option value="cat" {% if p.type == 'cat' %}selected{% endif %}>Cat</option>
+                            <option value="other" {% if p.type == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                        <input type="text" name="pet_breed" value="{{ p.breed }}" placeholder="Breed" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <input type="text" name="pet_weight" value="{{ p.weight }}" placeholder="Weight (lbs)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <input type="text" name="pet_age" value="{{ p.age }}" placeholder="Age" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                            <button type="button" onclick="this.closest('.pet-row').remove()" class="text-red-400 hover:text-red-600">&times;</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" onclick="addPet()" class="text-sm text-blue-600 hover:text-blue-500 font-medium">+ Add Pet</button>
+            </div>
+        </div>
+
+        <!-- Smoking -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Smoking Policy</h2>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="smoking_policy" value="not_permitted" {% if data.get('smoking_policy', 'not_permitted') == 'not_permitted' %}checked{% endif %}>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Not Permitted</p>
+                        <p class="text-xs text-gray-500">No smoking anywhere on the premises</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="smoking_policy" value="designated_areas" {% if data.get('smoking_policy') == 'designated_areas' %}checked{% endif %}>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Designated Areas Only</p>
+                        <p class="text-xs text-gray-500">Outdoor designated areas only</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Parking -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Parking</h2>
+            <textarea name="parking_rules" rows="3" placeholder="Describe parking rules, assigned spots, etc. (optional)" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">{{ data.get('parking_rules', '') }}</textarea>
+        </div>
+
+        <!-- Renters Insurance -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Renters Insurance</h2>
+            <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" name="renters_insurance_required" value="true" {% if data.get('renters_insurance_required', True) %}checked{% endif %} class="text-blue-600 rounded">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">Require Renters Insurance</p>
+                    <p class="text-xs text-gray-500">Minimum $100,000 liability coverage</p>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="mt-6 flex justify-between max-w-2xl">
+        <a href="/leases/builder/{{ builder.id }}/step/3" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">&larr; Back</a>
+        <div class="flex gap-3">
+            <button type="submit" name="action" value="save" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">Save</button>
+            <button type="submit" name="action" value="continue" class="px-6 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-sm">Save & Continue &rarr;</button>
+        </div>
+    </div>
+</form>
+
+<script>
+function togglePets() {
+    const allowed = document.querySelector('input[name="pets_allowed"][value="true"]').checked;
+    document.getElementById('pets-section').style.display = allowed ? '' : 'none';
+}
+
+function addPet() {
+    const c = document.getElementById('pets-container');
+    c.insertAdjacentHTML('beforeend', `
+        <div class="pet-row grid grid-cols-4 gap-3 mb-2">
+            <select name="pet_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="dog">Dog</option><option value="cat">Cat</option><option value="other">Other</option>
+            </select>
+            <input type="text" name="pet_breed" placeholder="Breed" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="text" name="pet_weight" placeholder="Weight (lbs)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <div class="flex items-center gap-2">
+                <input type="text" name="pet_age" placeholder="Age" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <button type="button" onclick="this.closest('.pet-row').remove()" class="text-red-400 hover:text-red-600">&times;</button>
+            </div>
+        </div>
+    `);
+}
+</script>
+{% endblock %}

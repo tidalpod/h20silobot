@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Payments{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                <span>&#128176;</span> Payments
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Rent payment tracking via ACH</p>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Total Collected</p>
+        <p class="text-2xl font-bold text-green-600">${{ "{:,.2f}".format(completed_amount) }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Total Initiated</p>
+        <p class="text-2xl font-bold text-gray-900">${{ "{:,.2f}".format(total_amount) }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Pending / Processing</p>
+        <p class="text-2xl font-bold text-blue-600">{{ pending_count }}</p>
+    </div>
+</div>
+
+<!-- Entity Breakdown -->
+{% if entity_summary and entity_summary|length > 0 %}
+<div class="mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3">By Entity</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{ [entity_summary|length, 4]|min }} gap-4">
+        {% for entity_name, data in entity_summary.items() %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm font-medium text-gray-900 truncate" title="{{ entity_name }}">{{ entity_name }}</p>
+                <span class="text-xs text-gray-400">{{ data.count }} pmt{{ 's' if data.count != 1 else '' }}</span>
+            </div>
+            <p class="text-xl font-bold text-green-600">${{ "{:,.2f}".format(data.collected) }}</p>
+            <p class="text-xs text-gray-500">collected</p>
+            {% if data.pending > 0 %}
+            <p class="text-xs text-blue-600 mt-1">${{ "{:,.2f}".format(data.pending) }} pending</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="mb-6 flex flex-wrap gap-3">
+    <a href="/payments" class="px-4 py-2 rounded-lg text-sm font-medium {% if not filter_status %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">All</a>
+    <a href="/payments?status=completed" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'completed' %}bg-green-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Completed</a>
+    <a href="/payments?status=processing" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'processing' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Processing</a>
+    <a href="/payments?status=pending" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'pending' %}bg-yellow-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Pending</a>
+    <a href="/payments?status=failed" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'failed' %}bg-red-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Failed</a>
+
+    {% if properties %}
+    <select onchange="if(this.value) window.location='/payments?property_id='+this.value; else window.location='/payments';" class="px-3 py-2 rounded-lg text-sm bg-white text-gray-700 ring-1 ring-gray-300">
+        <option value="">All Properties</option>
+        {% for prop in properties %}
+        <option value="{{ prop.id }}" {% if filter_property_id == prop.id %}selected{% endif %}>{{ prop.address }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</div>
+
+{% if payments %}
+<div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entity</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for payment in payments %}
+            <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/payments/{{ payment.id }}'">
+                <td class="px-6 py-4 text-sm text-gray-900 font-medium">
+                    {{ payment.tenant_ref.name if payment.tenant_ref else '—' }}
+                    {% if payment.is_autopay %}
+                    <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">Auto</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ payment.property_ref.address if payment.property_ref else '—' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ payment.property_ref.entity if payment.property_ref and payment.property_ref.entity else '—' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ payment.payment_month.strftime('%b %Y') }}</td>
+                <td class="px-6 py-4 text-sm text-gray-900 font-medium text-right">
+                    ${{ "{:,.2f}".format(payment.total_amount) }}
+                    {% if payment.late_fee and payment.late_fee > 0 %}
+                    <span class="block text-xs text-red-500">+${{ "{:,.2f}".format(payment.late_fee) }} late</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4">
+                    {% if payment.status.value == 'completed' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                    {% elif payment.status.value == 'processing' %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Processing</span>
+                    {% elif payment.status.value == 'pending' %}
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>
+                    {% elif payment.status.value == 'failed' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Failed</span>
+                    {% elif payment.status.value == 'returned' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Returned</span>
+                    {% elif payment.status.value == 'cancelled' %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cancelled</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ payment.initiated_at.strftime('%b %d, %Y') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <span class="text-4xl">&#128176;</span>
+    <h3 class="mt-3 text-lg font-semibold text-gray-900">No payments found</h3>
+    <p class="mt-1 text-sm text-gray-500">Payments will appear here when tenants pay rent through the portal.</p>
+</div>
+{% endif %}
+{% endblock %}

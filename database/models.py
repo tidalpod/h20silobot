@@ -72,6 +72,29 @@ class ProjectStatus(PyEnum):
     ON_HOLD = "on_hold"
 
 
+class PaymentStatus(PyEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    RETURNED = "returned"
+    CANCELLED = "cancelled"
+
+
+class AutopayStatus(PyEnum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    CANCELLED = "cancelled"
+
+
+class LeaseBuilderStatus(PyEnum):
+    DRAFT = "draft"
+    GENERATED = "generated"
+    SENT = "sent"
+    SIGNED = "signed"
+    VOIDED = "voided"
+
+
 class Property(Base):
     """Property/Account being tracked"""
     __tablename__ = "properties"
@@ -388,6 +411,9 @@ class Tenant(Base):
     sms_messages = relationship("SMSMessage", back_populates="tenant", order_by="SMSMessage.created_at")
     work_orders = relationship("WorkOrder", back_populates="tenant_ref", order_by="desc(WorkOrder.created_at)")
     lease_documents = relationship("LeaseDocument", back_populates="tenant_ref", order_by="desc(LeaseDocument.created_at)")
+    bank_accounts = relationship("TenantBankAccount", back_populates="tenant_ref", order_by="desc(TenantBankAccount.linked_at)")
+    rent_payments = relationship("RentPayment", back_populates="tenant_ref", order_by="desc(RentPayment.initiated_at)")
+    autopay = relationship("TenantAutopay", back_populates="tenant_ref", uselist=False)
 
     # Indexes
     __table_args__ = (
@@ -973,3 +999,172 @@ class Project(Base):
         if self.budget and float(self.budget) > 0:
             return min(100, (self.total_spent / float(self.budget)) * 100)
         return 0
+
+
+# =============================================================================
+# Payment Models (Plaid ACH)
+# =============================================================================
+
+class TenantBankAccount(Base):
+    """Plaid-linked bank accounts for tenants"""
+    __tablename__ = "tenant_bank_accounts"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+
+    # Plaid tokens
+    plaid_access_token = Column(String(255), nullable=False)
+    plaid_item_id = Column(String(255), nullable=False)
+    plaid_account_id = Column(String(255), nullable=False)
+
+    # Display info
+    account_name = Column(String(255), nullable=True)
+    account_mask = Column(String(4), nullable=True)
+    institution_name = Column(String(255), nullable=True)
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    linked_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    tenant_ref = relationship("Tenant", back_populates="bank_accounts")
+    payments = relationship("RentPayment", back_populates="bank_account_ref")
+
+    __table_args__ = (
+        Index("ix_tenant_bank_accounts_tenant", "tenant_id"),
+    )
+
+    def __repr__(self):
+        return f"<TenantBankAccount {self.institution_name} ...{self.account_mask}>"
+
+
+class RentPayment(Base):
+    """Rent payment records"""
+    __tablename__ = "rent_payments"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    bank_account_id = Column(Integer, ForeignKey("tenant_bank_accounts.id", ondelete="SET NULL"), nullable=True)
+
+    # Amounts
+    amount = Column(Numeric(10, 2), nullable=False)
+    late_fee = Column(Numeric(10, 2), default=0)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+
+    # Plaid transfer
+    plaid_transfer_id = Column(String(255), nullable=True)
+    plaid_transfer_status = Column(String(50), nullable=True)
+
+    # Payment info
+    payment_month = Column(Date, nullable=False)
+    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    is_autopay = Column(Boolean, default=False)
+
+    # Timestamps
+    initiated_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+
+    # Relationships
+    tenant_ref = relationship("Tenant", back_populates="rent_payments")
+    property_ref = relationship("Property")
+    bank_account_ref = relationship("TenantBankAccount", back_populates="payments")
+
+    __table_args__ = (
+        Index("ix_rent_payments_tenant", "tenant_id"),
+        Index("ix_rent_payments_status", "status"),
+        Index("ix_rent_payments_month", "payment_month"),
+    )
+
+    def __repr__(self):
+        return f"<RentPayment ${self.total_amount} - {self.status.value}>"
+
+
+class TenantAutopay(Base):
+    """Autopay configuration per tenant"""
+    __tablename__ = "tenant_autopay"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, unique=True)
+    bank_account_id = Column(Integer, ForeignKey("tenant_bank_accounts.id", ondelete="SET NULL"), nullable=True)
+
+    # Config
+    status = Column(Enum(AutopayStatus), default=AutopayStatus.ACTIVE)
+    pay_day = Column(Integer, default=1)
+    amount = Column(Numeric(10, 2), nullable=True)  # null = use current_rent
+
+    # Tracking
+    last_payment_date = Column(Date, nullable=True)
+    next_payment_date = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tenant_ref = relationship("Tenant", back_populates="autopay")
+    bank_account_ref = relationship("TenantBankAccount")
+
+    def __repr__(self):
+        return f"<TenantAutopay tenant={self.tenant_id} status={self.status.value}>"
+
+
+# =============================================================================
+# Lease Builder Models
+# =============================================================================
+
+class LeaseBuilder(Base):
+    """Lease builder wizard state and data"""
+    __tablename__ = "lease_builders"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+
+    # Wizard state
+    current_step = Column(Integer, default=1)
+    status = Column(Enum(LeaseBuilderStatus), default=LeaseBuilderStatus.DRAFT)
+
+    # All lease form data as JSON
+    lease_data = Column(Text, nullable=True)
+
+    # Generated document link
+    lease_document_id = Column(Integer, ForeignKey("lease_documents.id", ondelete="SET NULL"), nullable=True)
+    generated_at = Column(DateTime, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property")
+    tenant_ref = relationship("Tenant")
+    lease_document_ref = relationship("LeaseDocument")
+
+    __table_args__ = (
+        Index("ix_lease_builders_status", "status"),
+        Index("ix_lease_builders_property", "property_id"),
+    )
+
+    def __repr__(self):
+        return f"<LeaseBuilder {self.id} step={self.current_step} status={self.status.value}>"
+
+
+class EntityConfig(Base):
+    """Landlord entity configuration for lease auto-fill"""
+    __tablename__ = "entity_configs"
+
+    id = Column(Integer, primary_key=True)
+    entity_name = Column(String(255), unique=True, nullable=False)
+    owner_name = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(20), nullable=True)
+    mailing_address = Column(Text, nullable=True)
+    is_default = Column(Boolean, default=False)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<EntityConfig {self.entity_name}>"

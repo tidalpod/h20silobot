@@ -52,3 +52,6 @@ sendgrid==6.11.0
 
 # Async file handling
 aiofiles==23.2.1
+
+# PDF Generation (Lease Builder)
+weasyprint==62.3

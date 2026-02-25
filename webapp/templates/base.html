@@ -213,6 +213,17 @@
                                         </svg>
                                     </button>
                                     <div id="dropdown-operations" class="nav-dropdown hidden absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                                        <a href="/payments" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/payments' in request.url.path else '' }}">
+                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900">Payments</div>
+                                                <div class="text-xs text-gray-500">Rent payments (ACH)</div>
+                                            </div>
+                                        </a>
                                         <a href="/maintenance" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/maintenance' in request.url.path and '/maintenance/vendors' not in request.url.path else '' }}">
                                             <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
                                                 <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -450,6 +461,10 @@
                     <div class="mt-3 mb-1 px-3">
                         <span class="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Operations</span>
                     </div>
+                    <a href="/payments" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
+                        Payments
+                    </a>
                     <a href="/maintenance" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743" /></svg>
                         Maintenance

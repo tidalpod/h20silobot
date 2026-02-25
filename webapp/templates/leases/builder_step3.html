@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Lease Builder - Step 3{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-2 mb-2">
+            <a href="/leases/builder" class="text-sm text-blue-600 hover:text-blue-500">&larr; All Drafts</a>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">People on the Lease</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ property.address if property else '' }}</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Step Indicator -->
+<div class="mb-8 flex items-center gap-2">
+    {% for i in range(1, total_steps + 1) %}
+    <div class="flex items-center">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium {% if i == step %}bg-blue-600 text-white{% elif i < step %}bg-green-500 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+            {% if i < step %}&#10003;{% else %}{{ i }}{% endif %}
+        </div>
+        {% if i < total_steps %}<div class="w-8 h-0.5 {% if i < step %}bg-green-500{% else %}bg-gray-200{% endif %}"></div>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<form method="POST" action="/leases/builder/{{ builder.id }}/step/3">
+    <div class="max-w-2xl space-y-6">
+        <!-- Tenants -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Tenants</h2>
+            <div id="tenants-container">
+                {% for t in data.get('tenants', [{}]) %}
+                <div class="tenant-row p-4 rounded-lg border border-gray-200 mb-3 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-medium text-gray-500 uppercase">Tenant {{ loop.index }}</span>
+                        {% if not loop.first %}
+                        <button type="button" onclick="this.closest('.tenant-row').remove()" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+                        {% endif %}
+                    </div>
+                    <input type="text" name="tenant_name" value="{{ t.get('name', '') }}" placeholder="Full legal name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="email" name="tenant_email" value="{{ t.get('email', '') }}" placeholder="Email" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <input type="tel" name="tenant_phone" value="{{ t.get('phone', '') }}" placeholder="Phone" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="addTenant()" class="text-sm text-blue-600 hover:text-blue-500 font-medium">+ Add Tenant</button>
+        </div>
+
+        <!-- Additional Occupants -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Additional Occupants</h2>
+            <p class="text-xs text-gray-500">Anyone living in the unit who is not a leaseholder (e.g., children)</p>
+            <div id="occupants-container">
+                {% for o in data.get('additional_occupants', []) %}
+                <div class="flex gap-3 mb-2 occupant-row">
+                    <input type="text" name="occupant_name" value="{{ o.name }}" placeholder="Name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <input type="number" name="occupant_age" value="{{ o.age }}" placeholder="Age" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <select name="occupant_relationship" class="w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <option value="child" {% if o.relationship == 'child' %}selected{% endif %}>Child</option>
+                        <option value="spouse" {% if o.relationship == 'spouse' %}selected{% endif %}>Spouse</option>
+                        <option value="family" {% if o.relationship == 'family' %}selected{% endif %}>Family</option>
+                        <option value="other" {% if o.relationship == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="addOccupant()" class="text-sm text-blue-600 hover:text-blue-500 font-medium">+ Add Occupant</button>
+        </div>
+
+        <!-- Landlord -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Landlord / Management</h2>
+            {% set ll = data.get('landlord', {}) %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select name="landlord_type" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+                    <option value="company" {% if ll.get('type', 'company') == 'company' %}selected{% endif %}>Company / LLC</option>
+                    <option value="individual" {% if ll.get('type') == 'individual' %}selected{% endif %}>Individual</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Entity / Company Name</label>
+                <input type="text" name="landlord_entity_name" value="{{ ll.get('entity_name', '') }}" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Owner / Manager Name</label>
+                <input type="text" name="landlord_owner_name" value="{{ ll.get('owner_name', '') }}" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="landlord_email" value="{{ ll.get('email', '') }}" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input type="tel" name="landlord_phone" value="{{ ll.get('phone', '') }}" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
+                <textarea name="landlord_mailing_address" rows="2" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm">{{ ll.get('mailing_address', '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Cosigners -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Co-signers</h2>
+            <div id="cosigners-container">
+                {% for c in data.get('cosigners', []) %}
+                <div class="flex gap-3 mb-2 cosigner-row">
+                    <input type="text" name="cosigner_name" value="{{ c.name }}" placeholder="Full name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <input type="email" name="cosigner_email" value="{{ c.email }}" placeholder="Email" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="addCosigner()" class="text-sm text-blue-600 hover:text-blue-500 font-medium">+ Add Co-signer</button>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="mt-6 flex justify-between max-w-2xl">
+        <a href="/leases/builder/{{ builder.id }}/step/2" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">&larr; Back</a>
+        <div class="flex gap-3">
+            <button type="submit" name="action" value="save" class="px-6 py-3 rounded-lg text-sm font-medium text-gray-700 bg-white ring-1 ring-gray-300 hover:bg-gray-50">Save</button>
+            <button type="submit" name="action" value="continue" class="px-6 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-sm">Save & Continue &rarr;</button>
+        </div>
+    </div>
+</form>
+
+<script>
+function addTenant() {
+    const c = document.getElementById('tenants-container');
+    const n = c.querySelectorAll('.tenant-row').length + 1;
+    const row = document.createElement('div');
+    row.className = 'tenant-row p-4 rounded-lg border border-gray-200 mb-3 space-y-3';
+    row.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span class="text-xs font-medium text-gray-500 uppercase">Tenant ${n}</span>
+            <button type="button" onclick="this.closest('.tenant-row').remove()" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+        </div>
+        <input type="text" name="tenant_name" placeholder="Full legal name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <div class="grid grid-cols-2 gap-3">
+            <input type="email" name="tenant_email" placeholder="Email" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="tel" name="tenant_phone" placeholder="Phone" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        </div>
+    `;
+    c.appendChild(row);
+}
+
+function addOccupant() {
+    const c = document.getElementById('occupants-container');
+    c.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-3 mb-2 occupant-row">
+            <input type="text" name="occupant_name" placeholder="Name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="number" name="occupant_age" placeholder="Age" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <select name="occupant_relationship" class="w-36 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="child">Child</option><option value="spouse">Spouse</option><option value="family">Family</option><option value="other">Other</option>
+            </select>
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2">&times;</button>
+        </div>
+    `);
+}
+
+function addCosigner() {
+    const c = document.getElementById('cosigners-container');
+    c.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-3 mb-2 cosigner-row">
+            <input type="text" name="cosigner_name" placeholder="Full name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="email" name="cosigner_email" placeholder="Email" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2">&times;</button>
+        </div>
+    `);
+}
+</script>
+{% endblock %}

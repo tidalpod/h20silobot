@@ -13,6 +13,8 @@ async def run_migrations(engine):
     migrations = [
         # (table, column, type)
         ("properties", "entity", "VARCHAR(100)"),
+        # Payment models - these are full tables created by create_all,
+        # but we track column additions here for future migrations
     ]
 
     async with engine.begin() as conn:

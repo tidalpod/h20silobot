@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: letter;
+            margin: 1in 1in 1.2in 1in;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+        body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #222;
+        }
+        h1 {
+            font-size: 18pt;
+            text-align: center;
+            margin-bottom: 5pt;
+            font-weight: bold;
+        }
+        h2 {
+            font-size: 13pt;
+            margin-top: 18pt;
+            margin-bottom: 8pt;
+            font-weight: bold;
+            border-bottom: 1px solid #999;
+            padding-bottom: 3pt;
+        }
+        h3 {
+            font-size: 11pt;
+            font-weight: bold;
+            margin-top: 12pt;
+            margin-bottom: 4pt;
+        }
+        .cover-page {
+            text-align: center;
+            padding-top: 2in;
+        }
+        .cover-page h1 {
+            font-size: 24pt;
+            margin-bottom: 20pt;
+        }
+        .cover-page .subtitle {
+            font-size: 14pt;
+            color: #555;
+            margin-bottom: 40pt;
+        }
+        .cover-info {
+            text-align: left;
+            margin: 40pt auto;
+            max-width: 400pt;
+        }
+        .cover-info table {
+            width: 100%;
+        }
+        .cover-info td {
+            padding: 4pt 8pt;
+            vertical-align: top;
+        }
+        .cover-info .label {
+            font-weight: bold;
+            width: 140pt;
+            color: #555;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .provision {
+            margin-bottom: 12pt;
+            text-align: justify;
+        }
+        .provision-number {
+            font-weight: bold;
+        }
+        .signature-block {
+            margin-top: 40pt;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            border-bottom: 1px solid #333;
+            width: 300pt;
+            display: inline-block;
+            margin-bottom: 3pt;
+        }
+        .signature-row {
+            margin-bottom: 30pt;
+        }
+        .signature-label {
+            font-size: 9pt;
+            color: #666;
+        }
+        .notice-box {
+            border: 1px solid #999;
+            padding: 10pt;
+            margin: 12pt 0;
+            background: #f9f9f9;
+            font-size: 10pt;
+        }
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8pt 0;
+        }
+        table.data-table th,
+        table.data-table td {
+            border: 1px solid #ccc;
+            padding: 4pt 8pt;
+            text-align: left;
+            font-size: 10pt;
+        }
+        table.data-table th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover-page">
+    <h1>MICHIGAN<br>RESIDENTIAL RENTAL AGREEMENT</h1>
+    <p class="subtitle">Michigan Truth in Renting Act Compliant</p>
+
+    <div class="cover-info">
+        <table>
+            <tr>
+                <td class="label">Property Address:</td>
+                <td>{{ property_address }}</td>
+            </tr>
+            <tr>
+                <td class="label">Landlord:</td>
+                <td>{{ landlord.get('entity_name', '') }}{% if landlord.get('owner_name') %}<br>{{ landlord.get('owner_name') }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="label">Tenant(s):</td>
+                <td>
+                    {% for t in tenants %}
+                    {{ t.get('name', '') }}{% if not loop.last %}<br>{% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Lease Term:</td>
+                <td>
+                    {% if lease_data.get('lease_type', 'fixed') == 'fixed' %}
+                    {{ format_date(lease_data.get('start_date', '')) }} to {{ format_date(lease_data.get('end_date', '')) }}
+                    {% else %}
+                    Month-to-Month beginning {{ format_date(lease_data.get('start_date', '')) }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Monthly Rent:</td>
+                <td>{{ format_currency(lease_data.get('monthly_rent', 0)) }}</td>
+            </tr>
+            <tr>
+                <td class="label">Security Deposit:</td>
+                <td>{{ format_currency(lease_data.get('security_deposit', 0)) }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <p style="margin-top: 60pt; font-size: 10pt; color: #888;">Generated {{ generated_date }} by Blue Deer Property Management</p>
+</div>
+
+<!-- ==================== SECTION 1: PARTIES & PREMISES ==================== -->
+<div class="page-break"></div>
+
+<h2>SECTION 1: PARTIES AND PREMISES</h2>
+
+<p class="provision">
+    This Residential Rental Agreement ("Lease") is entered into on {{ format_date(lease_data.get('start_date', '')) }}
+    between:
+</p>
+
+<p class="provision">
+    <strong>LANDLORD:</strong>
+    {{ landlord.get('entity_name', '___________') }}{% if landlord.get('owner_name') %}, represented by {{ landlord.get('owner_name') }}{% endif %}
+    {% if landlord.get('mailing_address') %}<br>Address: {{ landlord.get('mailing_address') }}{% endif %}
+    {% if landlord.get('email') %}<br>Email: {{ landlord.get('email') }}{% endif %}
+    {% if landlord.get('phone') %}<br>Phone: {{ landlord.get('phone') }}{% endif %}
+</p>
+
+<p class="provision">
+    <strong>TENANT(S):</strong>
+    {% for t in tenants %}
+    {{ t.get('name', '') }}{% if t.get('email') %} ({{ t.get('email') }}){% endif %}{% if not loop.last %}; {% endif %}
+    {% endfor %}
+</p>
+
+{% if additional_occupants %}
+<p class="provision">
+    <strong>ADDITIONAL OCCUPANTS:</strong>
+    {% for o in additional_occupants %}
+    {{ o.get('name', '') }} ({{ o.get('relationship', '') }}, age {{ o.get('age', '') }}){% if not loop.last %}; {% endif %}
+    {% endfor %}
+</p>
+{% endif %}
+
+{% if cosigners %}
+<p class="provision">
+    <strong>CO-SIGNER(S):</strong>
+    {% for c in cosigners %}
+    {{ c.get('name', '') }}{% if c.get('email') %} ({{ c.get('email') }}){% endif %}{% if not loop.last %}; {% endif %}
+    {% endfor %}
+</p>
+{% endif %}
+
+<p class="provision">
+    <strong>PREMISES:</strong> The Landlord agrees to rent to the Tenant(s) the residential property
+    located at <strong>{{ property_address }}</strong> ("Premises"), for use as a private residential dwelling only.
+</p>
+
+<!-- ==================== SECTION 2: SPECIAL PROVISIONS ==================== -->
+<h2>SECTION 2: SPECIAL PROVISIONS</h2>
+
+{% for provision in section_2_provisions %}
+<p class="provision">
+    <span class="provision-number">{{ loop.index }}.</span> {{ provision }}
+</p>
+{% endfor %}
+
+<!-- ==================== SECTION 3: GENERAL PROVISIONS ==================== -->
+<div class="page-break"></div>
+<h2>SECTION 3: GENERAL PROVISIONS</h2>
+
+{% for gp in section_3_provisions %}
+<h3>{{ loop.index }}. {{ gp.title }}</h3>
+<p class="provision">{{ gp.text }}</p>
+{% endfor %}
+
+<!-- ==================== MICHIGAN NOTICES ==================== -->
+<div class="page-break"></div>
+<h2>MICHIGAN LEGAL NOTICES</h2>
+
+<div class="notice-box">
+    <strong>Truth in Renting Act Notice</strong><br>
+    {{ michigan_truth_in_renting }}
+</div>
+
+<div class="notice-box">
+    <strong>Security Deposit Notice</strong><br>
+    {{ michigan_security_deposit }}
+</div>
+
+{% if michigan_lead_paint %}
+<div class="notice-box">
+    <strong>Lead-Based Paint Disclosure</strong><br>
+    {{ michigan_lead_paint }}
+</div>
+{% endif %}
+
+<!-- ==================== ADDITIONAL TERMS ==================== -->
+{% if additional_terms %}
+<h2>ADDITIONAL TERMS AND CONDITIONS</h2>
+<p class="provision">{{ additional_terms }}</p>
+{% endif %}
+
+<!-- ==================== SIGNATURE PAGE ==================== -->
+<div class="page-break"></div>
+<h2>SIGNATURES</h2>
+
+<p class="provision">
+    By signing below, the parties acknowledge that they have read and understood the terms of this
+    Residential Rental Agreement and agree to be bound by all of its provisions.
+</p>
+
+<div class="signature-block">
+    <h3>LANDLORD:</h3>
+    <div class="signature-row">
+        <p><span class="signature-line">&nbsp;</span></p>
+        <p class="signature-label">{{ landlord.get('entity_name', 'Landlord') }}{% if landlord.get('owner_name') %} — {{ landlord.get('owner_name') }}{% endif %}</p>
+        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
+    </div>
+
+    <h3>TENANT(S):</h3>
+    {% for t in tenants %}
+    <div class="signature-row">
+        <p><span class="signature-line">&nbsp;</span></p>
+        <p class="signature-label">{{ t.get('name', 'Tenant') }}</p>
+        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
+    </div>
+    {% endfor %}
+
+    {% if cosigners %}
+    <h3>CO-SIGNER(S):</h3>
+    {% for c in cosigners %}
+    <div class="signature-row">
+        <p><span class="signature-line">&nbsp;</span></p>
+        <p class="signature-label">{{ c.get('name', 'Co-signer') }}</p>
+        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+
+</body>
+</html>

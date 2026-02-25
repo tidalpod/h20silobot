@@ -38,6 +38,24 @@
 </div>
 {% endif %}
 
+<!-- Rent Due Card -->
+{% if rent_due is defined and rent_due and not rent_due.get('paid') and rent_due.get('total_due', 0) > 0 %}
+<a href="/portal/pay" class="block portal-card p-5 mb-4 border-l-4 border-blue-600">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <span class="text-lg">💳</span>
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900">Rent Due</h2>
+                <p class="text-xs text-gray-500">{{ rent_due.payment_month.strftime('%B %Y') }}{% if rent_due.late_fee > 0 %} &middot; Includes late fee{% endif %}</p>
+            </div>
+        </div>
+        <p class="text-lg font-bold text-blue-600">${{ "{:,.2f}".format(rent_due.total_due) }}</p>
+    </div>
+</a>
+{% endif %}
+
 <!-- Quick Stats -->
 <div class="grid grid-cols-2 gap-3 mb-4">
     <!-- Open Requests -->

@@ -171,6 +171,14 @@ async def portal_dashboard(request: Request):
         else:
             latest_bill = None
 
+    # Rent balance due (safe import — won't fail if service has issues)
+    rent_due = None
+    try:
+        from webapp.services.payment_service import calculate_balance_due
+        rent_due = await calculate_balance_due(tenant["id"])
+    except Exception:
+        pass
+
     return templates.TemplateResponse("portal/dashboard.html", {
         "request": request,
         "tenant": tenant,
@@ -178,6 +186,7 @@ async def portal_dashboard(request: Request):
         "open_requests": open_requests,
         "active_lease": active_lease,
         "latest_bill": latest_bill,
+        "rent_due": rent_due,
     })
 
 
