@@ -119,12 +119,12 @@ class BlueDeerBot:
             name="Recertification reminders"
         )
 
-        # Water bill threshold alerts at 9 AM
+        # Water bill threshold alerts at 9 AM every other Monday (bi-weekly)
         self.scheduler.add_job(
             self.send_water_bill_alerts,
-            CronTrigger(hour=9, minute=0),
+            CronTrigger(day_of_week='mon', hour=9, minute=0, week='*/2'),
             id="water_bill_alerts",
-            name="Water bill threshold alerts"
+            name="Water bill threshold alerts (bi-weekly)"
         )
 
         # Due date reminders at 9:30 AM
@@ -695,23 +695,72 @@ class BlueDeerBot:
                 result = await session.execute(
                     select(WorkOrder)
                     .where(
-                        WorkOrder.status == WorkOrderStatus.NEW,
+                        WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED]),
                         WorkOrder.created_at >= cutoff,
                     )
-                    .options(selectinload(WorkOrder.property_ref))
+                    .options(
+                        selectinload(WorkOrder.property_ref),
+                        selectinload(WorkOrder.vendor_ref),
+                        selectinload(WorkOrder.tenant_ref),
+                    )
                 )
                 new_orders = result.scalars().all()
 
                 if new_orders:
                     message = "🔧 *New Work Orders*\n\n"
                     for wo in new_orders:
-                        priority_icon = "🚨" if wo.priority == WorkOrderPriority.EMERGENCY else "🔧"
+                        # Priority badge
+                        if wo.priority == WorkOrderPriority.EMERGENCY:
+                            priority_icon = "🚨"
+                            priority_label = "EMERGENCY"
+                        elif wo.priority == WorkOrderPriority.HIGH:
+                            priority_icon = "🔴"
+                            priority_label = "High"
+                        elif wo.priority == WorkOrderPriority.NORMAL:
+                            priority_icon = "🟡"
+                            priority_label = "Normal"
+                        else:
+                            priority_icon = "🟢"
+                            priority_label = "Low"
+
                         addr = wo.property_ref.address if wo.property_ref else "Unknown"
+                        category = wo.category.value.replace('_', ' ').title() if wo.category else "General"
+
                         message += f"{priority_icon} *{wo.title}*\n"
-                        message += f"  📍 {addr}\n"
-                        message += f"  📋 {wo.category.value.replace('_', ' ').title() if wo.category else 'General'}\n"
+                        message += f"  📍 {addr}"
+                        if wo.unit_area:
+                            message += f", {wo.unit_area}"
+                        message += "\n"
+                        message += f"  📋 {category} • Priority: {priority_label}\n"
+
+                        # Vendor assignment
+                        if wo.vendor_ref:
+                            vendor_name = wo.vendor_ref.name
+                            if wo.vendor_ref.company:
+                                vendor_name += f" ({wo.vendor_ref.company})"
+                            message += f"  🔨 Assigned to: {vendor_name}\n"
+                        else:
+                            message += f"  ⚠️ No vendor assigned\n"
+
+                        # Tenant info
+                        if wo.tenant_ref:
+                            message += f"  👤 Tenant: {wo.tenant_ref.name}\n"
                         if wo.submitted_by_tenant:
-                            message += f"  👤 Submitted by tenant\n"
+                            message += f"  📱 Submitted by tenant\n"
+
+                        # Description preview
+                        if wo.description:
+                            desc = wo.description[:120]
+                            if len(wo.description) > 120:
+                                desc += "..."
+                            message += f"  💬 _{desc}_\n"
+
+                        # Cost & schedule
+                        if wo.estimated_cost:
+                            message += f"  💰 Est. cost: ${wo.estimated_cost:.2f}\n"
+                        if wo.scheduled_date:
+                            message += f"  📅 Scheduled: {wo.scheduled_date.strftime('%b %d, %Y')}\n"
+
                         message += "\n"
 
                     await self.send_notification(message)
