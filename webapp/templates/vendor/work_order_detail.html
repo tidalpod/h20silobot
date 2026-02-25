@@ -1,0 +1,158 @@
+{% extends "vendor/base.html" %}
+
+{% block title %}Work Order #{{ wo.id }}{% endblock %}
+
+{% block content %}
+<!-- Back link -->
+<a href="/vendor/work-orders" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to Work Orders
+</a>
+
+<!-- Header -->
+<div class="portal-card p-4 mb-4">
+    <div class="flex items-start justify-between mb-3">
+        <div>
+            <h1 class="text-lg font-bold text-gray-900">{{ wo.title }}</h1>
+            <p class="text-xs text-gray-500">WO #{{ wo.id }}</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full font-medium
+            {% if wo.status.value == 'new' %}bg-blue-100 text-blue-700
+            {% elif wo.status.value == 'assigned' %}bg-amber-100 text-amber-700
+            {% elif wo.status.value == 'in_progress' %}bg-purple-100 text-purple-700
+            {% elif wo.status.value == 'completed' %}bg-green-100 text-green-700
+            {% elif wo.status.value == 'closed' %}bg-gray-100 text-gray-600
+            {% endif %}">{{ wo.status.value|replace('_', ' ')|title }}</span>
+    </div>
+
+    {% if wo.description %}
+    <p class="text-sm text-gray-700 mb-3">{{ wo.description }}</p>
+    {% endif %}
+
+    <div class="grid grid-cols-2 gap-3 text-sm">
+        {% if wo.property_ref %}
+        <div>
+            <span class="text-xs text-gray-400 block">Property</span>
+            <span class="text-gray-900">{{ wo.property_ref.address }}</span>
+        </div>
+        {% endif %}
+        {% if wo.category %}
+        <div>
+            <span class="text-xs text-gray-400 block">Category</span>
+            <span class="text-gray-900">{{ wo.category.value|replace('_', ' ')|title }}</span>
+        </div>
+        {% endif %}
+        {% if wo.priority %}
+        <div>
+            <span class="text-xs text-gray-400 block">Priority</span>
+            <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full
+                    {% if wo.priority.value == 'emergency' %}bg-red-500
+                    {% elif wo.priority.value == 'high' %}bg-orange-500
+                    {% elif wo.priority.value == 'normal' %}bg-blue-500
+                    {% else %}bg-gray-400
+                    {% endif %}"></span>
+                {{ wo.priority.value|title }}
+            </span>
+        </div>
+        {% endif %}
+        {% if wo.scheduled_date %}
+        <div>
+            <span class="text-xs text-gray-400 block">Scheduled</span>
+            <span class="text-gray-900">{{ wo.scheduled_date.strftime('%b %d, %Y') }}</span>
+        </div>
+        {% endif %}
+        {% if wo.unit_area %}
+        <div>
+            <span class="text-xs text-gray-400 block">Area</span>
+            <span class="text-gray-900">{{ wo.unit_area }}</span>
+        </div>
+        {% endif %}
+        {% if wo.tenant_ref %}
+        <div>
+            <span class="text-xs text-gray-400 block">Tenant</span>
+            <span class="text-gray-900">{{ wo.tenant_ref.name }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if wo.estimated_cost %}
+    <div class="mt-3 pt-3 border-t border-gray-100">
+        <span class="text-xs text-gray-400">Estimated Cost:</span>
+        <span class="text-sm font-semibold text-gray-900">${{ "%.2f"|format(wo.estimated_cost) }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Photos -->
+<div class="portal-card p-4 mb-4">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3">Photos</h2>
+
+    {% if wo.photos %}
+    <div class="grid grid-cols-3 gap-2 mb-3" id="photo-grid">
+        {% for photo in wo.photos %}
+        <div class="aspect-square rounded-lg overflow-hidden bg-gray-100">
+            <img src="{{ photo.url }}" class="w-full h-full object-cover" alt="{{ photo.caption or '' }}"
+                 onclick="window.open('{{ photo.url }}', '_blank')">
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 mb-3">No photos yet</p>
+    {% endif %}
+
+    <!-- Upload -->
+    <div class="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center" id="upload-area">
+        <input type="file" accept="image/*" id="photo-input" class="hidden">
+        <button onclick="document.getElementById('photo-input').click()" class="text-sm text-green-600 font-medium hover:text-green-700">
+            <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+            </svg>
+            Upload Photo
+        </button>
+        <p class="text-xs text-gray-400 mt-1">JPG, PNG, WebP up to 10MB</p>
+        <div id="upload-status" class="hidden mt-2 text-sm"></div>
+    </div>
+</div>
+
+{% if wo.resolution_notes %}
+<div class="portal-card p-4">
+    <h2 class="text-sm font-semibold text-gray-700 mb-2">Resolution Notes</h2>
+    <p class="text-sm text-gray-600">{{ wo.resolution_notes }}</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('photo-input').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const status = document.getElementById('upload-status');
+    status.classList.remove('hidden');
+    status.innerHTML = '<span class="text-blue-600">Uploading...</span>';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+        const resp = await fetch('/vendor/work-orders/{{ wo.id }}/photos/upload', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            status.innerHTML = '<span class="text-green-600">Uploaded!</span>';
+            setTimeout(() => location.reload(), 500);
+        } else {
+            status.innerHTML = `<span class="text-red-600">${data.error || 'Upload failed'}</span>`;
+        }
+    } catch (err) {
+        status.innerHTML = '<span class="text-red-600">Upload failed. Try again.</span>';
+    }
+});
+</script>
+{% endblock %}

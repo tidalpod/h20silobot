@@ -121,6 +121,9 @@ from .routes.public import router as public_router
 from .routes.maintenance import router as maintenance_router
 from .routes.leases import router as leases_router
 from .routes.portal import router as portal_router
+from .routes.vendor_portal import router as vendor_portal_router
+from .routes.invoices import router as invoices_router
+from .routes.projects import router as projects_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
 
@@ -139,6 +142,9 @@ app.include_router(public_router)
 app.include_router(maintenance_router, prefix="/maintenance")
 app.include_router(leases_router, prefix="/leases")
 app.include_router(portal_router, prefix="/portal")
+app.include_router(vendor_portal_router, prefix="/vendor")
+app.include_router(invoices_router, prefix="/invoices")
+app.include_router(projects_router, prefix="/projects")
 # Recertification routes removed - dates tracked on property/tenant directly
 # app.include_router(recertifications_router, prefix="/recertifications")
 

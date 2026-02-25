@@ -58,6 +58,20 @@ class LeaseStatus(PyEnum):
     TERMINATED = "terminated"
 
 
+class InvoiceStatus(PyEnum):
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PAID = "paid"
+
+
+class ProjectStatus(PyEnum):
+    PLANNING = "planning"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    ON_HOLD = "on_hold"
+
+
 class Property(Base):
     """Property/Account being tracked"""
     __tablename__ = "properties"
@@ -675,6 +689,8 @@ class Vendor(Base):
 
     # Relationships
     work_orders = relationship("WorkOrder", back_populates="vendor_ref")
+    invoices = relationship("Invoice", back_populates="vendor_ref")
+    projects = relationship("Project", back_populates="vendor_ref")
 
     def __repr__(self):
         return f"<Vendor {self.name}>"
@@ -688,6 +704,7 @@ class WorkOrder(Base):
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
 
     # Work order details
     title = Column(String(255), nullable=False)
@@ -719,6 +736,7 @@ class WorkOrder(Base):
     property_ref = relationship("Property", back_populates="work_orders")
     tenant_ref = relationship("Tenant", back_populates="work_orders")
     vendor_ref = relationship("Vendor", back_populates="work_orders")
+    project = relationship("Project", back_populates="work_orders")
     photos = relationship("WorkOrderPhoto", back_populates="work_order", cascade="all, delete-orphan")
 
     # Indexes
@@ -817,3 +835,141 @@ class TenantVerification(Base):
 
     def __repr__(self):
         return f"<TenantVerification {self.phone}>"
+
+
+# =============================================================================
+# Vendor Portal Models
+# =============================================================================
+
+class VendorVerification(Base):
+    """SMS verification codes for vendor portal login"""
+    __tablename__ = "vendor_verifications"
+
+    id = Column(Integer, primary_key=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=True)
+    phone = Column(String(20), nullable=False)
+    code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    verified = Column(Boolean, default=False)
+    attempts = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    vendor = relationship("Vendor")
+
+    def __repr__(self):
+        return f"<VendorVerification {self.phone}>"
+
+
+# =============================================================================
+# Invoice & Project Models
+# =============================================================================
+
+class Invoice(Base):
+    """Vendor invoices for work performed"""
+    __tablename__ = "invoices"
+
+    id = Column(Integer, primary_key=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id", ondelete="SET NULL"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+
+    # Invoice details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    amount = Column(Numeric(10, 2), nullable=False)
+    file_url = Column(String(500), nullable=True)
+
+    # Status
+    status = Column(Enum(InvoiceStatus), default=InvoiceStatus.SUBMITTED)
+
+    # Timestamps
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    paid_at = Column(DateTime, nullable=True)
+    rejected_at = Column(DateTime, nullable=True)
+
+    # PM notes (approval/rejection reason)
+    notes = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    vendor_ref = relationship("Vendor", back_populates="invoices")
+    property_ref = relationship("Property")
+    work_order_ref = relationship("WorkOrder")
+    project_ref = relationship("Project", back_populates="invoices")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_invoices_vendor", "vendor_id"),
+        Index("ix_invoices_status", "status"),
+        Index("ix_invoices_property", "property_id"),
+    )
+
+    def __repr__(self):
+        return f"<Invoice {self.id}: {self.title} - ${self.amount}>"
+
+
+class Project(Base):
+    """Rehab/renovation projects grouping work orders and invoices"""
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+
+    # Project details
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(Enum(ProjectStatus), default=ProjectStatus.PLANNING)
+    budget = Column(Numeric(10, 2), nullable=True)
+
+    # Dates
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    completed_date = Column(Date, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property")
+    vendor_ref = relationship("Vendor", back_populates="projects")
+    work_orders = relationship("WorkOrder", back_populates="project")
+    invoices = relationship("Invoice", back_populates="project_ref")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_projects_property", "property_id"),
+        Index("ix_projects_status", "status"),
+    )
+
+    def __repr__(self):
+        return f"<Project {self.id}: {self.name}>"
+
+    @property
+    def total_spent(self):
+        """Sum of approved/paid invoice amounts"""
+        return sum(
+            float(inv.amount) for inv in self.invoices
+            if inv.status in (InvoiceStatus.APPROVED, InvoiceStatus.PAID)
+        ) if self.invoices else 0
+
+    @property
+    def budget_remaining(self):
+        """Budget minus spent"""
+        if self.budget:
+            return float(self.budget) - self.total_spent
+        return None
+
+    @property
+    def budget_percent(self):
+        """Percentage of budget spent"""
+        if self.budget and float(self.budget) > 0:
+            return min(100, (self.total_spent / float(self.budget)) * 100)
+        return 0

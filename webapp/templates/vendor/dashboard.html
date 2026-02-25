@@ -1,0 +1,100 @@
+{% extends "vendor/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome -->
+<div class="mb-6">
+    <h1 class="text-xl font-bold text-gray-900">Welcome, {{ vendor.name }}</h1>
+    {% if vendor.company %}
+    <p class="text-sm text-gray-500">{{ vendor.company }}</p>
+    {% endif %}
+</div>
+
+<!-- Stats Grid -->
+<div class="grid grid-cols-3 gap-3 mb-6">
+    <div class="portal-card p-4 text-center">
+        <div class="text-2xl font-bold text-green-600">{{ active_wo_count }}</div>
+        <div class="text-xs text-gray-500 mt-1">Active Jobs</div>
+    </div>
+    <div class="portal-card p-4 text-center">
+        <div class="text-2xl font-bold text-amber-600">{{ pending_invoices }}</div>
+        <div class="text-xs text-gray-500 mt-1">Pending Invoices</div>
+    </div>
+    <div class="portal-card p-4 text-center">
+        <div class="text-2xl font-bold text-gray-900">${{ "%.0f"|format(total_earned) }}</div>
+        <div class="text-xs text-gray-500 mt-1">Total Earned</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-cols-2 gap-3 mb-6">
+    <a href="/vendor/invoices/new" class="portal-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+        </div>
+        <span class="text-sm font-medium text-gray-900">Submit Invoice</span>
+    </a>
+    <a href="/vendor/work-orders" class="portal-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63" />
+            </svg>
+        </div>
+        <span class="text-sm font-medium text-gray-900">View Work</span>
+    </a>
+</div>
+
+<!-- Upcoming Work -->
+{% if upcoming_work %}
+<div class="mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Upcoming Work</h2>
+    <div class="space-y-2">
+        {% for wo in upcoming_work %}
+        <a href="/vendor/work-orders/{{ wo.id }}" class="portal-card p-3 flex items-center gap-3 block">
+            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900 truncate">{{ wo.title }}</div>
+                <div class="text-xs text-gray-500">{{ wo.scheduled_date.strftime('%b %d, %Y') if wo.scheduled_date else 'TBD' }} &middot; {{ wo.property_ref.address if wo.property_ref else '' }}</div>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Invoices -->
+{% if recent_invoices %}
+<div class="mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Recent Invoices</h2>
+    <div class="space-y-2">
+        {% for inv in recent_invoices %}
+        <a href="/vendor/invoices/{{ inv.id }}" class="portal-card p-3 flex items-center gap-3 block">
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900 truncate">{{ inv.title }}</div>
+                <div class="text-xs text-gray-500">{{ inv.property_ref.address if inv.property_ref else '' }}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+                <div class="text-sm font-semibold text-gray-900">${{ "%.2f"|format(inv.amount) }}</div>
+                <span class="text-xs px-2 py-0.5 rounded-full
+                    {% if inv.status.value == 'submitted' %}bg-amber-100 text-amber-700
+                    {% elif inv.status.value == 'approved' %}bg-blue-100 text-blue-700
+                    {% elif inv.status.value == 'paid' %}bg-green-100 text-green-700
+                    {% elif inv.status.value == 'rejected' %}bg-red-100 text-red-700
+                    {% endif %}">{{ inv.status.value|capitalize }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

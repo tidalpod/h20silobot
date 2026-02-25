@@ -1,0 +1,54 @@
+{% extends "vendor/base.html" %}
+
+{% block title %}Invoices{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-bold text-gray-900">Invoices</h1>
+    <a href="/vendor/invoices/new" class="bg-green-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-green-500 transition-colors font-medium">
+        + New Invoice
+    </a>
+</div>
+
+{% if not invoices %}
+<div class="portal-card p-8 text-center">
+    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+    <p class="text-gray-500 font-medium">No invoices yet</p>
+    <p class="text-sm text-gray-400 mt-1">Submit your first invoice to get started</p>
+    <a href="/vendor/invoices/new" class="inline-block mt-4 bg-green-600 text-white text-sm px-6 py-2.5 rounded-lg hover:bg-green-500 transition-colors font-medium">Submit Invoice</a>
+</div>
+{% else %}
+<div class="space-y-3">
+    {% for inv in invoices %}
+    <a href="/vendor/invoices/{{ inv.id }}" class="portal-card p-4 block hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900 truncate">{{ inv.title }}</h3>
+                <p class="text-xs text-gray-500 mt-0.5">{{ inv.property_ref.address if inv.property_ref else 'Unknown Property' }}</p>
+                <p class="text-xs text-gray-400 mt-1">{{ inv.submitted_at.strftime('%b %d, %Y') if inv.submitted_at else inv.created_at.strftime('%b %d, %Y') }}</p>
+            </div>
+            <div class="text-right flex-shrink-0 ml-3">
+                <div class="text-base font-bold text-gray-900">${{ "%.2f"|format(inv.amount) }}</div>
+                <span class="inline-block mt-1 text-xs px-2.5 py-0.5 rounded-full font-medium
+                    {% if inv.status.value == 'submitted' %}bg-amber-100 text-amber-700
+                    {% elif inv.status.value == 'approved' %}bg-blue-100 text-blue-700
+                    {% elif inv.status.value == 'paid' %}bg-green-100 text-green-700
+                    {% elif inv.status.value == 'rejected' %}bg-red-100 text-red-700
+                    {% endif %}">{{ inv.status.value|capitalize }}</span>
+            </div>
+        </div>
+        {% if inv.file_url %}
+        <div class="mt-2 flex items-center gap-1 text-xs text-gray-400">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+            </svg>
+            File attached
+        </div>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

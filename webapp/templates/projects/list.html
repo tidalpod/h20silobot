@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Projects</h1>
+            <p class="text-sm text-gray-500 mt-1">Rehab and renovation tracking</p>
+        </div>
+        <a href="/projects/new" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Project
+        </a>
+    </div>
+
+    {% if not projects %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+        </svg>
+        <p class="text-gray-500">No projects yet</p>
+        <a href="/projects/new" class="inline-block mt-4 bg-blue-600 text-white text-sm px-6 py-2.5 rounded-lg hover:bg-blue-500">Create First Project</a>
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for proj in projects %}
+        <a href="/projects/{{ proj.id }}" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow block">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900 truncate">{{ proj.name }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ proj.property_ref.address if proj.property_ref else 'No property' }}</p>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2
+                    {% if proj.status.value == 'planning' %}bg-gray-100 text-gray-600
+                    {% elif proj.status.value == 'in_progress' %}bg-blue-100 text-blue-700
+                    {% elif proj.status.value == 'completed' %}bg-green-100 text-green-700
+                    {% elif proj.status.value == 'on_hold' %}bg-amber-100 text-amber-700
+                    {% endif %}">{{ proj.status.value|replace('_', ' ')|title }}</span>
+            </div>
+
+            {% if proj.vendor_ref %}
+            <p class="text-xs text-gray-500 mb-3">Vendor: {{ proj.vendor_ref.name }}</p>
+            {% endif %}
+
+            <!-- Budget Bar -->
+            {% if proj.budget %}
+            {% set spent = proj.total_spent %}
+            {% set pct = proj.budget_percent %}
+            <div class="mb-2">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-500">${{ "%.0f"|format(spent) }} spent</span>
+                    <span class="text-gray-500">${{ "%.0f"|format(proj.budget) }} budget</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full transition-all
+                        {% if pct > 90 %}bg-red-500
+                        {% elif pct > 70 %}bg-amber-500
+                        {% else %}bg-green-500
+                        {% endif %}" style="width: {{ pct }}%"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="flex items-center gap-4 text-xs text-gray-400 mt-3">
+                <span>{{ proj.work_orders|length }} work orders</span>
+                <span>{{ proj.invoices|length }} invoices</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
