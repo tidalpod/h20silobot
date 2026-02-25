@@ -51,7 +51,7 @@
         {% if invoice.work_order_ref %}
         <div class="flex justify-between">
             <span class="text-gray-500">Work Order</span>
-            <a href="/vendor/work-orders/{{ invoice.work_order_ref.id }}" class="text-green-600 hover:text-green-700">WO #{{ invoice.work_order_ref.id }} - {{ invoice.work_order_ref.title }}</a>
+            <a href="/vendor/work-orders/{{ invoice.work_order_ref.id }}" class="text-purple-700 hover:text-green-700">WO #{{ invoice.work_order_ref.id }} - {{ invoice.work_order_ref.title }}</a>
         </div>
         {% endif %}
         <div class="flex justify-between">

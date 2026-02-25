@@ -14,7 +14,7 @@
         text-overflow: ellipsis;
         cursor: pointer;
     }
-    .cal-today { background-color: #f0fdf4; border: 2px solid #22c55e; }
+    .cal-today { background-color: #faf5ff; border: 2px solid #7e22ce; }
 </style>
 {% endblock %}
 
@@ -95,7 +95,7 @@
             const dayEvents = events.filter(e => e.date === dateStr);
 
             html += `<div class="bg-white cal-day p-1 ${isToday ? 'cal-today' : ''} cursor-pointer hover:bg-gray-50" onclick="showDayEvents('${dateStr}', ${day})">`;
-            html += `<div class="text-xs font-medium ${isToday ? 'text-green-700' : 'text-gray-700'} mb-0.5">${day}</div>`;
+            html += `<div class="text-xs font-medium ${isToday ? 'text-purple-700' : 'text-gray-700'} mb-0.5">${day}</div>`;
 
             dayEvents.slice(0, 2).forEach(evt => {
                 const cls = statusColors[evt.status] || 'bg-gray-100 text-gray-700';

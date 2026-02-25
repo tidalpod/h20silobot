@@ -15,7 +15,7 @@
         border-radius: 1rem 1rem 1rem 0.25rem;
     }
     .msg-outbound {
-        background: #16a34a;
+        background: #6b21a8;
         color: white;
         border-radius: 1rem 1rem 0.25rem 1rem;
     }
@@ -37,8 +37,8 @@
 <div class="flex flex-col" style="height: calc(100vh - 180px);">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-4">
-        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
             </svg>
         </div>
@@ -76,10 +76,10 @@
         <form id="send-form" class="flex items-center gap-2">
             <input type="text" id="message-input"
                    placeholder="Type a message..."
-                   class="flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                   class="flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                    autocomplete="off">
             <button type="submit" id="send-btn"
-                    class="bg-green-600 hover:bg-green-700 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                    class="bg-purple-700 hover:bg-purple-800 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                 </svg>
@@ -166,7 +166,7 @@
                     <div class="msg-bubble ${bubbleClass} px-4 py-2.5">
                         ${label}
                         <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.body)}</p>
-                        <p class="text-xs mt-1 ${isFromMe ? 'text-green-200' : 'text-gray-400'} text-right">${formatTime(msg.created_at)}</p>
+                        <p class="text-xs mt-1 ${isFromMe ? 'text-purple-200' : 'text-gray-400'} text-right">${formatTime(msg.created_at)}</p>
                     </div>
                 </div>`;
             });

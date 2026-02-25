@@ -28,7 +28,7 @@
     <div class="portal-card p-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Title <span class="text-red-500">*</span></label>
         <input type="text" name="title" required
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm border px-3 py-2"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2"
             placeholder="e.g., Kitchen renovation - labor">
     </div>
 
@@ -38,7 +38,7 @@
         <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
             <input type="number" name="amount" step="0.01" min="0.01" required
-                class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm border pl-7 pr-3 py-2"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border pl-7 pr-3 py-2"
                 placeholder="0.00">
         </div>
     </div>
@@ -47,7 +47,7 @@
     <div class="portal-card p-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Property <span class="text-red-500">*</span></label>
         <select name="property_id" required
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm border px-3 py-2">
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
             <option value="">Select property...</option>
             {% for prop in properties %}
             <option value="{{ prop.id }}">{{ prop.address }}</option>
@@ -60,7 +60,7 @@
     <div class="portal-card p-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Link to Work Order <span class="text-gray-400 font-normal">(optional)</span></label>
         <select name="work_order_id"
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm border px-3 py-2">
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
             <option value="">None</option>
             {% for wo in work_orders %}
             <option value="{{ wo.id }}">WO #{{ wo.id }} - {{ wo.title }} ({{ wo.property_ref.address if wo.property_ref else '' }})</option>
@@ -73,7 +73,7 @@
     <div class="portal-card p-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
         <textarea name="description" rows="3"
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm border px-3 py-2"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2"
             placeholder="Describe the work performed..."></textarea>
     </div>
 
@@ -82,19 +82,19 @@
         <label class="block text-sm font-medium text-gray-700 mb-1">Attach File <span class="text-gray-400 font-normal">(optional)</span></label>
         <div class="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center" id="file-drop">
             <input type="file" name="file" accept=".pdf,image/*" id="file-input" class="hidden">
-            <button type="button" onclick="document.getElementById('file-input').click()" class="text-sm text-green-600 font-medium hover:text-green-700">
+            <button type="button" onclick="document.getElementById('file-input').click()" class="text-sm text-purple-700 font-medium hover:text-green-700">
                 <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
                 </svg>
                 Choose File
             </button>
             <p class="text-xs text-gray-400 mt-1">PDF or image, up to 20MB</p>
-            <p id="file-name" class="text-xs text-green-600 mt-2 hidden"></p>
+            <p id="file-name" class="text-xs text-purple-700 mt-2 hidden"></p>
         </div>
     </div>
 
     <!-- Submit -->
-    <button type="submit" class="w-full bg-green-600 text-white rounded-xl py-3 font-medium hover:bg-green-500 transition-colors text-base">
+    <button type="submit" class="w-full bg-purple-700 text-white rounded-xl py-3 font-medium hover:bg-purple-600 transition-colors text-base">
         Submit Invoice
     </button>
 </form>

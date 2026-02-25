@@ -14,7 +14,7 @@
 <!-- Stats Grid -->
 <div class="grid grid-cols-3 gap-3 mb-6">
     <div class="portal-card p-4 text-center">
-        <div class="text-2xl font-bold text-green-600">{{ active_wo_count }}</div>
+        <div class="text-2xl font-bold text-purple-700">{{ active_wo_count }}</div>
         <div class="text-xs text-gray-500 mt-1">Active Jobs</div>
     </div>
     <div class="portal-card p-4 text-center">
@@ -30,8 +30,8 @@
 <!-- Quick Actions -->
 <div class="grid grid-cols-2 gap-3 mb-6">
     <a href="/vendor/invoices/new" class="portal-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
         </div>
@@ -88,7 +88,7 @@
                 <span class="text-xs px-2 py-0.5 rounded-full
                     {% if inv.status.value == 'submitted' %}bg-amber-100 text-amber-700
                     {% elif inv.status.value == 'approved' %}bg-blue-100 text-blue-700
-                    {% elif inv.status.value == 'paid' %}bg-green-100 text-green-700
+                    {% elif inv.status.value == 'paid' %}bg-purple-100 text-green-700
                     {% elif inv.status.value == 'rejected' %}bg-red-100 text-red-700
                     {% endif %}">{{ inv.status.value|capitalize }}</span>
             </div>
