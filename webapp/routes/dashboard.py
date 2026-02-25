@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Property, WaterBill, BillStatus, Notification, Tenant,
-    WorkOrder, WorkOrderStatus, LeaseDocument, LeaseStatus
+    WorkOrder, WorkOrderStatus, WorkOrderPriority, LeaseDocument, LeaseStatus
 )
 from webapp.auth.dependencies import get_current_user
 
@@ -270,7 +270,7 @@ async def dashboard(request: Request):
         wo_emergency_result = await session.execute(
             select(func.count(WorkOrder.id)).where(
                 WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]),
-                WorkOrder.priority == "emergency",
+                WorkOrder.priority == WorkOrderPriority.EMERGENCY,
             )
         )
         emergency_work_orders = wo_emergency_result.scalar() or 0
