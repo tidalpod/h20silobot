@@ -104,41 +104,41 @@
                                 <span>Blue Deer</span>
                             </a>
                         </div>
-                        <div class="hidden md:block">
-                            <div class="ml-10 flex items-baseline space-x-1">
-                                <a href="/" class="{% if request.url.path == '/' %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                        <div class="hidden lg:block">
+                            <div class="ml-6 flex items-baseline space-x-0.5">
+                                <a href="/" class="{% if request.url.path == '/' %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>📊</span> Dashboard
                                 </a>
-                                <a href="/properties" class="{% if '/properties' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/properties" class="{% if '/properties' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>🏠</span> Properties
                                 </a>
-                                <a href="/tenants" class="{% if '/tenants' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/tenants" class="{% if '/tenants' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>👥</span> Tenants
                                 </a>
-                                <a href="/phas" class="{% if '/phas' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/phas" class="{% if '/phas' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>🏛️</span> PHAs
                                 </a>
-                                <a href="/inspections" class="{% if '/inspections' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/inspections" class="{% if '/inspections' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>📋</span> Inspections
                                 </a>
-                                <a href="/maintenance" class="{% if '/maintenance' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/maintenance" class="{% if '/maintenance' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>🔧</span> Maintenance
                                 </a>
-                                <a href="/leases" class="{% if '/leases' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/leases" class="{% if '/leases' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>📄</span> Leases
                                 </a>
-                                <a href="/notifications/chat" class="{% if '/notifications/chat' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                <a href="/notifications/chat" class="{% if '/notifications/chat' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors whitespace-nowrap">
                                     <span>💬</span> Messages
                                 </a>
                             </div>
                         </div>
                     </div>
-                    <div class="hidden md:block">
-                        <div class="ml-8 flex items-center gap-4">
+                    <div class="hidden lg:block">
+                        <div class="ml-4 flex items-center gap-3">
                             <!-- Public Site Link -->
-                            <a href="/listings" target="_blank" class="text-white/80 text-sm flex items-center gap-1.5 hover:text-white transition-colors" title="View public listings">
+                            <a href="/listings" target="_blank" class="text-white/80 text-xs flex items-center gap-1 hover:text-white transition-colors whitespace-nowrap" title="View public listings">
                                 <span>🌐</span>
-                                <span>Public Site</span>
+                                <span>Public</span>
                             </a>
                             <!-- Divider -->
                             <div class="h-6 w-px bg-white/30"></div>
@@ -171,7 +171,7 @@
                         </div>
                     </div>
                     <!-- Mobile menu button -->
-                    <div class="-mr-2 flex md:hidden">
+                    <div class="-mr-2 flex lg:hidden">
                         <button type="button" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="inline-flex items-center justify-center rounded-lg bg-white/20 p-2 text-white hover:bg-white/30 transition-colors">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -181,7 +181,7 @@
                 </div>
             </div>
             <!-- Mobile menu -->
-            <div class="md:hidden hidden" id="mobile-menu">
+            <div class="lg:hidden hidden" id="mobile-menu">
                 <div class="space-y-1 px-2 pb-3 pt-2 sm:px-3">
                     <a href="/" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📊 Dashboard</a>
                     <a href="/properties" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏠 Properties</a>
