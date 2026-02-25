@@ -373,11 +373,19 @@ async def vendor_invoice_form(request: Request):
         )
         work_orders = work_orders_result.scalars().all()
 
+    # Pre-fill from query params (when coming from work order detail)
+    prefill_work_order_id = request.query_params.get("work_order_id", "")
+    prefill_property_id = request.query_params.get("property_id", "")
+    prefill_title = request.query_params.get("title", "")
+
     return templates.TemplateResponse("vendor/invoice_form.html", {
         "request": request,
         "vendor": vendor,
         "properties": properties,
         "work_orders": work_orders,
+        "prefill_work_order_id": prefill_work_order_id,
+        "prefill_property_id": prefill_property_id,
+        "prefill_title": prefill_title,
     })
 
 

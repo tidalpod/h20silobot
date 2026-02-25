@@ -29,7 +29,8 @@
         <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Title <span class="text-red-500">*</span></label>
         <input type="text" name="title" required
             class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2"
-            placeholder="e.g., Kitchen renovation - labor">
+            placeholder="e.g., Kitchen renovation - labor"
+            value="{{ prefill_title or '' }}">
     </div>
 
     <!-- Amount -->
@@ -50,7 +51,7 @@
             class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
             <option value="">Select property...</option>
             {% for prop in properties %}
-            <option value="{{ prop.id }}">{{ prop.address }}</option>
+            <option value="{{ prop.id }}" {% if prefill_property_id and prefill_property_id|string == prop.id|string %}selected{% endif %}>{{ prop.address }}</option>
             {% endfor %}
         </select>
     </div>
@@ -63,7 +64,7 @@
             class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
             <option value="">None</option>
             {% for wo in work_orders %}
-            <option value="{{ wo.id }}">WO #{{ wo.id }} - {{ wo.title }} ({{ wo.property_ref.address if wo.property_ref else '' }})</option>
+            <option value="{{ wo.id }}" {% if prefill_work_order_id and prefill_work_order_id|string == wo.id|string %}selected{% endif %}>WO #{{ wo.id }} - {{ wo.title }} ({{ wo.property_ref.address if wo.property_ref else '' }})</option>
             {% endfor %}
         </select>
     </div>
