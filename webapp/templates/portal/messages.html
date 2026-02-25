@@ -1,0 +1,244 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Messages{% endblock %}
+
+{% block head %}
+<style>
+    .msg-bubble {
+        max-width: 80%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .msg-inbound {
+        background: #e5e7eb;
+        color: #1f2937;
+        border-radius: 1rem 1rem 1rem 0.25rem;
+    }
+    .msg-outbound {
+        background: #2563eb;
+        color: white;
+        border-radius: 1rem 1rem 0.25rem 1rem;
+    }
+    #chat-container {
+        height: calc(100vh - 220px);
+        overflow-y: auto;
+    }
+    #chat-container::-webkit-scrollbar {
+        width: 4px;
+    }
+    #chat-container::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col" style="height: calc(100vh - 180px);">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <span class="text-lg">💬</span>
+        </div>
+        <div>
+            <h1 class="text-lg font-bold text-gray-900">Messages</h1>
+            <p class="text-xs text-gray-500">Chat with Blue Deer Property Management</p>
+        </div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div id="chat-container" class="flex-1 overflow-y-auto portal-card p-4 mb-3 space-y-3">
+        <div id="messages-area">
+            <!-- Loading state -->
+            <div id="loading-state" class="flex items-center justify-center py-12">
+                <div class="text-center text-gray-400">
+                    <span class="text-3xl block mb-2">💬</span>
+                    <span class="text-sm">Loading messages...</span>
+                </div>
+            </div>
+        </div>
+        <div id="empty-state" class="hidden flex items-center justify-center py-12">
+            <div class="text-center text-gray-400">
+                <span class="text-4xl block mb-3">👋</span>
+                <p class="font-medium text-gray-600">No messages yet</p>
+                <p class="text-sm mt-1">Send a message to get started!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Send Input -->
+    <div class="portal-card p-3">
+        <form id="send-form" class="flex items-center gap-2">
+            <input type="text" id="message-input"
+                   placeholder="Type a message..."
+                   class="flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   autocomplete="off">
+            <button type="submit" id="send-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const messagesArea = document.getElementById('messages-area');
+    const chatContainer = document.getElementById('chat-container');
+    const emptyState = document.getElementById('empty-state');
+    const loadingState = document.getElementById('loading-state');
+    const sendForm = document.getElementById('send-form');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    let lastMessageCount = 0;
+
+    function formatTime(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const now = new Date();
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+
+        const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+        if (diffDays === 0) return time;
+        if (diffDays === 1) return 'Yesterday ' + time;
+        if (diffDays < 7) {
+            return date.toLocaleDateString([], { weekday: 'short' }) + ' ' + time;
+        }
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+    }
+
+    function scrollToBottom(smooth) {
+        chatContainer.scrollTo({
+            top: chatContainer.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto'
+        });
+    }
+
+    async function loadMessages() {
+        try {
+            const resp = await fetch('/portal/messages/conversation');
+            const data = await resp.json();
+
+            if (data.error) {
+                messagesArea.innerHTML = `
+                    <div class="flex items-center justify-center py-12">
+                        <div class="text-center text-gray-400">
+                            <span class="text-3xl block mb-2">⚠️</span>
+                            <p class="text-sm">${data.error}</p>
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            loadingState.classList.add('hidden');
+
+            if (!data.messages || data.messages.length === 0) {
+                messagesArea.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            // Only re-render if message count changed
+            if (data.messages.length === lastMessageCount) return;
+            lastMessageCount = data.messages.length;
+
+            let html = '';
+            let lastDate = '';
+
+            data.messages.forEach(msg => {
+                // Date separator
+                if (msg.created_at) {
+                    const msgDate = new Date(msg.created_at).toLocaleDateString();
+                    if (msgDate !== lastDate) {
+                        lastDate = msgDate;
+                        const dateLabel = new Date(msg.created_at).toLocaleDateString([], {
+                            weekday: 'long', month: 'short', day: 'numeric'
+                        });
+                        html += `<div class="text-center my-4">
+                            <span class="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">${dateLabel}</span>
+                        </div>`;
+                    }
+                }
+
+                // inbound = from tenant (right side, blue)
+                // outbound = from property mgmt (left side, gray)
+                const isFromMe = msg.direction === 'inbound';
+                const align = isFromMe ? 'justify-end' : 'justify-start';
+                const bubbleClass = isFromMe ? 'msg-outbound' : 'msg-inbound';
+                const label = isFromMe ? '' : '<span class="text-xs text-gray-400 mb-1 block">Blue Deer</span>';
+
+                html += `<div class="flex ${align}">
+                    <div class="msg-bubble ${bubbleClass} px-4 py-2.5">
+                        ${label}
+                        <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.body)}</p>
+                        <p class="text-xs mt-1 ${isFromMe ? 'text-blue-200' : 'text-gray-400'} text-right">${formatTime(msg.created_at)}</p>
+                    </div>
+                </div>`;
+            });
+
+            messagesArea.innerHTML = html;
+            scrollToBottom(true);
+
+        } catch (err) {
+            console.error('Failed to load messages:', err);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Send message
+    sendForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = messageInput.value.trim();
+        if (!body) return;
+
+        sendBtn.disabled = true;
+        messageInput.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('message', body);
+
+            const resp = await fetch('/portal/messages/send', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                messageInput.value = '';
+                lastMessageCount = 0; // Force refresh
+                await loadMessages();
+            } else {
+                alert(data.error || 'Failed to send message');
+            }
+        } catch (err) {
+            console.error('Send failed:', err);
+            alert('Failed to send message. Please try again.');
+        } finally {
+            sendBtn.disabled = false;
+            messageInput.disabled = false;
+            messageInput.focus();
+        }
+    });
+
+    // Initial load
+    loadMessages();
+
+    // Poll for new messages every 5 seconds
+    setInterval(loadMessages, 5000);
+
+    // Focus input on load
+    messageInput.focus();
+</script>
+{% endblock %}

@@ -70,6 +70,10 @@
                 <span class="block text-lg">🔧</span>
                 <span class="text-xs font-medium">Requests</span>
             </a>
+            <a href="/portal/messages" class="flex-1 py-3 text-center {% if '/portal/messages' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
+                <span class="block text-lg">💬</span>
+                <span class="text-xs font-medium">Messages</span>
+            </a>
             <a href="/portal/lease" class="flex-1 py-3 text-center {% if '/portal/lease' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
                 <span class="block text-lg">📄</span>
                 <span class="text-xs font-medium">Lease</span>

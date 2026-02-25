@@ -15,7 +15,7 @@ from database.connection import get_session
 from database.models import (
     Tenant, Property, WorkOrder, WorkOrderPhoto, WorkOrderStatus,
     WorkOrderPriority, WorkOrderCategory, LeaseDocument, LeaseStatus,
-    WaterBill,
+    WaterBill, SMSMessage, MessageDirection,
 )
 from webapp.auth.tenant_auth import get_current_tenant, login_tenant, logout_tenant
 from webapp.services.verification_service import send_verification_code, verify_code
@@ -410,3 +410,129 @@ async def portal_bills(request: Request):
         "tenant": tenant,
         "bills": bills,
     })
+
+
+# =============================================================================
+# Messages
+# =============================================================================
+
+def _normalize_phone(phone: str):
+    """Normalize phone number to E.164 format"""
+    if not phone:
+        return None
+    digits = ''.join(c for c in phone if c.isdigit() or c == '+')
+    if not digits:
+        return None
+    if digits.startswith('+'):
+        return digits
+    elif digits.startswith('1') and len(digits) == 11:
+        return f"+{digits}"
+    elif len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}"
+
+
+@router.get("/messages", response_class=HTMLResponse)
+async def portal_messages(request: Request):
+    """Tenant messaging - chat with property management"""
+    tenant = await get_current_tenant(request)
+    if not tenant:
+        return RedirectResponse(url="/portal/login", status_code=303)
+
+    return templates.TemplateResponse("portal/messages.html", {
+        "request": request,
+        "tenant": tenant,
+    })
+
+
+@router.get("/messages/conversation")
+async def portal_messages_conversation(request: Request):
+    """API: Get tenant's message history"""
+    tenant = await get_current_tenant(request)
+    if not tenant:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    async with get_session() as session:
+        # Get the tenant record for phone number
+        tenant_result = await session.execute(
+            select(Tenant).where(Tenant.id == tenant["id"])
+        )
+        tenant_record = tenant_result.scalar_one_or_none()
+
+        if not tenant_record or not tenant_record.phone:
+            return JSONResponse({"messages": [], "error": "No phone number on file"})
+
+        tenant_phone = _normalize_phone(tenant_record.phone)
+
+        # Get all messages for this tenant
+        from sqlalchemy import or_
+        result = await session.execute(
+            select(SMSMessage)
+            .where(
+                or_(
+                    SMSMessage.tenant_id == tenant["id"],
+                    SMSMessage.from_number == tenant_phone,
+                    SMSMessage.to_number == tenant_phone,
+                )
+            )
+            .order_by(SMSMessage.created_at.asc())
+        )
+        messages = result.scalars().all()
+
+        return JSONResponse({
+            "messages": [
+                {
+                    "id": msg.id,
+                    "body": msg.body,
+                    "direction": msg.direction.value,
+                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                }
+                for msg in messages
+            ]
+        })
+
+
+@router.post("/messages/send")
+async def portal_messages_send(request: Request):
+    """API: Send a message from tenant to property management"""
+    tenant = await get_current_tenant(request)
+    if not tenant:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    form = await request.form()
+    body = form.get("message", "").strip()
+    if not body:
+        return JSONResponse({"error": "Message cannot be empty"}, status_code=400)
+
+    async with get_session() as session:
+        # Get tenant record for phone
+        tenant_result = await session.execute(
+            select(Tenant).where(Tenant.id == tenant["id"])
+        )
+        tenant_record = tenant_result.scalar_one_or_none()
+
+        if not tenant_record or not tenant_record.phone:
+            return JSONResponse({"error": "No phone number on file"}, status_code=400)
+
+        tenant_phone = _normalize_phone(tenant_record.phone)
+
+        # Get our Twilio number
+        from webapp.services.twilio_service import twilio_service
+        our_phone = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "portal"
+
+        # Store as INBOUND message (tenant -> property management)
+        # This way it shows up in the admin chat as a message from the tenant
+        sms_message = SMSMessage(
+            tenant_id=tenant["id"],
+            property_id=tenant["property_id"],
+            from_number=tenant_phone,
+            to_number=our_phone,
+            body=body,
+            direction=MessageDirection.INBOUND,
+            status="received",
+            created_at=datetime.utcnow(),
+        )
+        session.add(sms_message)
+        await session.flush()
+
+        return JSONResponse({"success": True, "message_id": sms_message.id})
