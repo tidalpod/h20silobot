@@ -153,7 +153,7 @@ async def vendor_dashboard(request: Request):
         inv_result = await session.execute(
             select(func.count(Invoice.id)).where(
                 Invoice.vendor_id == vendor["id"],
-                Invoice.status == InvoiceStatus.SUBMITTED,
+                Invoice.status == InvoiceStatus.SUBMITTED.value,
             )
         )
         pending_invoices = inv_result.scalar() or 0
@@ -162,7 +162,7 @@ async def vendor_dashboard(request: Request):
         paid_result = await session.execute(
             select(func.sum(Invoice.amount)).where(
                 Invoice.vendor_id == vendor["id"],
-                Invoice.status == InvoiceStatus.PAID,
+                Invoice.status == InvoiceStatus.PAID.value,
             )
         )
         total_earned = paid_result.scalar() or 0
@@ -448,7 +448,7 @@ async def vendor_invoice_submit(request: Request):
             description=description,
             amount=amount_val,
             file_url=file_url,
-            status=InvoiceStatus.SUBMITTED,
+            status=InvoiceStatus.SUBMITTED.value,
             submitted_at=datetime.utcnow(),
         )
         session.add(invoice)

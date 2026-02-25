@@ -882,7 +882,7 @@ class Invoice(Base):
     file_url = Column(String(500), nullable=True)
 
     # Status
-    status = Column(Enum(InvoiceStatus), default=InvoiceStatus.SUBMITTED)
+    status = Column(String(20), default=InvoiceStatus.SUBMITTED.value)
 
     # Timestamps
     submitted_at = Column(DateTime, default=datetime.utcnow)
@@ -925,7 +925,7 @@ class Project(Base):
     # Project details
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(Enum(ProjectStatus), default=ProjectStatus.PLANNING)
+    status = Column(String(20), default=ProjectStatus.PLANNING.value)
     budget = Column(Numeric(10, 2), nullable=True)
 
     # Dates
@@ -957,7 +957,7 @@ class Project(Base):
         """Sum of approved/paid invoice amounts"""
         return sum(
             float(inv.amount) for inv in self.invoices
-            if inv.status in (InvoiceStatus.APPROVED, InvoiceStatus.PAID)
+            if inv.status in (InvoiceStatus.APPROVED.value, InvoiceStatus.PAID.value)
         ) if self.invoices else 0
 
     @property

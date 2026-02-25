@@ -98,7 +98,7 @@ async def project_create(request: Request):
             vendor_id=int(form["vendor_id"]) if form.get("vendor_id") else None,
             name=form["name"],
             description=form.get("description", ""),
-            status=ProjectStatus(form.get("status", "planning")),
+            status=form.get("status", "planning"),
             budget=float(form["budget"]) if form.get("budget") else None,
             start_date=start_date,
             end_date=end_date,
@@ -146,11 +146,11 @@ async def project_detail(request: Request, project_id: int):
     # Calculate budget stats
     total_spent = sum(
         float(inv.amount) for inv in project.invoices
-        if inv.status in (InvoiceStatus.APPROVED, InvoiceStatus.PAID)
+        if inv.status in (InvoiceStatus.APPROVED.value, InvoiceStatus.PAID.value)
     )
     total_paid = sum(
         float(inv.amount) for inv in project.invoices
-        if inv.status == InvoiceStatus.PAID
+        if inv.status == InvoiceStatus.PAID.value
     )
 
     return templates.TemplateResponse("projects/detail.html", {
@@ -219,7 +219,7 @@ async def project_update(request: Request, project_id: int):
         project.property_id = int(form["property_id"])
         project.vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
         project.description = form.get("description", "")
-        project.status = ProjectStatus(form.get("status", "planning"))
+        project.status = form.get("status", "planning")
         project.budget = float(form["budget"]) if form.get("budget") else None
 
         if form.get("start_date"):
@@ -232,7 +232,7 @@ async def project_update(request: Request, project_id: int):
         else:
             project.end_date = None
 
-        if project.status == ProjectStatus.COMPLETED and not project.completed_date:
+        if project.status == ProjectStatus.COMPLETED.value and not project.completed_date:
             project.completed_date = date.today()
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

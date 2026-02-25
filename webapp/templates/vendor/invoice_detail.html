@@ -10,21 +10,21 @@
 
 <!-- Status Banner -->
 <div class="portal-card p-4 mb-4
-    {% if invoice.status.value == 'submitted' %}border-l-4 border-l-amber-400
-    {% elif invoice.status.value == 'approved' %}border-l-4 border-l-blue-400
-    {% elif invoice.status.value == 'paid' %}border-l-4 border-l-green-400
-    {% elif invoice.status.value == 'rejected' %}border-l-4 border-l-red-400
+    {% if invoice.status == 'submitted' %}border-l-4 border-l-amber-400
+    {% elif invoice.status == 'approved' %}border-l-4 border-l-blue-400
+    {% elif invoice.status == 'paid' %}border-l-4 border-l-green-400
+    {% elif invoice.status == 'rejected' %}border-l-4 border-l-red-400
     {% endif %}">
     <div class="flex items-center justify-between">
         <div>
             <span class="text-xs text-gray-400">Status</span>
             <div class="flex items-center gap-2 mt-0.5">
                 <span class="text-sm font-semibold
-                    {% if invoice.status.value == 'submitted' %}text-amber-700
-                    {% elif invoice.status.value == 'approved' %}text-blue-700
-                    {% elif invoice.status.value == 'paid' %}text-green-700
-                    {% elif invoice.status.value == 'rejected' %}text-red-700
-                    {% endif %}">{{ invoice.status.value|capitalize }}</span>
+                    {% if invoice.status == 'submitted' %}text-amber-700
+                    {% elif invoice.status == 'approved' %}text-blue-700
+                    {% elif invoice.status == 'paid' %}text-green-700
+                    {% elif invoice.status == 'rejected' %}text-red-700
+                    {% endif %}">{{ invoice.status|capitalize }}</span>
             </div>
         </div>
         <div class="text-right">

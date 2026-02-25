@@ -21,11 +21,11 @@
                         <p class="text-sm text-gray-500">Invoice #{{ invoice.id }}</p>
                     </div>
                     <span class="text-xs px-3 py-1 rounded-full font-semibold
-                        {% if invoice.status.value == 'submitted' %}bg-amber-100 text-amber-700
-                        {% elif invoice.status.value == 'approved' %}bg-blue-100 text-blue-700
-                        {% elif invoice.status.value == 'paid' %}bg-green-100 text-green-700
-                        {% elif invoice.status.value == 'rejected' %}bg-red-100 text-red-700
-                        {% endif %}">{{ invoice.status.value|upper }}</span>
+                        {% if invoice.status == 'submitted' %}bg-amber-100 text-amber-700
+                        {% elif invoice.status == 'approved' %}bg-blue-100 text-blue-700
+                        {% elif invoice.status == 'paid' %}bg-green-100 text-green-700
+                        {% elif invoice.status == 'rejected' %}bg-red-100 text-red-700
+                        {% endif %}">{{ invoice.status|upper }}</span>
                 </div>
 
                 <div class="text-3xl font-bold text-gray-900 mb-4">${{ "%.2f"|format(invoice.amount) }}</div>
@@ -103,7 +103,7 @@
 
         <!-- Actions Sidebar -->
         <div class="space-y-4">
-            {% if invoice.status.value == 'submitted' %}
+            {% if invoice.status == 'submitted' %}
             <!-- Approve -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Approve Invoice</h3>
@@ -129,7 +129,7 @@
             </div>
             {% endif %}
 
-            {% if invoice.status.value == 'approved' %}
+            {% if invoice.status == 'approved' %}
             <!-- Mark Paid -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Mark as Paid</h3>

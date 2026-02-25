@@ -53,7 +53,7 @@ async def invoice_list(request: Request):
         )
 
         if status_filter:
-            query = query.where(Invoice.status == InvoiceStatus(status_filter))
+            query = query.where(Invoice.status == status_filter)
         if vendor_filter:
             query = query.where(Invoice.vendor_id == int(vendor_filter))
         if property_filter:
@@ -79,7 +79,7 @@ async def invoice_list(request: Request):
         total_amount = total_result.scalar() or 0
 
         pending_result = await session.execute(
-            select(func.sum(Invoice.amount)).where(Invoice.status == InvoiceStatus.SUBMITTED)
+            select(func.sum(Invoice.amount)).where(Invoice.status == InvoiceStatus.SUBMITTED.value)
         )
         pending_amount = pending_result.scalar() or 0
 
@@ -169,7 +169,7 @@ async def invoice_create(request: Request):
             description=form.get("description", ""),
             amount=float(form["amount"]),
             file_url=file_url,
-            status=InvoiceStatus(form.get("status", "submitted")),
+            status=form.get("status", "submitted"),
             submitted_at=datetime.utcnow(),
             notes=form.get("notes", ""),
         )
@@ -224,7 +224,7 @@ async def invoice_approve(request: Request, invoice_id: int):
         )
         invoice = result.scalar_one_or_none()
         if invoice:
-            invoice.status = InvoiceStatus.APPROVED
+            invoice.status = InvoiceStatus.APPROVED.value
             invoice.approved_at = datetime.utcnow()
             if form.get("notes"):
                 invoice.notes = form["notes"]
@@ -247,7 +247,7 @@ async def invoice_reject(request: Request, invoice_id: int):
         )
         invoice = result.scalar_one_or_none()
         if invoice:
-            invoice.status = InvoiceStatus.REJECTED
+            invoice.status = InvoiceStatus.REJECTED.value
             invoice.rejected_at = datetime.utcnow()
             invoice.notes = form.get("notes", "")
 
@@ -269,7 +269,7 @@ async def invoice_mark_paid(request: Request, invoice_id: int):
         )
         invoice = result.scalar_one_or_none()
         if invoice:
-            invoice.status = InvoiceStatus.PAID
+            invoice.status = InvoiceStatus.PAID.value
             invoice.paid_at = datetime.utcnow()
             if form.get("notes"):
                 invoice.notes = form["notes"]
