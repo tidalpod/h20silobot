@@ -47,6 +47,13 @@
             </div>
         </div>
         <div class="flex gap-3">
+            {% if wo.vendor_ref and wo.vendor_ref.phone %}
+            <form method="POST" action="/maintenance/{{ wo.id }}/notify-vendor">
+                <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors">
+                    <span class="mr-2">📱</span> SMS Vendor
+                </button>
+            </form>
+            {% endif %}
             <a href="/maintenance/{{ wo.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
                 <span class="mr-2">✏️</span> Edit
             </a>
@@ -61,6 +68,16 @@
 {% endblock %}
 
 {% block content %}
+{% set sms_status = request.query_params.get('sms', '') %}
+{% if sms_status == 'sent' %}
+<div class="mb-4 bg-green-50 text-green-700 text-sm rounded-lg p-3 flex items-center gap-2">
+    <span>📱</span> SMS notification sent to vendor successfully.
+</div>
+{% elif sms_status == 'failed' %}
+<div class="mb-4 bg-red-50 text-red-700 text-sm rounded-lg p-3 flex items-center gap-2">
+    <span>⚠️</span> Failed to send SMS to vendor. Check their phone number.
+</div>
+{% endif %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Main Content -->
     <div class="lg:col-span-2 space-y-6">

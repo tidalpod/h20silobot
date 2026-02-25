@@ -1,5 +1,6 @@
 """Maintenance / Work Order routes"""
 
+import logging
 import os
 import uuid
 from datetime import datetime, date
@@ -17,8 +18,11 @@ from database.models import (
     WorkOrderCategory, Vendor, Property, Tenant
 )
 from webapp.auth.dependencies import get_current_user
+from webapp.services.twilio_service import twilio_service
 
 router = APIRouter(tags=["maintenance"])
+
+logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -30,6 +34,49 @@ UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
 )
 UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+async def _notify_vendor_sms(vendor_id: int, wo, session):
+    """Send SMS to vendor about a work order assignment"""
+    result = await session.execute(
+        select(Vendor).where(Vendor.id == vendor_id)
+    )
+    vendor = result.scalar_one_or_none()
+    if not vendor or not vendor.phone:
+        return False
+
+    # Build property address
+    prop_addr = ""
+    if wo.property_ref:
+        prop_addr = wo.property_ref.address
+    elif wo.property_id:
+        prop_result = await session.execute(
+            select(Property).where(Property.id == wo.property_id)
+        )
+        prop = prop_result.scalar_one_or_none()
+        prop_addr = prop.address if prop else ""
+
+    priority_label = wo.priority.value.title() if wo.priority else "Normal"
+    scheduled = wo.scheduled_date.strftime('%b %d, %Y') if wo.scheduled_date else "TBD"
+
+    msg = (
+        f"Blue Deer - New Work Order Assigned\n\n"
+        f"Title: {wo.title}\n"
+        f"Property: {prop_addr}\n"
+        f"Priority: {priority_label}\n"
+        f"Scheduled: {scheduled}\n"
+    )
+    if wo.description:
+        desc_short = wo.description[:100] + ("..." if len(wo.description) > 100 else "")
+        msg += f"Details: {desc_short}\n"
+    msg += f"\nView in portal: https://bluedeer.space/vendor/work-orders/{wo.id}"
+
+    sms_result = await twilio_service.send_sms(vendor.phone, msg)
+    if sms_result.success:
+        logger.info(f"Vendor SMS sent to {vendor.name} for WO #{wo.id}")
+    else:
+        logger.error(f"Failed to SMS vendor {vendor.name}: {sms_result.error_message}")
+    return sms_result.success
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -277,6 +324,10 @@ async def create_work_order(request: Request):
         await session.flush()
         wo_id = wo.id
 
+        # Send SMS to vendor if assigned and checkbox checked
+        if wo.vendor_id and form.get("notify_vendor"):
+            await _notify_vendor_sms(wo.vendor_id, wo, session)
+
     return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
 
 
@@ -382,15 +433,20 @@ async def update_work_order(request: Request, wo_id: int):
 
     async with get_session() as session:
         result = await session.execute(
-            select(WorkOrder).where(WorkOrder.id == wo_id)
+            select(WorkOrder)
+            .where(WorkOrder.id == wo_id)
+            .options(selectinload(WorkOrder.property_ref))
         )
         wo = result.scalar_one_or_none()
         if not wo:
             return RedirectResponse(url="/maintenance", status_code=303)
 
+        old_vendor_id = wo.vendor_id
+        new_vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
+
         wo.property_id = int(form["property_id"])
         wo.tenant_id = int(form["tenant_id"]) if form.get("tenant_id") else None
-        wo.vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
+        wo.vendor_id = new_vendor_id
         wo.title = form["title"]
         wo.description = form.get("description", "")
         wo.category = WorkOrderCategory(form.get("category", "general"))
@@ -409,7 +465,33 @@ async def update_work_order(request: Request, wo_id: int):
 
         wo.updated_at = datetime.utcnow()
 
+        # Notify vendor if newly assigned or reassigned and checkbox checked
+        if new_vendor_id and form.get("notify_vendor") and new_vendor_id != old_vendor_id:
+            await _notify_vendor_sms(new_vendor_id, wo, session)
+
     return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
+
+
+@router.post("/{wo_id}/notify-vendor")
+async def notify_vendor(request: Request, wo_id: int):
+    """Manually send SMS notification to assigned vendor"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkOrder)
+            .where(WorkOrder.id == wo_id)
+            .options(selectinload(WorkOrder.property_ref))
+        )
+        wo = result.scalar_one_or_none()
+        if not wo or not wo.vendor_id:
+            return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
+
+        sent = await _notify_vendor_sms(wo.vendor_id, wo, session)
+
+    return RedirectResponse(url=f"/maintenance/{wo_id}?sms={'sent' if sent else 'failed'}", status_code=303)
 
 
 @router.post("/{wo_id}/status")

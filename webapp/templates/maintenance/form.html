@@ -90,6 +90,15 @@
                 </div>
             </div>
 
+            <!-- Notify Vendor -->
+            <div id="notify-vendor-row" class="hidden">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="notify_vendor" value="1" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm font-medium text-gray-700">📱 Send SMS notification to vendor</span>
+                    <span class="text-xs text-gray-400" id="notify-vendor-phone"></span>
+                </label>
+            </div>
+
             <!-- Description -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -146,4 +155,32 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const vendorSelect = document.querySelector('select[name="vendor_id"]');
+    const notifyRow = document.getElementById('notify-vendor-row');
+    const notifyPhone = document.getElementById('notify-vendor-phone');
+
+    // Vendor phone lookup
+    const vendorPhones = {
+        {% for v in vendors %}
+        {{ v.id }}: "{{ v.phone or '' }}",
+        {% endfor %}
+    };
+
+    function updateNotifyRow() {
+        const vid = vendorSelect.value;
+        if (vid && vendorPhones[vid]) {
+            notifyRow.classList.remove('hidden');
+            notifyPhone.textContent = '(' + vendorPhones[vid] + ')';
+        } else {
+            notifyRow.classList.add('hidden');
+        }
+    }
+
+    vendorSelect.addEventListener('change', updateNotifyRow);
+    updateNotifyRow();
+</script>
 {% endblock %}
