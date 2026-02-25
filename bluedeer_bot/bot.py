@@ -1,7 +1,7 @@
 """Blue Deer Bot - Property management notifications via Telegram"""
 
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, List
 from decimal import Decimal
 
@@ -81,6 +81,8 @@ class BlueDeerBot:
             BotCommand("inspections", "🏗️ Upcoming inspections"),
             BotCommand("recerts", "📅 Upcoming recertifications"),
             BotCommand("bills", "💧 Water bill alerts"),
+            BotCommand("maintenance", "🔧 Open work orders"),
+            BotCommand("leases", "📄 Expiring leases"),
             BotCommand("notify", "🔔 Send test notification"),
             BotCommand("help", "❓ Help & commands"),
         ]
@@ -147,6 +149,23 @@ class BlueDeerBot:
             CronTrigger(hour=7, minute=0),
             id="inspection_reminders",
             name="Inspection reminders"
+        )
+
+        # New work order alerts every 5 minutes
+        self.scheduler.add_job(
+            self.send_new_work_order_alerts,
+            'interval',
+            minutes=5,
+            id="work_order_alerts",
+            name="New work order alerts"
+        )
+
+        # Lease expiry alerts at 8:30 AM daily
+        self.scheduler.add_job(
+            self.send_lease_expiry_alerts,
+            CronTrigger(hour=8, minute=30),
+            id="lease_expiry_alerts",
+            name="Lease expiry alerts"
         )
 
         logger.info("Scheduled jobs configured")
@@ -657,6 +676,236 @@ class BlueDeerBot:
 
         except Exception as e:
             logger.error(f"Error getting recerts summary: {e}")
+            return f"Error: {str(e)}"
+
+    async def send_new_work_order_alerts(self):
+        """Send alerts for work orders created in the last 5 minutes"""
+        if not self.db_available:
+            return
+
+        try:
+            from database.connection import get_session
+            from database.models import WorkOrder, WorkOrderStatus, WorkOrderPriority
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            cutoff = datetime.now() - timedelta(minutes=5)
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(WorkOrder)
+                    .where(
+                        WorkOrder.status == WorkOrderStatus.NEW,
+                        WorkOrder.created_at >= cutoff,
+                    )
+                    .options(selectinload(WorkOrder.property_ref))
+                )
+                new_orders = result.scalars().all()
+
+                if new_orders:
+                    message = "🔧 *New Work Orders*\n\n"
+                    for wo in new_orders:
+                        priority_icon = "🚨" if wo.priority == WorkOrderPriority.EMERGENCY else "🔧"
+                        addr = wo.property_ref.address if wo.property_ref else "Unknown"
+                        message += f"{priority_icon} *{wo.title}*\n"
+                        message += f"  📍 {addr}\n"
+                        message += f"  📋 {wo.category.value.replace('_', ' ').title() if wo.category else 'General'}\n"
+                        if wo.submitted_by_tenant:
+                            message += f"  👤 Submitted by tenant\n"
+                        message += "\n"
+
+                    await self.send_notification(message)
+                    logger.info(f"Sent {len(new_orders)} new work order alerts")
+
+        except Exception as e:
+            logger.error(f"Error sending work order alerts: {e}")
+
+    async def send_lease_expiry_alerts(self):
+        """Send alerts for leases expiring within 30/60/90 days"""
+        if not self.db_available:
+            return
+
+        try:
+            from database.connection import get_session
+            from database.models import LeaseDocument, LeaseStatus
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            today = date.today()
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(LeaseDocument)
+                    .where(
+                        LeaseDocument.status == LeaseStatus.ACTIVE,
+                        LeaseDocument.lease_end != None,
+                    )
+                    .options(
+                        selectinload(LeaseDocument.property_ref),
+                        selectinload(LeaseDocument.tenant_ref),
+                    )
+                )
+                leases = result.scalars().all()
+
+                alerts = []
+                for lease in leases:
+                    if lease.lease_end:
+                        days_until = (lease.lease_end - today).days
+                        if days_until in (90, 60, 30, 14, 7, 3, 1, 0):
+                            alerts.append({
+                                "property": lease.property_ref.address if lease.property_ref else "Unknown",
+                                "tenant": lease.tenant_ref.name if lease.tenant_ref else "Unknown",
+                                "lease_end": lease.lease_end,
+                                "days_until": days_until,
+                            })
+
+                if alerts:
+                    alerts.sort(key=lambda x: x["days_until"])
+                    message = "📄 *Lease Expiry Alerts*\n\n"
+                    for a in alerts:
+                        if a["days_until"] == 0:
+                            urgency = "🚨 *EXPIRES TODAY*"
+                        elif a["days_until"] <= 7:
+                            urgency = f"🔴 {a['days_until']} days"
+                        elif a["days_until"] <= 30:
+                            urgency = f"🟡 {a['days_until']} days"
+                        else:
+                            urgency = f"🟢 {a['days_until']} days"
+
+                        message += f"• *{a['property']}*\n"
+                        message += f"  👤 {a['tenant']}\n"
+                        message += f"  📅 Expires {a['lease_end'].strftime('%b %d, %Y')} ({urgency})\n\n"
+
+                    await self.send_notification(message)
+                    logger.info(f"Sent {len(alerts)} lease expiry alerts")
+
+        except Exception as e:
+            logger.error(f"Error sending lease expiry alerts: {e}")
+
+    async def get_maintenance_summary(self) -> str:
+        """Get summary of open work orders"""
+        if not self.db_available:
+            return "Database not available"
+
+        try:
+            from database.connection import get_session
+            from database.models import WorkOrder, WorkOrderStatus, WorkOrderPriority
+            from sqlalchemy import select, func
+            from sqlalchemy.orm import selectinload
+
+            async with get_session() as session:
+                # Count by status
+                status_counts = {}
+                for s in WorkOrderStatus:
+                    result = await session.execute(
+                        select(func.count(WorkOrder.id)).where(WorkOrder.status == s)
+                    )
+                    status_counts[s.value] = result.scalar() or 0
+
+                open_statuses = [WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]
+                result = await session.execute(
+                    select(WorkOrder)
+                    .where(WorkOrder.status.in_(open_statuses))
+                    .options(selectinload(WorkOrder.property_ref))
+                    .order_by(WorkOrder.created_at.desc())
+                )
+                open_orders = result.scalars().all()
+
+                total_open = sum(status_counts.get(s.value, 0) for s in open_statuses)
+
+                message = f"🔧 *Work Orders Summary*\n\n"
+                message += f"*Open:* {total_open}\n"
+                message += f"  🆕 New: {status_counts.get('new', 0)}\n"
+                message += f"  📋 Assigned: {status_counts.get('assigned', 0)}\n"
+                message += f"  🔨 In Progress: {status_counts.get('in_progress', 0)}\n"
+                message += f"  ✅ Completed: {status_counts.get('completed', 0)}\n"
+                message += f"  🔒 Closed: {status_counts.get('closed', 0)}\n\n"
+
+                if open_orders:
+                    message += "*Open Work Orders:*\n"
+                    for wo in open_orders[:10]:
+                        priority = "🚨" if wo.priority == WorkOrderPriority.EMERGENCY else "🔴" if wo.priority == WorkOrderPriority.HIGH else "🔧"
+                        addr = wo.property_ref.address[:25] if wo.property_ref else "Unknown"
+                        message += f"• {priority} {wo.title}\n"
+                        message += f"  📍 {addr}\n\n"
+
+                    if len(open_orders) > 10:
+                        message += f"_...and {len(open_orders) - 10} more_"
+                else:
+                    message += "_No open work orders_"
+
+                return message
+
+        except Exception as e:
+            logger.error(f"Error getting maintenance summary: {e}")
+            return f"Error: {str(e)}"
+
+    async def get_leases_summary(self) -> str:
+        """Get summary of expiring leases"""
+        if not self.db_available:
+            return "Database not available"
+
+        try:
+            from database.connection import get_session
+            from database.models import LeaseDocument, LeaseStatus
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            today = date.today()
+
+            async with get_session() as session:
+                result = await session.execute(
+                    select(LeaseDocument)
+                    .where(
+                        LeaseDocument.status == LeaseStatus.ACTIVE,
+                        LeaseDocument.lease_end != None,
+                    )
+                    .options(
+                        selectinload(LeaseDocument.property_ref),
+                        selectinload(LeaseDocument.tenant_ref),
+                    )
+                )
+                leases = result.scalars().all()
+
+                expiring = []
+                for lease in leases:
+                    if lease.lease_end:
+                        days_until = (lease.lease_end - today).days
+                        if days_until <= 90:
+                            expiring.append({
+                                "property": lease.property_ref.address if lease.property_ref else "Unknown",
+                                "tenant": lease.tenant_ref.name if lease.tenant_ref else "Unknown",
+                                "lease_end": lease.lease_end,
+                                "days_until": days_until,
+                            })
+
+                expiring.sort(key=lambda x: x["days_until"])
+
+                if not expiring:
+                    return "📄 *Expiring Leases*\n\n_No leases expiring within 90 days._"
+
+                message = f"📄 *Expiring Leases* ({len(expiring)})\n\n"
+                for e in expiring[:10]:
+                    if e["days_until"] <= 0:
+                        urgency = "🚨 *EXPIRED*"
+                    elif e["days_until"] <= 7:
+                        urgency = f"🔴 {e['days_until']} days"
+                    elif e["days_until"] <= 30:
+                        urgency = f"🟡 {e['days_until']} days"
+                    else:
+                        urgency = f"🟢 {e['days_until']} days"
+
+                    message += f"• *{e['property']}*\n"
+                    message += f"  👤 {e['tenant']}\n"
+                    message += f"  📅 {e['lease_end'].strftime('%b %d, %Y')} ({urgency})\n\n"
+
+                if len(expiring) > 10:
+                    message += f"_...and {len(expiring) - 10} more_"
+
+                return message
+
+        except Exception as e:
+            logger.error(f"Error getting leases summary: {e}")
             return f"Error: {str(e)}"
 
     async def get_bills_summary(self) -> str:

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lease.title }}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                <a href="/leases" class="hover:text-gray-700">Leases</a>
+                <span>/</span>
+                <span class="text-gray-900">{{ lease.title }}</span>
+            </nav>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                <span>📄</span> {{ lease.title }}
+            </h1>
+            <div class="mt-2 flex flex-wrap gap-2">
+                {% if lease.status.value == 'active' %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                {% elif lease.status.value == 'expiring_soon' %}
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Expiring Soon</span>
+                {% elif lease.status.value == 'expired' %}
+                <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Expired</span>
+                {% elif lease.status.value == 'renewed' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Renewed</span>
+                {% elif lease.status.value == 'terminated' %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Terminated</span>
+                {% endif %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">{{ lease.file_type|upper }}</span>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <a href="/leases/{{ lease.id }}/download" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors">
+                <span class="mr-2">⬇️</span> Download
+            </a>
+            <a href="/leases/{{ lease.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+                <span class="mr-2">✏️</span> Edit
+            </a>
+            {% if lease.status.value != 'terminated' %}
+            <form method="POST" action="/leases/{{ lease.id }}/delete" class="inline" onsubmit="return confirm('Terminate this lease?')">
+                <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-500 transition-colors">
+                    Terminate
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Metadata -->
+    <div class="space-y-6">
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Lease Details</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-xs text-gray-500">Property</dt>
+                    <dd class="text-sm font-medium text-gray-900">
+                        {% if lease.property_ref %}<a href="/properties/{{ lease.property_ref.id }}" class="text-blue-600 hover:underline">{{ lease.property_ref.address }}</a>{% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Tenant</dt>
+                    <dd class="text-sm text-gray-900">{{ lease.tenant_ref.name if lease.tenant_ref else '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Monthly Rent</dt>
+                    <dd class="text-sm font-medium text-gray-900">{% if lease.monthly_rent %}${{ "{:,.2f}".format(lease.monthly_rent) }}{% else %}—{% endif %}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Lease Period</dt>
+                    <dd class="text-sm text-gray-900">
+                        {% if lease.lease_start and lease.lease_end %}
+                        {{ lease.lease_start.strftime('%b %d, %Y') }} &mdash; {{ lease.lease_end.strftime('%b %d, %Y') }}
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">File</dt>
+                    <dd class="text-sm text-gray-900">{{ lease.file_type|upper }}{% if lease.file_size %} &middot; {{ "%.1f"|format(lease.file_size / 1024 / 1024) }}MB{% endif %}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Uploaded</dt>
+                    <dd class="text-sm text-gray-900">{{ lease.created_at.strftime('%b %d, %Y') }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        {% if lease.notes %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
+            <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ lease.notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- PDF Viewer -->
+    <div class="lg:col-span-2">
+        {% if lease.file_type == 'pdf' %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Document Preview</h2>
+                <a href="/leases/{{ lease.id }}/download" class="text-sm text-blue-600 hover:text-blue-500">Download PDF</a>
+            </div>
+            <iframe src="{{ lease.file_url }}" class="w-full" style="height: 800px;" frameborder="0"></iframe>
+        </div>
+        {% else %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-12 text-center">
+            <span class="text-4xl">📄</span>
+            <h3 class="mt-3 text-lg font-semibold text-gray-900">Preview not available</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ lease.file_type|upper }} files cannot be previewed. Download to view.</p>
+            <a href="/leases/{{ lease.id }}/download" class="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+                <span class="mr-2">⬇️</span> Download
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

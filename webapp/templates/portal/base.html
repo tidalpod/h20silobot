@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Tenant Portal{% endblock %} | Blue Deer</title>
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe',
+                            300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6',
+                            600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+            min-height: 100vh;
+        }
+        .portal-card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full pb-20">
+    <!-- Top Header -->
+    {% if tenant %}
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain">
+                <span class="font-bold text-gray-900">Blue Deer</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-gray-600">{{ tenant.name }}</span>
+                <a href="/portal/logout" class="text-xs text-red-500 hover:text-red-700">Logout</a>
+            </div>
+        </div>
+    </header>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="max-w-lg mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Navigation -->
+    {% if tenant %}
+    <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-50">
+        <div class="max-w-lg mx-auto flex">
+            <a href="/portal" class="flex-1 py-3 text-center {% if request.url.path == '/portal' or request.url.path == '/portal/' %}text-blue-600{% else %}text-gray-500{% endif %}">
+                <span class="block text-lg">🏠</span>
+                <span class="text-xs font-medium">Home</span>
+            </a>
+            <a href="/portal/maintenance" class="flex-1 py-3 text-center {% if '/portal/maintenance' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
+                <span class="block text-lg">🔧</span>
+                <span class="text-xs font-medium">Requests</span>
+            </a>
+            <a href="/portal/lease" class="flex-1 py-3 text-center {% if '/portal/lease' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
+                <span class="block text-lg">📄</span>
+                <span class="text-xs font-medium">Lease</span>
+            </a>
+            <a href="/portal/bills" class="flex-1 py-3 text-center {% if '/portal/bills' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
+                <span class="block text-lg">💧</span>
+                <span class="text-xs font-medium">Bills</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

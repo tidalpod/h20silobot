@@ -1,0 +1,90 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome -->
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Welcome, {{ tenant.name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ tenant.property_address or 'Your property' }}</p>
+</div>
+
+<!-- Property Info Card -->
+{% if property %}
+<div class="portal-card p-5 mb-4">
+    <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+            <span class="text-lg">🏠</span>
+        </div>
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Your Property</h2>
+            <p class="text-xs text-gray-500">{{ property.address }}</p>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+        {% if property.city %}
+        <div>
+            <span class="text-gray-500">City</span>
+            <p class="font-medium text-gray-900">{{ property.city }}, {{ property.state }}</p>
+        </div>
+        {% endif %}
+        {% if property.property_type %}
+        <div>
+            <span class="text-gray-500">Type</span>
+            <p class="font-medium text-gray-900">{{ property.property_type }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Stats -->
+<div class="grid grid-cols-2 gap-3 mb-4">
+    <!-- Open Requests -->
+    <a href="/portal/maintenance" class="portal-card p-4 text-center hover:shadow-md transition-shadow">
+        <span class="text-2xl">🔧</span>
+        <p class="text-2xl font-bold text-gray-900 mt-1">{{ open_requests }}</p>
+        <p class="text-xs text-gray-500">Open Requests</p>
+    </a>
+
+    <!-- Lease Status -->
+    <a href="/portal/lease" class="portal-card p-4 text-center hover:shadow-md transition-shadow">
+        <span class="text-2xl">📄</span>
+        {% if active_lease and active_lease.lease_end %}
+        <p class="text-sm font-bold text-gray-900 mt-1">{{ active_lease.lease_end.strftime('%b %d, %Y') }}</p>
+        <p class="text-xs text-gray-500">Lease Expires</p>
+        {% else %}
+        <p class="text-sm font-medium text-gray-500 mt-1">—</p>
+        <p class="text-xs text-gray-500">No Active Lease</p>
+        {% endif %}
+    </a>
+</div>
+
+<!-- Latest Water Bill -->
+{% if latest_bill %}
+<div class="portal-card p-5 mb-4">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <span class="text-lg">💧</span>
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900">Latest Water Bill</h2>
+                <p class="text-xs text-gray-500">
+                    {% if latest_bill.due_date %}Due {{ latest_bill.due_date.strftime('%b %d, %Y') }}{% else %}Statement{% endif %}
+                </p>
+            </div>
+        </div>
+        <p class="text-lg font-bold {% if latest_bill.amount_due and latest_bill.amount_due > 0 %}text-blue-600{% else %}text-green-600{% endif %}">
+            {% if latest_bill.amount_due %}${{ "{:,.2f}".format(latest_bill.amount_due) }}{% else %}$0.00{% endif %}
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Action -->
+<a href="/portal/maintenance/new" class="block portal-card p-4 bg-blue-600 text-white text-center hover:bg-blue-500 transition-colors">
+    <span class="text-lg mr-2">➕</span>
+    <span class="font-medium">Submit Maintenance Request</span>
+</a>
+{% endblock %}

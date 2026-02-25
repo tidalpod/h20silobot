@@ -1,0 +1,53 @@
+{% extends "portal/base.html" %}
+
+{% block title %}My Requests{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-bold text-gray-900">Maintenance Requests</h1>
+    <a href="/portal/maintenance/new" class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        <span class="mr-1">➕</span> New
+    </a>
+</div>
+
+{% if work_orders %}
+<div class="space-y-3">
+    {% for wo in work_orders %}
+    <a href="/portal/maintenance/{{ wo.id }}" class="block portal-card p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-900 truncate mr-2">{{ wo.title }}</h3>
+            {% if wo.status.value == 'new' %}
+            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 flex-shrink-0">New</span>
+            {% elif wo.status.value == 'assigned' %}
+            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 flex-shrink-0">Assigned</span>
+            {% elif wo.status.value == 'in_progress' %}
+            <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 flex-shrink-0">In Progress</span>
+            {% elif wo.status.value == 'completed' %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 flex-shrink-0">Completed</span>
+            {% elif wo.status.value == 'closed' %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 flex-shrink-0">Closed</span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3 text-xs text-gray-500">
+            <span>{{ wo.category.value.replace('_', ' ').title() if wo.category else '' }}</span>
+            <span>&middot;</span>
+            <span>{{ wo.created_at.strftime('%b %d, %Y') }}</span>
+            {% if wo.photos %}
+            <span>&middot;</span>
+            <span>📷 {{ wo.photos|length }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="portal-card p-8 text-center">
+    <span class="text-3xl">🔧</span>
+    <h3 class="mt-2 text-sm font-semibold text-gray-900">No requests yet</h3>
+    <p class="mt-1 text-xs text-gray-500">Submit a maintenance request when you need something fixed.</p>
+    <a href="/portal/maintenance/new" class="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        <span class="mr-1">➕</span> Submit Request
+    </a>
+</div>
+{% endif %}
+{% endblock %}

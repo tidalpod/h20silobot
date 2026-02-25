@@ -10,7 +10,10 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Notification, Tenant
+from database.models import (
+    Property, WaterBill, BillStatus, Notification, Tenant,
+    WorkOrder, WorkOrderStatus, LeaseDocument, LeaseStatus
+)
 from webapp.auth.dependencies import get_current_user
 
 router = APIRouter(tags=["dashboard"])
@@ -256,6 +259,41 @@ async def dashboard(request: Request):
         # Calculate total outstanding
         total_outstanding = sum(b["amount"] for b in outstanding_bills)
 
+        # === WORK ORDERS ===
+        wo_open_result = await session.execute(
+            select(func.count(WorkOrder.id)).where(
+                WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS])
+            )
+        )
+        open_work_orders = wo_open_result.scalar() or 0
+
+        wo_emergency_result = await session.execute(
+            select(func.count(WorkOrder.id)).where(
+                WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]),
+                WorkOrder.priority == "emergency",
+            )
+        )
+        emergency_work_orders = wo_emergency_result.scalar() or 0
+
+        # === EXPIRING LEASES ===
+        today = datetime.now().date()
+        threshold_30 = today + timedelta(days=30)
+        lease_result = await session.execute(
+            select(LeaseDocument)
+            .where(
+                LeaseDocument.status == LeaseStatus.ACTIVE,
+                LeaseDocument.lease_end != None,
+                LeaseDocument.lease_end <= threshold_30,
+                LeaseDocument.lease_end >= today,
+            )
+            .options(
+                selectinload(LeaseDocument.property_ref),
+                selectinload(LeaseDocument.tenant_ref),
+            )
+            .order_by(LeaseDocument.lease_end)
+        )
+        expiring_leases = lease_result.scalars().all()
+
         # === DETERMINE "ALL CAUGHT UP" STATE ===
         all_caught_up = (
             needs_attention_count == 0 and
@@ -300,5 +338,11 @@ async def dashboard(request: Request):
             "total_outstanding": total_outstanding,
             # State
             "all_caught_up": all_caught_up,
+            # Work Orders
+            "open_work_orders": open_work_orders,
+            "emergency_work_orders": emergency_work_orders,
+            # Expiring Leases
+            "expiring_leases": expiring_leases[:5],
+            "today": datetime.now().date(),
         }
     )

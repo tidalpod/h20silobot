@@ -121,6 +121,12 @@
                                 <a href="/inspections" class="{% if '/inspections' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>📋</span> Inspections
                                 </a>
+                                <a href="/maintenance" class="{% if '/maintenance' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>🔧</span> Maintenance
+                                </a>
+                                <a href="/leases" class="{% if '/leases' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <span>📄</span> Leases
+                                </a>
                                 <a href="/notifications/chat" class="{% if '/notifications/chat' in request.url.path %}bg-white/20{% endif %} text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
                                     <span>💬</span> Messages
                                 </a>
@@ -182,6 +188,8 @@
                     <a href="/tenants" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">👥 Tenants</a>
                     <a href="/phas" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🏛️ PHAs</a>
                     <a href="/inspections" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📋 Inspections</a>
+                    <a href="/maintenance" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🔧 Maintenance</a>
+                    <a href="/leases" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">📄 Leases</a>
                     <a href="/notifications/chat" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">💬 Messages</a>
                     <a href="/listings" target="_blank" class="text-white flex items-center gap-2 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">🌐 Public Site</a>
                 </div>

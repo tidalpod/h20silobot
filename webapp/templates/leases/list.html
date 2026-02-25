@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Leases{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                <span>📄</span> Leases
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Lease document management</p>
+        </div>
+        <a href="/leases/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <span class="mr-2">➕</span> Upload Lease
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Expiring Soon Banner -->
+{% if expiring_leases and not filter_expiring %}
+<div class="mb-6 bg-amber-50 rounded-xl border border-amber-200 p-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-xl">⚠️</span>
+        <div>
+            <p class="text-sm font-medium text-amber-800">{{ expiring_leases|length }} lease{{ 's' if expiring_leases|length > 1 else '' }} expiring within 30 days</p>
+            <p class="text-xs text-amber-600">Review and renew expiring leases</p>
+        </div>
+    </div>
+    <a href="/leases?expiring=true" class="text-sm font-medium text-amber-700 hover:text-amber-600">View expiring &rarr;</a>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="mb-6 flex flex-wrap gap-3">
+    <a href="/leases" class="px-4 py-2 rounded-lg text-sm font-medium {% if not filter_status and not filter_expiring %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">All</a>
+    <a href="/leases?status=active" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'active' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Active</a>
+    <a href="/leases?expiring=true" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_expiring %}bg-amber-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Expiring Soon</a>
+    <a href="/leases?status=expired" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'expired' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Expired</a>
+    <a href="/leases?status=terminated" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'terminated' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Terminated</a>
+</div>
+
+{% if leases %}
+<div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lease Period</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rent</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for lease in leases %}
+            <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/leases/{{ lease.id }}'">
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-lg">{% if lease.file_type == 'pdf' %}📕{% else %}📄{% endif %}</span>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">{{ lease.title }}</div>
+                            <div class="text-xs text-gray-500">{{ lease.file_type|upper }}{% if lease.file_size %} &middot; {{ "%.1f"|format(lease.file_size / 1024 / 1024) }}MB{% endif %}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    {% if lease.property_ref %}{{ lease.property_ref.address }}{% else %}—{% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ lease.tenant_ref.name if lease.tenant_ref else '—' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    {% if lease.lease_start and lease.lease_end %}
+                    {{ lease.lease_start.strftime('%b %d, %Y') }} - {{ lease.lease_end.strftime('%b %d, %Y') }}
+                    {% else %}—{% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900 font-medium">
+                    {% if lease.monthly_rent %}${{ "{:,.0f}".format(lease.monthly_rent) }}{% else %}—{% endif %}
+                </td>
+                <td class="px-6 py-4">
+                    {% if lease.status.value == 'active' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                    {% elif lease.status.value == 'expiring_soon' %}
+                    <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Expiring Soon</span>
+                    {% elif lease.status.value == 'expired' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Expired</span>
+                    {% elif lease.status.value == 'renewed' %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Renewed</span>
+                    {% elif lease.status.value == 'terminated' %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Terminated</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <span class="text-4xl">📄</span>
+    <h3 class="mt-3 text-lg font-semibold text-gray-900">No leases found</h3>
+    <p class="mt-1 text-sm text-gray-500">Upload your first lease document to get started.</p>
+    <a href="/leases/new" class="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        <span class="mr-2">➕</span> Upload Lease
+    </a>
+</div>
+{% endif %}
+{% endblock %}

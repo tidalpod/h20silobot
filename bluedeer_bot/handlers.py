@@ -20,6 +20,10 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("💧 Bills", callback_data="menu_bills")
         ],
         [
+            InlineKeyboardButton("🔧 Maintenance", callback_data="menu_maintenance"),
+            InlineKeyboardButton("📄 Leases", callback_data="menu_leases")
+        ],
+        [
             InlineKeyboardButton("🔔 Test Alert", callback_data="menu_test"),
             InlineKeyboardButton("❓ Help", callback_data="menu_help")
         ]
@@ -110,6 +114,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_recerts(query, context)
     elif action == "bills":
         await show_bills(query, context)
+    elif action == "maintenance":
+        await show_maintenance(query, context)
+    elif action == "leases":
+        await show_leases(query, context)
     elif action == "test":
         await send_test_notification(query, context)
     elif action == "help":
@@ -441,6 +449,76 @@ _Add this ID to BLUEDEER_ADMIN_TELEGRAM_ID to receive scheduled alerts._
     await update.message.reply_text("✅ Test notification sent!")
 
 
+async def show_maintenance(query, context: ContextTypes.DEFAULT_TYPE):
+    """Show open work orders"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await query.edit_message_text(
+            "⚠️ Bot not initialized.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("« Back", callback_data="back_to_menu")
+            ]])
+        )
+        return
+
+    message = await bot.get_maintenance_summary()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Refresh", callback_data="menu_maintenance")],
+        [InlineKeyboardButton("« Back", callback_data="back_to_menu")]
+    ])
+
+    await query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+
+async def show_leases(query, context: ContextTypes.DEFAULT_TYPE):
+    """Show expiring leases"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await query.edit_message_text(
+            "⚠️ Bot not initialized.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("« Back", callback_data="back_to_menu")
+            ]])
+        )
+        return
+
+    message = await bot.get_leases_summary()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Refresh", callback_data="menu_leases")],
+        [InlineKeyboardButton("« Back", callback_data="back_to_menu")]
+    ])
+
+    await query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+
+async def maintenance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /maintenance command"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await update.message.reply_text("⚠️ Bot not initialized.")
+        return
+
+    message = await bot.get_maintenance_summary()
+    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+
+
+async def leases_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /leases command"""
+    bot = context.bot_data.get('blue_deer_bot')
+
+    if not bot:
+        await update.message.reply_text("⚠️ Bot not initialized.")
+        return
+
+    message = await bot.get_leases_summary()
+    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /help command"""
     help_text = """
@@ -451,6 +529,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /inspections - Upcoming inspections
 /recerts - Upcoming recertifications
 /bills - Water bill alerts
+/maintenance - Open work orders
+/leases - Expiring leases
 /notify - Send test notification
 /help - This help message
 
@@ -468,6 +548,8 @@ def setup_handlers(application):
     application.add_handler(CommandHandler("inspections", inspections_command))
     application.add_handler(CommandHandler("recerts", recerts_command))
     application.add_handler(CommandHandler("bills", bills_command))
+    application.add_handler(CommandHandler("maintenance", maintenance_command))
+    application.add_handler(CommandHandler("leases", leases_command))
     application.add_handler(CommandHandler("notify", notify_command))
     application.add_handler(CommandHandler("help", help_command))
 

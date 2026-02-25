@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum as PyEnum
 from sqlalchemy import (
     Column, Integer, String, Numeric, DateTime, Date,
-    ForeignKey, Text, Enum, Boolean, Index
+    ForeignKey, Text, Enum, Boolean, Index, Float
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -23,6 +23,39 @@ class BillStatus(PyEnum):
     OVERDUE = "overdue"
     PAID = "paid"
     UNKNOWN = "unknown"
+
+
+class WorkOrderStatus(PyEnum):
+    NEW = "new"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CLOSED = "closed"
+
+
+class WorkOrderPriority(PyEnum):
+    EMERGENCY = "emergency"
+    HIGH = "high"
+    NORMAL = "normal"
+    LOW = "low"
+
+
+class WorkOrderCategory(PyEnum):
+    PLUMBING = "plumbing"
+    ELECTRICAL = "electrical"
+    HVAC = "hvac"
+    APPLIANCE = "appliance"
+    STRUCTURAL = "structural"
+    PEST_CONTROL = "pest_control"
+    GENERAL = "general"
+
+
+class LeaseStatus(PyEnum):
+    ACTIVE = "active"
+    EXPIRING_SOON = "expiring_soon"
+    EXPIRED = "expired"
+    RENEWED = "renewed"
+    TERMINATED = "terminated"
 
 
 class Property(Base):
@@ -115,6 +148,8 @@ class Property(Base):
     web_user = relationship("WebUser", back_populates="properties")
     sms_messages = relationship("SMSMessage", back_populates="property", order_by="SMSMessage.created_at")
     photos = relationship("PropertyPhoto", back_populates="property", order_by="PropertyPhoto.display_order")
+    work_orders = relationship("WorkOrder", back_populates="property_ref", order_by="desc(WorkOrder.created_at)")
+    lease_documents = relationship("LeaseDocument", back_populates="property_ref", order_by="desc(LeaseDocument.created_at)")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -337,6 +372,8 @@ class Tenant(Base):
     notifications = relationship("Notification", back_populates="tenant")
     recertifications = relationship("Recertification", back_populates="tenant")
     sms_messages = relationship("SMSMessage", back_populates="tenant", order_by="SMSMessage.created_at")
+    work_orders = relationship("WorkOrder", back_populates="tenant_ref", order_by="desc(WorkOrder.created_at)")
+    lease_documents = relationship("LeaseDocument", back_populates="tenant_ref", order_by="desc(LeaseDocument.created_at)")
 
     # Indexes
     __table_args__ = (
@@ -615,3 +652,168 @@ class PropertyPhoto(Base):
 
     def __repr__(self):
         return f"<PropertyPhoto {self.id} for Property {self.property_id}>"
+
+
+# =============================================================================
+# Maintenance / Work Order Models
+# =============================================================================
+
+class Vendor(Base):
+    """Maintenance vendors/contractors"""
+    __tablename__ = "vendors"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=True)
+    email = Column(String(255), nullable=True)
+    specialty = Column(String(100), nullable=True)
+    company = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    work_orders = relationship("WorkOrder", back_populates="vendor_ref")
+
+    def __repr__(self):
+        return f"<Vendor {self.name}>"
+
+
+class WorkOrder(Base):
+    """Maintenance work orders"""
+    __tablename__ = "work_orders"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+
+    # Work order details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(Enum(WorkOrderCategory), default=WorkOrderCategory.GENERAL)
+    priority = Column(Enum(WorkOrderPriority), default=WorkOrderPriority.NORMAL)
+    status = Column(Enum(WorkOrderStatus), default=WorkOrderStatus.NEW)
+    unit_area = Column(String(100), nullable=True)
+
+    # Scheduling
+    scheduled_date = Column(Date, nullable=True)
+    completed_date = Column(Date, nullable=True)
+
+    # Cost tracking
+    estimated_cost = Column(Numeric(10, 2), nullable=True)
+    actual_cost = Column(Numeric(10, 2), nullable=True)
+
+    # Resolution
+    resolution_notes = Column(Text, nullable=True)
+
+    # Tenant submission flag
+    submitted_by_tenant = Column(Boolean, default=False)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property", back_populates="work_orders")
+    tenant_ref = relationship("Tenant", back_populates="work_orders")
+    vendor_ref = relationship("Vendor", back_populates="work_orders")
+    photos = relationship("WorkOrderPhoto", back_populates="work_order", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_work_orders_status", "status"),
+        Index("ix_work_orders_property", "property_id"),
+        Index("ix_work_orders_priority", "priority"),
+    )
+
+    def __repr__(self):
+        return f"<WorkOrder {self.id}: {self.title}>"
+
+
+class WorkOrderPhoto(Base):
+    """Photos attached to work orders"""
+    __tablename__ = "work_order_photos"
+
+    id = Column(Integer, primary_key=True)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False)
+    url = Column(String(500), nullable=False)
+    caption = Column(String(255), nullable=True)
+    uploaded_by_tenant = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    work_order = relationship("WorkOrder", back_populates="photos")
+
+    def __repr__(self):
+        return f"<WorkOrderPhoto {self.id} for WO {self.work_order_id}>"
+
+
+# =============================================================================
+# Lease Document Models
+# =============================================================================
+
+class LeaseDocument(Base):
+    """Lease documents"""
+    __tablename__ = "lease_documents"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+
+    # Document info
+    title = Column(String(255), nullable=False)
+    file_url = Column(String(500), nullable=False)
+    file_type = Column(String(20), nullable=True)
+    file_size = Column(Integer, nullable=True)
+
+    # Lease terms
+    lease_start = Column(Date, nullable=True)
+    lease_end = Column(Date, nullable=True)
+    monthly_rent = Column(Numeric(10, 2), nullable=True)
+
+    # Status
+    status = Column(Enum(LeaseStatus), default=LeaseStatus.ACTIVE)
+    notes = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property", back_populates="lease_documents")
+    tenant_ref = relationship("Tenant", back_populates="lease_documents")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_lease_documents_status", "status"),
+        Index("ix_lease_documents_property", "property_id"),
+    )
+
+    def __repr__(self):
+        return f"<LeaseDocument {self.id}: {self.title}>"
+
+
+# =============================================================================
+# Tenant Portal Models
+# =============================================================================
+
+class TenantVerification(Base):
+    """SMS verification codes for tenant portal login"""
+    __tablename__ = "tenant_verifications"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True)
+    phone = Column(String(20), nullable=False)
+    code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    verified = Column(Boolean, default=False)
+    attempts = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    tenant = relationship("Tenant")
+
+    def __repr__(self):
+        return f"<TenantVerification {self.phone}>"
