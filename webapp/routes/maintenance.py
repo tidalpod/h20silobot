@@ -38,45 +38,47 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 async def _notify_vendor_sms(vendor_id: int, wo, session):
     """Send SMS to vendor about a work order assignment"""
-    result = await session.execute(
-        select(Vendor).where(Vendor.id == vendor_id)
-    )
-    vendor = result.scalar_one_or_none()
-    if not vendor or not vendor.phone:
-        return False
-
-    # Build property address
-    prop_addr = ""
-    if wo.property_ref:
-        prop_addr = wo.property_ref.address
-    elif wo.property_id:
-        prop_result = await session.execute(
-            select(Property).where(Property.id == wo.property_id)
+    try:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
         )
-        prop = prop_result.scalar_one_or_none()
-        prop_addr = prop.address if prop else ""
+        vendor = result.scalar_one_or_none()
+        if not vendor or not vendor.phone:
+            return False
 
-    priority_label = wo.priority.value.title() if wo.priority else "Normal"
-    scheduled = wo.scheduled_date.strftime('%b %d, %Y') if wo.scheduled_date else "TBD"
+        # Always query property by ID (avoid lazy-load issues in async)
+        prop_addr = ""
+        if wo.property_id:
+            prop_result = await session.execute(
+                select(Property).where(Property.id == wo.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            prop_addr = prop.address if prop else ""
 
-    msg = (
-        f"Blue Deer - New Work Order Assigned\n\n"
-        f"Title: {wo.title}\n"
-        f"Property: {prop_addr}\n"
-        f"Priority: {priority_label}\n"
-        f"Scheduled: {scheduled}\n"
-    )
-    if wo.description:
-        desc_short = wo.description[:100] + ("..." if len(wo.description) > 100 else "")
-        msg += f"Details: {desc_short}\n"
-    msg += f"\nView in portal: https://bluedeer.space/vendor/work-orders/{wo.id}"
+        priority_label = wo.priority.value.title() if wo.priority else "Normal"
+        scheduled = wo.scheduled_date.strftime('%b %d, %Y') if wo.scheduled_date else "TBD"
 
-    sms_result = await twilio_service.send_sms(vendor.phone, msg)
-    if sms_result.success:
-        logger.info(f"Vendor SMS sent to {vendor.name} for WO #{wo.id}")
-    else:
-        logger.error(f"Failed to SMS vendor {vendor.name}: {sms_result.error_message}")
-    return sms_result.success
+        msg = (
+            f"Blue Deer - New Work Order Assigned\n\n"
+            f"Title: {wo.title}\n"
+            f"Property: {prop_addr}\n"
+            f"Priority: {priority_label}\n"
+            f"Scheduled: {scheduled}\n"
+        )
+        if wo.description:
+            desc_short = wo.description[:100] + ("..." if len(wo.description) > 100 else "")
+            msg += f"Details: {desc_short}\n"
+        msg += f"\nView in portal: https://bluedeer.space/vendor/work-orders/{wo.id}"
+
+        sms_result = await twilio_service.send_sms(vendor.phone, msg)
+        if sms_result.success:
+            logger.info(f"Vendor SMS sent to {vendor.name} for WO #{wo.id}")
+        else:
+            logger.error(f"Failed to SMS vendor {vendor.name}: {sms_result.error_message}")
+        return sms_result.success
+    except Exception as e:
+        logger.error(f"Error sending vendor SMS: {e}")
+        return False
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -306,14 +308,18 @@ async def create_work_order(request: Request):
 
     form = await request.form()
 
+    property_id_str = form.get("property_id", "").strip()
     tenant_id_str = form.get("tenant_id", "").strip()
     vendor_id_str = form.get("vendor_id", "").strip()
     scheduled_str = form.get("scheduled_date", "").strip()
     cost_str = form.get("estimated_cost", "").strip()
 
+    if not property_id_str:
+        return RedirectResponse(url="/maintenance/new", status_code=303)
+
     async with get_session() as session:
         wo = WorkOrder(
-            property_id=int(form["property_id"]),
+            property_id=int(property_id_str),
             tenant_id=int(tenant_id_str) if tenant_id_str else None,
             vendor_id=int(vendor_id_str) if vendor_id_str else None,
             title=form["title"],
