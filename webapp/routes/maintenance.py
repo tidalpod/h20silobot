@@ -486,6 +486,36 @@ async def upload_work_order_photo(
         })
 
 
+@router.post("/{wo_id}/delete")
+async def delete_work_order(request: Request, wo_id: int):
+    """Delete a work order and its photos"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkOrder)
+            .where(WorkOrder.id == wo_id)
+            .options(selectinload(WorkOrder.photos))
+        )
+        wo = result.scalar_one_or_none()
+        if not wo:
+            return RedirectResponse(url="/maintenance", status_code=303)
+
+        # Delete photo files from disk
+        for photo in wo.photos:
+            if photo.url:
+                filepath = Path(UPLOAD_BASE) / photo.url.lstrip("/uploads/")
+                if filepath.exists():
+                    filepath.unlink()
+            await session.delete(photo)
+
+        await session.delete(wo)
+
+    return RedirectResponse(url="/maintenance", status_code=303)
+
+
 @router.post("/{wo_id}/photos/{photo_id}/delete")
 async def delete_work_order_photo(request: Request, wo_id: int, photo_id: int):
     """Delete a work order photo"""

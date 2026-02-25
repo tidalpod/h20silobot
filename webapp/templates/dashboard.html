@@ -17,7 +17,7 @@
 <!-- KPI Cards -->
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-6">
     <!-- 1. Properties -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+    <a href="/properties" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0 p-3 bg-blue-50 rounded-xl">
@@ -36,10 +36,10 @@
                 <span class="{% if vacant_count > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">{{ vacant_count }} vacant</span>
             </p>
         </div>
-    </div>
+    </a>
 
     <!-- 2. Compliance -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+    <a href="/properties?filter=missing_license" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-amber-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0 p-3 {% if missing_license_count > 0 %}bg-amber-50{% else %}bg-green-50{% endif %} rounded-xl">
@@ -62,10 +62,10 @@
                 {% endif %}
             </p>
         </div>
-    </div>
+    </a>
 
     <!-- 3. Tenants -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+    <a href="/tenants" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0 p-3 bg-purple-50 rounded-xl">
@@ -82,10 +82,10 @@
                 <span class="text-purple-600 font-medium">{{ section8_tenants }} Section 8</span>
             </p>
         </div>
-    </div>
+    </a>
 
     <!-- 4. Total Rent -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+    <a href="/leases" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-green-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0 p-3 bg-green-50 rounded-xl">
@@ -112,10 +112,10 @@
                 {% endif %}
             </p>
         </div>
-    </div>
+    </a>
 
     <!-- 5. Maintenance -->
-    <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100">
+    <a href="/maintenance" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0 p-3 {% if emergency_work_orders > 0 %}bg-red-50{% elif open_work_orders > 0 %}bg-orange-50{% else %}bg-green-50{% endif %} rounded-xl">
@@ -138,7 +138,7 @@
                 {% endif %}
             </p>
         </div>
-    </div>
+    </a>
 </div>
 
 <!-- Quick Actions -->
