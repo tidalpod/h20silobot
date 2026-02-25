@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant
+from database.models import Property, WaterBill, BillStatus, Tenant, WorkOrder, SMSMessage, MessageDirection
 
 router = APIRouter(tags=["api"])
 logger = logging.getLogger(__name__)
@@ -718,6 +718,92 @@ async def lookup_zillow(address: str) -> dict:
     except Exception as e:
         logger.error(f"Zillow lookup error: {e}")
         return None
+
+
+@router.get("/search")
+async def api_search(request: Request, q: str = ""):
+    """Global search across properties, tenants, and work orders"""
+    from webapp.auth.dependencies import get_current_user
+
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not q or len(q) < 2:
+        return {"properties": [], "tenants": [], "work_orders": []}
+
+    term = f"%{q}%"
+
+    async with get_session() as session:
+        # Search properties by address
+        prop_result = await session.execute(
+            select(Property)
+            .where(Property.is_active == True, Property.address.ilike(term))
+            .limit(5)
+        )
+        properties = [
+            {"id": p.id, "address": p.address, "city": p.city or ""}
+            for p in prop_result.scalars().all()
+        ]
+
+        # Search tenants by name
+        tenant_result = await session.execute(
+            select(Tenant)
+            .where(Tenant.is_active == True, Tenant.name.ilike(term))
+            .options(selectinload(Tenant.property_ref))
+            .limit(5)
+        )
+        tenants = [
+            {
+                "id": t.id,
+                "name": t.name,
+                "property": t.property_ref.address if t.property_ref else "",
+            }
+            for t in tenant_result.scalars().all()
+        ]
+
+        # Search work orders by title
+        wo_result = await session.execute(
+            select(WorkOrder)
+            .where(WorkOrder.title.ilike(term))
+            .options(selectinload(WorkOrder.property_ref))
+            .order_by(WorkOrder.created_at.desc())
+            .limit(5)
+        )
+        work_orders = [
+            {
+                "id": w.id,
+                "title": w.title,
+                "status": w.status.value if w.status else "",
+                "property": w.property_ref.address if w.property_ref else "",
+            }
+            for w in wo_result.scalars().all()
+        ]
+
+    return {"properties": properties, "tenants": tenants, "work_orders": work_orders}
+
+
+@router.get("/unread-count")
+async def api_unread_count(request: Request):
+    """Get count of unread inbound SMS messages"""
+    from webapp.auth.dependencies import get_current_user
+    from sqlalchemy import func
+
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(func.count(SMSMessage.id))
+            .where(
+                SMSMessage.direction == MessageDirection.INBOUND,
+                SMSMessage.status == "received",
+            )
+        )
+        count = result.scalar() or 0
+
+    return {"unread": count}
 
 
 async def lookup_redfin(address: str) -> dict:
