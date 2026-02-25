@@ -99,6 +99,119 @@ async def list_work_orders(
     )
 
 
+# =============================================================================
+# Vendor Management (must be above /{wo_id} routes to avoid path conflicts)
+# =============================================================================
+
+@router.get("/vendors", response_class=HTMLResponse)
+async def list_vendors(request: Request):
+    """Vendor directory"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor).order_by(Vendor.name)
+        )
+        vendors = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "maintenance/vendors.html",
+        {"request": request, "user": user, "vendors": vendors}
+    )
+
+
+@router.get("/vendors/new", response_class=HTMLResponse)
+async def new_vendor_form(request: Request):
+    """Add vendor form"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return templates.TemplateResponse(
+        "maintenance/vendor_form.html",
+        {"request": request, "user": user, "vendor": None}
+    )
+
+
+@router.post("/vendors/new")
+async def create_vendor(request: Request):
+    """Create a new vendor"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        vendor = Vendor(
+            name=form["name"],
+            phone=form.get("phone", ""),
+            email=form.get("email", ""),
+            specialty=form.get("specialty", ""),
+            company=form.get("company", ""),
+            notes=form.get("notes", ""),
+        )
+        session.add(vendor)
+
+    return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+
+@router.get("/vendors/{vendor_id}/edit", response_class=HTMLResponse)
+async def edit_vendor_form(request: Request, vendor_id: int):
+    """Edit vendor form"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
+        )
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+    return templates.TemplateResponse(
+        "maintenance/vendor_form.html",
+        {"request": request, "user": user, "vendor": vendor}
+    )
+
+
+@router.post("/vendors/{vendor_id}/edit")
+async def update_vendor(request: Request, vendor_id: int):
+    """Update a vendor"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
+        )
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+        vendor.name = form["name"]
+        vendor.phone = form.get("phone", "")
+        vendor.email = form.get("email", "")
+        vendor.specialty = form.get("specialty", "")
+        vendor.company = form.get("company", "")
+        vendor.notes = form.get("notes", "")
+        vendor.is_active = form.get("is_active") == "on"
+        vendor.updated_at = datetime.utcnow()
+
+    return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+
+# =============================================================================
+# Work Order CRUD
+# =============================================================================
+
 @router.get("/new", response_class=HTMLResponse)
 async def new_work_order_form(request: Request):
     """Create work order form"""
@@ -400,112 +513,3 @@ async def delete_work_order_photo(request: Request, wo_id: int, photo_id: int):
         await session.delete(photo)
 
     return JSONResponse({"success": True})
-
-
-# =============================================================================
-# Vendor Management
-# =============================================================================
-
-@router.get("/vendors", response_class=HTMLResponse)
-async def list_vendors(request: Request):
-    """Vendor directory"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(Vendor).order_by(Vendor.name)
-        )
-        vendors = result.scalars().all()
-
-    return templates.TemplateResponse(
-        "maintenance/vendors.html",
-        {"request": request, "user": user, "vendors": vendors}
-    )
-
-
-@router.get("/vendors/new", response_class=HTMLResponse)
-async def new_vendor_form(request: Request):
-    """Add vendor form"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    return templates.TemplateResponse(
-        "maintenance/vendor_form.html",
-        {"request": request, "user": user, "vendor": None}
-    )
-
-
-@router.post("/vendors/new")
-async def create_vendor(request: Request):
-    """Create a new vendor"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    form = await request.form()
-
-    async with get_session() as session:
-        vendor = Vendor(
-            name=form["name"],
-            phone=form.get("phone", ""),
-            email=form.get("email", ""),
-            specialty=form.get("specialty", ""),
-            company=form.get("company", ""),
-            notes=form.get("notes", ""),
-        )
-        session.add(vendor)
-
-    return RedirectResponse(url="/maintenance/vendors", status_code=303)
-
-
-@router.get("/vendors/{vendor_id}/edit", response_class=HTMLResponse)
-async def edit_vendor_form(request: Request, vendor_id: int):
-    """Edit vendor form"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(Vendor).where(Vendor.id == vendor_id)
-        )
-        vendor = result.scalar_one_or_none()
-        if not vendor:
-            return RedirectResponse(url="/maintenance/vendors", status_code=303)
-
-    return templates.TemplateResponse(
-        "maintenance/vendor_form.html",
-        {"request": request, "user": user, "vendor": vendor}
-    )
-
-
-@router.post("/vendors/{vendor_id}/edit")
-async def update_vendor(request: Request, vendor_id: int):
-    """Update a vendor"""
-    user = await get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    form = await request.form()
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(Vendor).where(Vendor.id == vendor_id)
-        )
-        vendor = result.scalar_one_or_none()
-        if not vendor:
-            return RedirectResponse(url="/maintenance/vendors", status_code=303)
-
-        vendor.name = form["name"]
-        vendor.phone = form.get("phone", "")
-        vendor.email = form.get("email", "")
-        vendor.specialty = form.get("specialty", "")
-        vendor.company = form.get("company", "")
-        vendor.notes = form.get("notes", "")
-        vendor.is_active = form.get("is_active") == "on"
-        vendor.updated_at = datetime.utcnow()
-
-    return RedirectResponse(url="/maintenance/vendors", status_code=303)
