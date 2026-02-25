@@ -32,23 +32,23 @@
 
             <!-- Property & Tenant -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div class="relative">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Property *</label>
-                    <select name="property_id" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                        <option value="">Select property...</option>
-                        {% for p in properties %}
-                        <option value="{{ p.id }}" {% if work_order and work_order.property_id == p.id %}selected{% endif %}>{{ p.address }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="hidden" name="property_id" id="property-id-input" required value="{{ work_order.property_id if work_order else '' }}">
+                    <input type="text" id="property-search" autocomplete="off"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                        placeholder="Search by address..."
+                        value="{% if work_order and work_order.property_ref %}{{ work_order.property_ref.address }}{% endif %}">
+                    <div id="property-dropdown" class="hidden absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto"></div>
                 </div>
-                <div>
+                <div class="relative">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tenant</label>
-                    <select name="tenant_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                        <option value="">No tenant</option>
-                        {% for t in tenants %}
-                        <option value="{{ t.id }}" {% if work_order and work_order.tenant_id == t.id %}selected{% endif %}>{{ t.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="hidden" name="tenant_id" id="tenant-id-input" value="{{ work_order.tenant_id if work_order and work_order.tenant_id else '' }}">
+                    <input type="text" id="tenant-search" autocomplete="off"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                        placeholder="Search by name..."
+                        value="{% if work_order and work_order.tenant_ref %}{{ work_order.tenant_ref.name }}{% endif %}">
+                    <div id="tenant-dropdown" class="hidden absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto"></div>
                 </div>
             </div>
 
@@ -159,11 +159,126 @@
 
 {% block scripts %}
 <script>
+    // --- Searchable dropdown helper ---
+    function initSearchable(config) {
+        const searchInput = document.getElementById(config.searchId);
+        const hiddenInput = document.getElementById(config.hiddenId);
+        const dropdown = document.getElementById(config.dropdownId);
+        const items = config.items;
+        let selectedIndex = -1;
+
+        function renderDropdown(query) {
+            const q = query.toLowerCase().trim();
+            const filtered = q
+                ? items.filter(i => i.label.toLowerCase().includes(q))
+                : items;
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">No results</div>';
+            } else {
+                dropdown.innerHTML = filtered.map((item, idx) =>
+                    `<div class="search-option px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${idx === selectedIndex ? 'bg-blue-50' : ''}"
+                          data-id="${item.id}" data-label="${item.label}">${highlightMatch(item.label, q)}</div>`
+                ).join('');
+            }
+            dropdown.classList.remove('hidden');
+            selectedIndex = -1;
+        }
+
+        function highlightMatch(text, query) {
+            if (!query) return text;
+            const idx = text.toLowerCase().indexOf(query);
+            if (idx === -1) return text;
+            return text.slice(0, idx) + '<strong class="text-blue-600">' + text.slice(idx, idx + query.length) + '</strong>' + text.slice(idx + query.length);
+        }
+
+        function selectItem(id, label) {
+            hiddenInput.value = id;
+            searchInput.value = label;
+            dropdown.classList.add('hidden');
+            if (config.onSelect) config.onSelect(id);
+        }
+
+        function clear() {
+            hiddenInput.value = '';
+            searchInput.value = '';
+            if (config.onSelect) config.onSelect('');
+        }
+
+        searchInput.addEventListener('focus', () => renderDropdown(searchInput.value));
+        searchInput.addEventListener('input', () => {
+            if (!searchInput.value.trim()) clear();
+            renderDropdown(searchInput.value);
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const options = dropdown.querySelectorAll('.search-option');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, options.length - 1);
+                options.forEach((o, i) => o.classList.toggle('bg-blue-50', i === selectedIndex));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                options.forEach((o, i) => o.classList.toggle('bg-blue-50', i === selectedIndex));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && options[selectedIndex]) {
+                    selectItem(options[selectedIndex].dataset.id, options[selectedIndex].dataset.label);
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        dropdown.addEventListener('click', (e) => {
+            const option = e.target.closest('.search-option');
+            if (option) selectItem(option.dataset.id, option.dataset.label);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('hidden');
+                // Restore label if user typed gibberish but had a prior selection
+                if (hiddenInput.value) {
+                    const match = items.find(i => String(i.id) === hiddenInput.value);
+                    if (match) searchInput.value = match.label;
+                }
+            }
+        });
+    }
+
+    // --- Property search ---
+    const properties = [
+        {% for p in properties %}
+        { id: "{{ p.id }}", label: "{{ p.address|replace('"', '\\"') }}" },
+        {% endfor %}
+    ];
+    initSearchable({
+        searchId: 'property-search',
+        hiddenId: 'property-id-input',
+        dropdownId: 'property-dropdown',
+        items: properties,
+    });
+
+    // --- Tenant search ---
+    const tenants = [
+        {% for t in tenants %}
+        { id: "{{ t.id }}", label: "{{ t.name|replace('"', '\\"') }}" },
+        {% endfor %}
+    ];
+    initSearchable({
+        searchId: 'tenant-search',
+        hiddenId: 'tenant-id-input',
+        dropdownId: 'tenant-dropdown',
+        items: tenants,
+    });
+
+    // --- Vendor notify ---
     const vendorSelect = document.querySelector('select[name="vendor_id"]');
     const notifyRow = document.getElementById('notify-vendor-row');
     const notifyPhone = document.getElementById('notify-vendor-phone');
 
-    // Vendor phone lookup
     const vendorPhones = {
         {% for v in vendors %}
         {{ v.id }}: "{{ v.phone or '' }}",

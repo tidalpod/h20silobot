@@ -306,19 +306,24 @@ async def create_work_order(request: Request):
 
     form = await request.form()
 
+    tenant_id_str = form.get("tenant_id", "").strip()
+    vendor_id_str = form.get("vendor_id", "").strip()
+    scheduled_str = form.get("scheduled_date", "").strip()
+    cost_str = form.get("estimated_cost", "").strip()
+
     async with get_session() as session:
         wo = WorkOrder(
             property_id=int(form["property_id"]),
-            tenant_id=int(form["tenant_id"]) if form.get("tenant_id") else None,
-            vendor_id=int(form["vendor_id"]) if form.get("vendor_id") else None,
+            tenant_id=int(tenant_id_str) if tenant_id_str else None,
+            vendor_id=int(vendor_id_str) if vendor_id_str else None,
             title=form["title"],
             description=form.get("description", ""),
             category=WorkOrderCategory(form.get("category", "general")),
             priority=WorkOrderPriority(form.get("priority", "normal")),
             status=WorkOrderStatus.NEW,
             unit_area=form.get("unit_area", ""),
-            scheduled_date=datetime.strptime(form["scheduled_date"], "%Y-%m-%d").date() if form.get("scheduled_date") else None,
-            estimated_cost=float(form["estimated_cost"]) if form.get("estimated_cost") else None,
+            scheduled_date=datetime.strptime(scheduled_str, "%Y-%m-%d").date() if scheduled_str else None,
+            estimated_cost=float(cost_str) if cost_str else None,
         )
         session.add(wo)
         await session.flush()
@@ -442,19 +447,24 @@ async def update_work_order(request: Request, wo_id: int):
             return RedirectResponse(url="/maintenance", status_code=303)
 
         old_vendor_id = wo.vendor_id
-        new_vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
+        tenant_str = form.get("tenant_id", "").strip()
+        vendor_str = form.get("vendor_id", "").strip()
+        sched_str = form.get("scheduled_date", "").strip()
+        est_str = form.get("estimated_cost", "").strip()
+        act_str = form.get("actual_cost", "").strip()
+        new_vendor_id = int(vendor_str) if vendor_str else None
 
         wo.property_id = int(form["property_id"])
-        wo.tenant_id = int(form["tenant_id"]) if form.get("tenant_id") else None
+        wo.tenant_id = int(tenant_str) if tenant_str else None
         wo.vendor_id = new_vendor_id
         wo.title = form["title"]
         wo.description = form.get("description", "")
         wo.category = WorkOrderCategory(form.get("category", "general"))
         wo.priority = WorkOrderPriority(form.get("priority", "normal"))
         wo.unit_area = form.get("unit_area", "")
-        wo.scheduled_date = datetime.strptime(form["scheduled_date"], "%Y-%m-%d").date() if form.get("scheduled_date") else None
-        wo.estimated_cost = float(form["estimated_cost"]) if form.get("estimated_cost") else None
-        wo.actual_cost = float(form["actual_cost"]) if form.get("actual_cost") else None
+        wo.scheduled_date = datetime.strptime(sched_str, "%Y-%m-%d").date() if sched_str else None
+        wo.estimated_cost = float(est_str) if est_str else None
+        wo.actual_cost = float(act_str) if act_str else None
         wo.resolution_notes = form.get("resolution_notes", "")
 
         if form.get("status"):
