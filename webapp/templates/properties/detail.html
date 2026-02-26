@@ -731,11 +731,18 @@
             <div class="bg-white shadow rounded-lg">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="text-base font-semibold text-gray-900">🏠 Rental Inspection</h3>
-                    {% if property.rental_inspection_date %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
-                    {% else %}
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
-                    {% endif %}
+                    <div class="flex items-center gap-2">
+                        {% if property.rental_inspection_status == 'passed' %}
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Passed</span>
+                        {% elif property.rental_inspection_status == 'failed' %}
+                        <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Failed</span>
+                        {% endif %}
+                        {% if property.rental_inspection_date %}
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="px-5 py-4">
                     {% if property.rental_inspection_date %}

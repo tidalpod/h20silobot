@@ -165,6 +165,7 @@ class Property(Base):
     # Rental inspection
     rental_inspection_date = Column(Date, nullable=True)
     rental_inspection_time = Column(String(10), nullable=True)
+    rental_inspection_status = Column(String(20), nullable=True)  # "passed" or "failed"
 
     # Section 8 inspection time
     section8_inspection_time = Column(String(10), nullable=True)

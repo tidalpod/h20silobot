@@ -179,6 +179,7 @@ async def create_property(
     co_building_status: str = Form(""),
     rental_inspection_date: str = Form(""),
     rental_inspection_time: str = Form(""),
+    rental_inspection_status: str = Form(""),
     # Apartment building fields
     num_units: str = Form(""),
     unit_prefix: str = Form("Unit"),
@@ -331,6 +332,7 @@ async def create_property(
                 # Rental inspection
                 rental_inspection_date=parse_date(rental_inspection_date),
                 rental_inspection_time=rental_inspection_time or None,
+                rental_inspection_status=rental_inspection_status or None,
             )
             session.add(prop)
             created_props.append(prop)
@@ -474,6 +476,7 @@ async def update_property(
     co_building_status: str = Form(""),
     rental_inspection_date: str = Form(""),
     rental_inspection_time: str = Form(""),
+    rental_inspection_status: str = Form(""),
     # Public listing fields
     description: str = Form(""),
     monthly_rent: str = Form(""),
@@ -597,6 +600,7 @@ async def update_property(
             # Rental inspection
             prop.rental_inspection_date = parse_date(rental_inspection_date)
             prop.rental_inspection_time = rental_inspection_time or None
+            prop.rental_inspection_status = rental_inspection_status or None
 
             # Public listing fields
             prop.description = description or None
