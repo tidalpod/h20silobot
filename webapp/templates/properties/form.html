@@ -373,6 +373,12 @@
                         <input type="time" name="co_mechanical_time" id="co_mechanical_time"
                                value="{{ property.co_mechanical_time if property and property.co_mechanical_time else '' }}"
                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                        <select name="co_mechanical_status" id="co_mechanical_status"
+                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">-- Status --</option>
+                            <option value="passed" {% if property and property.co_mechanical_status == 'passed' %}selected{% endif %}>Passed</option>
+                            <option value="failed" {% if property and property.co_mechanical_status == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
                     </div>
                     <div>
                         <label for="co_electrical_date" class="block text-sm font-medium text-gray-700 mb-1">⚡ Electrical Date</label>
@@ -382,6 +388,12 @@
                         <input type="time" name="co_electrical_time" id="co_electrical_time"
                                value="{{ property.co_electrical_time if property and property.co_electrical_time else '' }}"
                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                        <select name="co_electrical_status" id="co_electrical_status"
+                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">-- Status --</option>
+                            <option value="passed" {% if property and property.co_electrical_status == 'passed' %}selected{% endif %}>Passed</option>
+                            <option value="failed" {% if property and property.co_electrical_status == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
                     </div>
                     <div>
                         <label for="co_plumbing_date" class="block text-sm font-medium text-gray-700 mb-1">🔧 Plumbing Date</label>
@@ -391,6 +403,12 @@
                         <input type="time" name="co_plumbing_time" id="co_plumbing_time"
                                value="{{ property.co_plumbing_time if property and property.co_plumbing_time else '' }}"
                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                        <select name="co_plumbing_status" id="co_plumbing_status"
+                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">-- Status --</option>
+                            <option value="passed" {% if property and property.co_plumbing_status == 'passed' %}selected{% endif %}>Passed</option>
+                            <option value="failed" {% if property and property.co_plumbing_status == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
                     </div>
                     <div>
                         <label for="co_zoning_date" class="block text-sm font-medium text-gray-700 mb-1">📐 Zoning Date</label>
@@ -400,6 +418,12 @@
                         <input type="time" name="co_zoning_time" id="co_zoning_time"
                                value="{{ property.co_zoning_time if property and property.co_zoning_time else '' }}"
                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                        <select name="co_zoning_status" id="co_zoning_status"
+                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">-- Status --</option>
+                            <option value="passed" {% if property and property.co_zoning_status == 'passed' %}selected{% endif %}>Passed</option>
+                            <option value="failed" {% if property and property.co_zoning_status == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
                     </div>
                     <div>
                         <label for="co_building_date" class="block text-sm font-medium text-gray-700 mb-1">🏢 Building Date</label>
@@ -409,6 +433,12 @@
                         <input type="time" name="co_building_time" id="co_building_time"
                                value="{{ property.co_building_time if property and property.co_building_time else '' }}"
                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                        <select name="co_building_status" id="co_building_status"
+                                class="block w-full mt-2 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
+                            <option value="">-- Status --</option>
+                            <option value="passed" {% if property and property.co_building_status == 'passed' %}selected{% endif %}>Passed</option>
+                            <option value="failed" {% if property and property.co_building_status == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
                     </div>
                 </div>
             </div>

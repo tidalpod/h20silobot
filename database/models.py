@@ -148,14 +148,19 @@ class Property(Base):
     # Certificate of Occupancy (CO) inspections
     co_mechanical_date = Column(Date, nullable=True)
     co_mechanical_time = Column(String(10), nullable=True)  # e.g., "09:00 AM"
+    co_mechanical_status = Column(String(20), nullable=True)  # "passed" or "failed"
     co_electrical_date = Column(Date, nullable=True)
     co_electrical_time = Column(String(10), nullable=True)
+    co_electrical_status = Column(String(20), nullable=True)
     co_plumbing_date = Column(Date, nullable=True)
     co_plumbing_time = Column(String(10), nullable=True)
+    co_plumbing_status = Column(String(20), nullable=True)
     co_zoning_date = Column(Date, nullable=True)
     co_zoning_time = Column(String(10), nullable=True)
+    co_zoning_status = Column(String(20), nullable=True)
     co_building_date = Column(Date, nullable=True)
     co_building_time = Column(String(10), nullable=True)
+    co_building_status = Column(String(20), nullable=True)
 
     # Rental inspection
     rental_inspection_date = Column(Date, nullable=True)
@@ -187,6 +192,7 @@ class Property(Base):
     photos = relationship("PropertyPhoto", back_populates="property", order_by="PropertyPhoto.display_order")
     work_orders = relationship("WorkOrder", back_populates="property_ref", order_by="desc(WorkOrder.created_at)")
     lease_documents = relationship("LeaseDocument", back_populates="property_ref", order_by="desc(LeaseDocument.created_at)")
+    violations = relationship("InspectionViolation", back_populates="property", order_by="desc(InspectionViolation.violation_date)")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -225,6 +231,25 @@ class Property(Base):
             BillStatus.PAID: "✅",
             BillStatus.UNKNOWN: "⚪"
         }.get(status, "⚪")
+
+
+class InspectionViolation(Base):
+    """Inspection violation record with uploaded PDF"""
+    __tablename__ = "inspection_violations"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    description = Column(String(255), nullable=True)
+    violation_date = Column(Date, nullable=True)
+    file_url = Column(String(500), nullable=True)
+    original_filename = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    property = relationship("Property", back_populates="violations")
+
+    def __repr__(self):
+        return f"<InspectionViolation {self.id} - {self.description}>"
 
 
 class WaterBill(Base):

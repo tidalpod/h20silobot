@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto
+from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation
 from webapp.auth.dependencies import get_current_user
 
 # Upload directory - use UPLOAD_PATH env var for Railway volume, fallback to local
@@ -164,14 +164,19 @@ async def create_property(
     section8_inspection_notes: str = Form(""),
     co_mechanical_date: str = Form(""),
     co_mechanical_time: str = Form(""),
+    co_mechanical_status: str = Form(""),
     co_electrical_date: str = Form(""),
     co_electrical_time: str = Form(""),
+    co_electrical_status: str = Form(""),
     co_plumbing_date: str = Form(""),
     co_plumbing_time: str = Form(""),
+    co_plumbing_status: str = Form(""),
     co_zoning_date: str = Form(""),
     co_zoning_time: str = Form(""),
+    co_zoning_status: str = Form(""),
     co_building_date: str = Form(""),
     co_building_time: str = Form(""),
+    co_building_status: str = Form(""),
     rental_inspection_date: str = Form(""),
     rental_inspection_time: str = Form(""),
     # Apartment building fields
@@ -310,14 +315,19 @@ async def create_property(
                 # Certificate of Occupancy inspections
                 co_mechanical_date=parse_date(co_mechanical_date),
                 co_mechanical_time=co_mechanical_time or None,
+                co_mechanical_status=co_mechanical_status or None,
                 co_electrical_date=parse_date(co_electrical_date),
                 co_electrical_time=co_electrical_time or None,
+                co_electrical_status=co_electrical_status or None,
                 co_plumbing_date=parse_date(co_plumbing_date),
                 co_plumbing_time=co_plumbing_time or None,
+                co_plumbing_status=co_plumbing_status or None,
                 co_zoning_date=parse_date(co_zoning_date),
                 co_zoning_time=co_zoning_time or None,
+                co_zoning_status=co_zoning_status or None,
                 co_building_date=parse_date(co_building_date),
                 co_building_time=co_building_time or None,
+                co_building_status=co_building_status or None,
                 # Rental inspection
                 rental_inspection_date=parse_date(rental_inspection_date),
                 rental_inspection_time=rental_inspection_time or None,
@@ -351,7 +361,8 @@ async def property_detail(request: Request, property_id: int):
             .options(
                 selectinload(Property.bills),
                 selectinload(Property.tenants).selectinload(Tenant.pha),
-                selectinload(Property.taxes)
+                selectinload(Property.taxes),
+                selectinload(Property.violations)
             )
         )
         prop = result.scalar_one_or_none()
@@ -380,6 +391,7 @@ async def property_detail(request: Request, property_id: int):
             "active_tenants": active_tenants,
             "bills": prop.bills[:10],  # Last 10 bills
             "today": datetime.now().date(),  # For expiry date comparisons
+            "violations": prop.violations,
         }
     )
 
@@ -447,14 +459,19 @@ async def update_property(
     section8_inspection_notes: str = Form(""),
     co_mechanical_date: str = Form(""),
     co_mechanical_time: str = Form(""),
+    co_mechanical_status: str = Form(""),
     co_electrical_date: str = Form(""),
     co_electrical_time: str = Form(""),
+    co_electrical_status: str = Form(""),
     co_plumbing_date: str = Form(""),
     co_plumbing_time: str = Form(""),
+    co_plumbing_status: str = Form(""),
     co_zoning_date: str = Form(""),
     co_zoning_time: str = Form(""),
+    co_zoning_status: str = Form(""),
     co_building_date: str = Form(""),
     co_building_time: str = Form(""),
+    co_building_status: str = Form(""),
     rental_inspection_date: str = Form(""),
     rental_inspection_time: str = Form(""),
     # Public listing fields
@@ -564,14 +581,19 @@ async def update_property(
             # Certificate of Occupancy inspections
             prop.co_mechanical_date = parse_date(co_mechanical_date)
             prop.co_mechanical_time = co_mechanical_time or None
+            prop.co_mechanical_status = co_mechanical_status or None
             prop.co_electrical_date = parse_date(co_electrical_date)
             prop.co_electrical_time = co_electrical_time or None
+            prop.co_electrical_status = co_electrical_status or None
             prop.co_plumbing_date = parse_date(co_plumbing_date)
             prop.co_plumbing_time = co_plumbing_time or None
+            prop.co_plumbing_status = co_plumbing_status or None
             prop.co_zoning_date = parse_date(co_zoning_date)
             prop.co_zoning_time = co_zoning_time or None
+            prop.co_zoning_status = co_zoning_status or None
             prop.co_building_date = parse_date(co_building_date)
             prop.co_building_time = co_building_time or None
+            prop.co_building_status = co_building_status or None
             # Rental inspection
             prop.rental_inspection_date = parse_date(rental_inspection_date)
             prop.rental_inspection_time = rental_inspection_time or None
@@ -981,6 +1003,109 @@ async def toggle_star_photo(request: Request, property_id: int, photo_id: int):
         await session.commit()
 
     return RedirectResponse(url=f"/properties/{property_id}/edit", status_code=303)
+
+
+# =============================================================================
+# Inspection Violations
+# =============================================================================
+
+VIOLATION_UPLOAD_DIR = Path(UPLOAD_BASE) / "violations"
+VIOLATION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.post("/{property_id}/violations/upload")
+async def upload_violation(
+    request: Request,
+    property_id: int,
+    description: str = Form(""),
+    violation_date: str = Form(""),
+    violation_file: UploadFile = File(...)
+):
+    """Upload a violation PDF for a property"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Validate file type
+    allowed_types = ["application/pdf"]
+    if violation_file.content_type not in allowed_types:
+        return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
+
+    # Validate file size (max 20MB)
+    contents = await violation_file.read()
+    if len(contents) > 20 * 1024 * 1024:
+        return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
+
+    async with get_session() as session:
+        # Verify property exists
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        # Generate unique filename
+        ext = Path(violation_file.filename).suffix.lower() or ".pdf"
+        filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
+        filepath = VIOLATION_UPLOAD_DIR / filename
+
+        # Save file
+        with open(filepath, "wb") as f:
+            f.write(contents)
+
+        # Parse date
+        parsed_date = None
+        if violation_date:
+            try:
+                parsed_date = datetime.strptime(violation_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        # Create database record
+        violation = InspectionViolation(
+            property_id=property_id,
+            description=description or None,
+            violation_date=parsed_date,
+            file_url=f"/uploads/violations/{filename}",
+            original_filename=violation_file.filename,
+        )
+        session.add(violation)
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
+
+
+@router.post("/{property_id}/violations/{violation_id}/delete")
+async def delete_violation(request: Request, property_id: int, violation_id: int):
+    """Delete a violation record and its file"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(InspectionViolation)
+            .where(InspectionViolation.id == violation_id)
+            .where(InspectionViolation.property_id == property_id)
+        )
+        violation = result.scalar_one_or_none()
+
+        if not violation:
+            raise HTTPException(status_code=404, detail="Violation not found")
+
+        # Delete file from disk
+        if violation.file_url:
+            filename = violation.file_url.split("/")[-1]
+            filepath = VIOLATION_UPLOAD_DIR / filename
+            if filepath.exists():
+                filepath.unlink()
+
+        # Delete from database
+        await session.delete(violation)
+        await session.commit()
+
+    return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
 
 
 # =============================================================================
