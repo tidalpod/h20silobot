@@ -1019,22 +1019,36 @@ async def upload_violation(
     property_id: int,
     description: str = Form(""),
     violation_date: str = Form(""),
-    violation_file: UploadFile = File(...)
+    violation_file: UploadFile = File(...),
+    violation_image: UploadFile = File(None)
 ):
-    """Upload a violation PDF for a property"""
+    """Upload a violation PDF (and optional image) for a property"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Validate file type
-    allowed_types = ["application/pdf"]
-    if violation_file.content_type not in allowed_types:
+    # Validate PDF file type
+    allowed_pdf_types = ["application/pdf"]
+    if violation_file.content_type not in allowed_pdf_types:
         return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
 
     # Validate file size (max 20MB)
-    contents = await violation_file.read()
-    if len(contents) > 20 * 1024 * 1024:
+    pdf_contents = await violation_file.read()
+    if len(pdf_contents) > 20 * 1024 * 1024:
         return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
+
+    # Handle optional image upload
+    image_contents = None
+    image_filename = None
+    if violation_image and violation_image.filename:
+        allowed_image_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+        if violation_image.content_type in allowed_image_types:
+            image_contents = await violation_image.read()
+            if len(image_contents) > 10 * 1024 * 1024:  # Max 10MB for images
+                image_contents = None
+            else:
+                img_ext = Path(violation_image.filename).suffix.lower() or ".jpg"
+                image_filename = f"{property_id}_vimg_{uuid.uuid4().hex[:8]}{img_ext}"
 
     async with get_session() as session:
         # Verify property exists
@@ -1045,14 +1059,20 @@ async def upload_violation(
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        # Generate unique filename
+        # Save PDF file
         ext = Path(violation_file.filename).suffix.lower() or ".pdf"
         filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
         filepath = VIOLATION_UPLOAD_DIR / filename
-
-        # Save file
         with open(filepath, "wb") as f:
-            f.write(contents)
+            f.write(pdf_contents)
+
+        # Save image file if provided
+        saved_image_url = None
+        if image_contents and image_filename:
+            img_filepath = VIOLATION_UPLOAD_DIR / image_filename
+            with open(img_filepath, "wb") as f:
+                f.write(image_contents)
+            saved_image_url = f"/uploads/violations/{image_filename}"
 
         # Parse date
         parsed_date = None
@@ -1069,6 +1089,7 @@ async def upload_violation(
             violation_date=parsed_date,
             file_url=f"/uploads/violations/{filename}",
             original_filename=violation_file.filename,
+            image_url=saved_image_url,
         )
         session.add(violation)
         await session.commit()
@@ -1094,12 +1115,19 @@ async def delete_violation(request: Request, property_id: int, violation_id: int
         if not violation:
             raise HTTPException(status_code=404, detail="Violation not found")
 
-        # Delete file from disk
+        # Delete PDF file from disk
         if violation.file_url:
             filename = violation.file_url.split("/")[-1]
             filepath = VIOLATION_UPLOAD_DIR / filename
             if filepath.exists():
                 filepath.unlink()
+
+        # Delete image file from disk
+        if violation.image_url:
+            img_filename = violation.image_url.split("/")[-1]
+            img_filepath = VIOLATION_UPLOAD_DIR / img_filename
+            if img_filepath.exists():
+                img_filepath.unlink()
 
         # Delete from database
         await session.delete(violation)

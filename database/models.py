@@ -243,6 +243,7 @@ class InspectionViolation(Base):
     violation_date = Column(Date, nullable=True)
     file_url = Column(String(500), nullable=True)
     original_filename = Column(String(255), nullable=True)
+    image_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

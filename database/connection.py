@@ -19,6 +19,8 @@ async def run_migrations(engine):
         ("properties", "co_plumbing_status", "VARCHAR(20)"),
         ("properties", "co_zoning_status", "VARCHAR(20)"),
         ("properties", "co_building_status", "VARCHAR(20)"),
+        # Inspection violation image support
+        ("inspection_violations", "image_url", "VARCHAR(500)"),
     ]
 
     async with engine.begin() as conn:
