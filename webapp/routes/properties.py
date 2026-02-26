@@ -1023,23 +1023,25 @@ async def upload_violation(
     property_id: int,
     description: str = Form(""),
     violation_date: str = Form(""),
-    violation_file: UploadFile = File(...),
+    violation_file: UploadFile = File(None),
     violation_image: UploadFile = File(None)
 ):
-    """Upload a violation PDF (and optional image) for a property"""
+    """Upload a violation with optional PDF and/or image"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Validate PDF file type
-    allowed_pdf_types = ["application/pdf"]
-    if violation_file.content_type not in allowed_pdf_types:
-        return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
-
-    # Validate file size (max 20MB)
-    pdf_contents = await violation_file.read()
-    if len(pdf_contents) > 20 * 1024 * 1024:
-        return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
+    # Handle optional PDF upload
+    pdf_contents = None
+    pdf_filename = None
+    if violation_file and violation_file.filename:
+        if violation_file.content_type == "application/pdf":
+            pdf_contents = await violation_file.read()
+            if len(pdf_contents) > 20 * 1024 * 1024:
+                pdf_contents = None
+            else:
+                ext = Path(violation_file.filename).suffix.lower() or ".pdf"
+                pdf_filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
 
     # Handle optional image upload
     image_contents = None
@@ -1048,11 +1050,15 @@ async def upload_violation(
         allowed_image_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
         if violation_image.content_type in allowed_image_types:
             image_contents = await violation_image.read()
-            if len(image_contents) > 10 * 1024 * 1024:  # Max 10MB for images
+            if len(image_contents) > 10 * 1024 * 1024:
                 image_contents = None
             else:
                 img_ext = Path(violation_image.filename).suffix.lower() or ".jpg"
                 image_filename = f"{property_id}_vimg_{uuid.uuid4().hex[:8]}{img_ext}"
+
+    # Require at least one file
+    if not pdf_contents and not image_contents:
+        return RedirectResponse(url=f"/properties/{property_id}#compliance", status_code=303)
 
     async with get_session() as session:
         # Verify property exists
@@ -1063,12 +1069,15 @@ async def upload_violation(
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        # Save PDF file
-        ext = Path(violation_file.filename).suffix.lower() or ".pdf"
-        filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = VIOLATION_UPLOAD_DIR / filename
-        with open(filepath, "wb") as f:
-            f.write(pdf_contents)
+        # Save PDF file if provided
+        saved_pdf_url = None
+        original_name = None
+        if pdf_contents and pdf_filename:
+            filepath = VIOLATION_UPLOAD_DIR / pdf_filename
+            with open(filepath, "wb") as f:
+                f.write(pdf_contents)
+            saved_pdf_url = f"/uploads/violations/{pdf_filename}"
+            original_name = violation_file.filename
 
         # Save image file if provided
         saved_image_url = None
@@ -1091,8 +1100,8 @@ async def upload_violation(
             property_id=property_id,
             description=description or None,
             violation_date=parsed_date,
-            file_url=f"/uploads/violations/{filename}",
-            original_filename=violation_file.filename,
+            file_url=saved_pdf_url,
+            original_filename=original_name,
             image_url=saved_image_url,
         )
         session.add(violation)
