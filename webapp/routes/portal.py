@@ -19,6 +19,10 @@ from database.models import (
 )
 from webapp.auth.tenant_auth import get_current_tenant, login_tenant, logout_tenant
 from webapp.services.verification_service import send_verification_code, verify_code
+from webapp.services.telegram_service import telegram_service
+
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["portal"])
 
@@ -255,6 +259,33 @@ async def portal_maintenance_submit(request: Request):
         session.add(wo)
         await session.flush()
         wo_id = wo.id
+
+        # Send Telegram notification via Blue Deer bot
+        try:
+            prop_result = await session.execute(
+                select(Property).where(Property.id == wo.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            addr = prop.address if prop else "Unknown"
+            category = wo.category.value.replace('_', ' ').title() if wo.category else "General"
+
+            msg = f"🔧 *New Tenant Work Order*\n\n"
+            msg += f"🟡 *{wo.title}*\n"
+            msg += f"  📍 {addr}"
+            if wo.unit_area:
+                msg += f", {wo.unit_area}"
+            msg += "\n"
+            msg += f"  📋 {category} • Priority: Normal\n"
+            msg += f"  📱 Submitted by tenant: {tenant.get('name', 'Unknown')}\n"
+            if wo.description:
+                desc = wo.description[:120]
+                if len(wo.description) > 120:
+                    desc += "..."
+                msg += f"  💬 _{desc}_\n"
+
+            await telegram_service.send_message(msg)
+        except Exception as e:
+            logger.error(f"Failed to send tenant work order Telegram alert: {e}")
 
     return RedirectResponse(url=f"/portal/maintenance/{wo_id}", status_code=303)
 

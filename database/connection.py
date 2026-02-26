@@ -38,6 +38,26 @@ async def run_migrations(engine):
                 """))
                 print(f"[DB] Column '{column}' added successfully")
 
+async def _seed_telegram_admins(engine):
+    """Ensure default Telegram admin users exist for Blue Deer alerts"""
+    admin_users = [
+        # (telegram_id, first_name)
+        (2092822589, "Admin"),
+    ]
+
+    async with engine.begin() as conn:
+        for telegram_id, first_name in admin_users:
+            result = await conn.execute(text(
+                f"SELECT id FROM telegram_users WHERE telegram_id = {telegram_id}"
+            ))
+            if not result.fetchone():
+                await conn.execute(text(
+                    f"INSERT INTO telegram_users (telegram_id, first_name, is_admin, notifications_enabled) "
+                    f"VALUES ({telegram_id}, '{first_name}', true, true)"
+                ))
+                print(f"[DB] Added Telegram admin user {telegram_id}")
+
+
 # Global variables
 engine = None
 AsyncSessionLocal = None
@@ -91,6 +111,9 @@ async def init_db():
 
         # Run migrations for new columns
         await run_migrations(engine)
+
+        # Seed default Telegram admin user for Blue Deer alerts
+        await _seed_telegram_admins(engine)
 
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")

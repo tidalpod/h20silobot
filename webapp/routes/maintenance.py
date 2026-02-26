@@ -19,6 +19,7 @@ from database.models import (
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
+from webapp.services.telegram_service import telegram_service
 
 router = APIRouter(tags=["maintenance"])
 
@@ -338,6 +339,46 @@ async def create_work_order(request: Request):
         # Send SMS to vendor if assigned and checkbox checked
         if wo.vendor_id and form.get("notify_vendor"):
             await _notify_vendor_sms(wo.vendor_id, wo, session)
+
+        # Send Telegram notification via Blue Deer bot
+        try:
+            # Load property address for the message
+            prop_result = await session.execute(
+                select(Property).where(Property.id == wo.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            addr = prop.address if prop else "Unknown"
+
+            # Priority badge
+            priority_icons = {
+                WorkOrderPriority.EMERGENCY: ("🚨", "EMERGENCY"),
+                WorkOrderPriority.HIGH: ("🔴", "High"),
+                WorkOrderPriority.NORMAL: ("🟡", "Normal"),
+                WorkOrderPriority.LOW: ("🟢", "Low"),
+            }
+            icon, label = priority_icons.get(wo.priority, ("🟡", "Normal"))
+            category = wo.category.value.replace('_', ' ').title() if wo.category else "General"
+
+            msg = f"🔧 *New Work Order Created*\n\n"
+            msg += f"{icon} *{wo.title}*\n"
+            msg += f"  📍 {addr}"
+            if wo.unit_area:
+                msg += f", {wo.unit_area}"
+            msg += "\n"
+            msg += f"  📋 {category} • Priority: {label}\n"
+            if wo.description:
+                desc = wo.description[:120]
+                if len(wo.description) > 120:
+                    desc += "..."
+                msg += f"  💬 _{desc}_\n"
+            if wo.estimated_cost:
+                msg += f"  💰 Est. cost: ${wo.estimated_cost:.2f}\n"
+            if wo.scheduled_date:
+                msg += f"  📅 Scheduled: {wo.scheduled_date.strftime('%b %d, %Y')}\n"
+
+            await telegram_service.send_message(msg)
+        except Exception as e:
+            logger.error(f"Failed to send work order Telegram alert: {e}")
 
     return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
 
