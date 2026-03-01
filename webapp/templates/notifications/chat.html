@@ -4,43 +4,68 @@
 
 {% block header %}
 <header class="bg-white shadow-sm">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 sm:gap-3">
                 <span>💬</span> SMS Conversations
             </h1>
-            <p class="mt-1 text-sm text-gray-500">Chat with tenants via SMS</p>
+            <p class="mt-1 text-sm text-gray-500 hidden sm:block">Chat with tenants via SMS</p>
         </div>
-        <button onclick="openNewConversationModal()" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
-            <span class="mr-2">➕</span> New Conversation
+        <button onclick="openNewConversationModal()" class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 sm:px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <span class="mr-1 sm:mr-2">+</span><span class="hidden sm:inline">New </span>Chat
         </button>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
-<div class="flex h-[calc(100vh-220px)] min-h-[500px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <!-- Conversations List (Left Panel) -->
-    <div class="w-80 border-r border-gray-200 flex flex-col">
-        <div class="p-4 border-b border-gray-100 bg-gray-50">
+<style>
+    /* Mobile: full-screen panels that slide */
+    @media (max-width: 767px) {
+        .chat-wrapper { height: calc(100dvh - 160px); height: calc(100vh - 160px); }
+        .panel-list { display: flex; flex-direction: column; width: 100%; }
+        .panel-chat { display: none; flex-direction: column; width: 100%; position: absolute; inset: 0; background: white; z-index: 10; }
+        .panel-chat.active { display: flex; }
+        .chat-wrapper { position: relative; }
+        .back-btn { display: flex; }
+    }
+    /* Desktop: side by side */
+    @media (min-width: 768px) {
+        .chat-wrapper { height: calc(100vh - 220px); min-height: 500px; }
+        .panel-list { width: 320px; border-right: 1px solid #e5e7eb; }
+        .panel-chat { flex: 1; }
+        .panel-chat, .panel-list { display: flex; flex-direction: column; }
+        .back-btn { display: none; }
+    }
+</style>
+
+<div class="chat-wrapper flex bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <!-- Conversations List -->
+    <div class="panel-list" id="panel-list">
+        <div class="p-3 sm:p-4 border-b border-gray-100 bg-gray-50">
             <h2 class="text-sm font-semibold text-gray-700">Conversations</h2>
         </div>
         <div id="conversations-list" class="flex-1 overflow-y-auto">
-            <!-- Loading state -->
             <div id="conversations-loading" class="p-4 text-center text-gray-500">
                 <div class="animate-pulse">Loading conversations...</div>
             </div>
-            <!-- Conversations will be loaded here -->
         </div>
     </div>
 
-    <!-- Chat Window (Right Panel) -->
-    <div class="flex-1 flex flex-col">
+    <!-- Chat Panel -->
+    <div class="panel-chat" id="panel-chat">
         <!-- Chat Header -->
-        <div id="chat-header" class="p-4 border-b border-gray-100 bg-gray-50">
-            <div id="chat-header-content" class="hidden">
-                <h3 id="chat-tenant-name" class="text-lg font-semibold text-gray-900"></h3>
-                <p id="chat-tenant-info" class="text-sm text-gray-500"></p>
+        <div id="chat-header" class="p-3 sm:p-4 border-b border-gray-100 bg-gray-50">
+            <div id="chat-header-content" class="hidden flex items-center gap-3">
+                <button class="back-btn items-center justify-center w-8 h-8 -ml-1 rounded-full hover:bg-gray-200 transition-colors" onclick="showListPanel()">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                    </svg>
+                </button>
+                <div class="min-w-0 flex-1">
+                    <h3 id="chat-tenant-name" class="text-base sm:text-lg font-semibold text-gray-900 truncate"></h3>
+                    <p id="chat-tenant-info" class="text-xs sm:text-sm text-gray-500 truncate"></p>
+                </div>
             </div>
             <div id="chat-header-empty" class="text-gray-400 text-sm">
                 Select a conversation to start chatting
@@ -48,37 +73,35 @@
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-            <!-- Empty state -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50">
             <div id="messages-empty" class="h-full flex items-center justify-center">
                 <div class="text-center text-gray-400">
                     <span class="text-4xl">💬</span>
                     <p class="mt-2">Select a tenant to view messages</p>
                 </div>
             </div>
-            <!-- Messages will be loaded here -->
         </div>
 
         <!-- Message Input -->
-        <div id="chat-input-area" class="p-4 border-t border-gray-200 bg-white hidden">
-            <form id="send-message-form" class="flex gap-3">
+        <div id="chat-input-area" class="p-2 sm:p-4 border-t border-gray-200 bg-white hidden">
+            <form id="send-message-form" class="flex gap-2 sm:gap-3">
                 <input type="hidden" id="current-tenant-id" value="">
                 <input
                     type="text"
                     id="message-input"
                     name="message"
                     placeholder="Type your message..."
-                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    class="flex-1 rounded-full sm:rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-4 py-2"
                     autocomplete="off"
                 >
                 <button
                     type="submit"
-                    class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    class="inline-flex items-center justify-center rounded-full sm:rounded-lg bg-blue-600 w-10 h-10 sm:w-auto sm:h-auto sm:px-4 sm:py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 flex-shrink-0"
                 >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
                     </svg>
-                    Send
+                    <span class="hidden sm:inline">Send</span>
                 </button>
             </form>
             <p id="send-error" class="mt-2 text-sm text-red-600 hidden"></p>
@@ -87,7 +110,7 @@
 </div>
 
 <!-- Unmatched Messages Section -->
-<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
     <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <span>❓</span> Unmatched Messages
         <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
@@ -99,13 +122,9 @@
 
 <!-- New Conversation Modal -->
 <div id="new-conversation-modal" class="fixed inset-0 z-50 hidden">
-    <!-- Backdrop -->
     <div class="fixed inset-0 bg-black/50 transition-opacity" onclick="closeNewConversationModal()"></div>
-
-    <!-- Modal Content -->
     <div class="fixed inset-0 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
-            <!-- Modal Header -->
             <div class="p-4 border-b border-gray-200 flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-900">Start New Conversation</h3>
                 <button onclick="closeNewConversationModal()" class="text-gray-400 hover:text-gray-600">
@@ -114,8 +133,6 @@
                     </svg>
                 </button>
             </div>
-
-            <!-- Search -->
             <div class="p-4 border-b border-gray-100">
                 <input
                     type="text"
@@ -125,8 +142,6 @@
                     oninput="searchTenants(this.value)"
                 >
             </div>
-
-            <!-- Tenant List -->
             <div id="tenant-list" class="flex-1 overflow-y-auto p-2 min-h-[200px] max-h-[400px]">
                 <div class="text-center text-gray-400 py-8">
                     <div class="animate-pulse">Loading tenants...</div>
@@ -140,6 +155,14 @@
 let currentTenantId = null;
 let refreshInterval = null;
 
+// Mobile panel switching
+function showChatPanel() {
+    document.getElementById('panel-chat').classList.add('active');
+}
+function showListPanel() {
+    document.getElementById('panel-chat').classList.remove('active');
+}
+
 // Load conversations list
 async function loadConversations() {
     try {
@@ -147,7 +170,6 @@ async function loadConversations() {
         const data = await response.json();
 
         const container = document.getElementById('conversations-list');
-        const loading = document.getElementById('conversations-loading');
 
         if (data.conversations.length === 0) {
             container.innerHTML = `
@@ -168,11 +190,11 @@ async function loadConversations() {
             const directionIcon = conv.last_direction === 'inbound' ? '←' : '→';
 
             html += `
-                <div class="p-4 border-b border-gray-100 cursor-pointer ${isActive}"
+                <div class="p-3 sm:p-4 border-b border-gray-100 cursor-pointer ${isActive}"
                      onclick="selectConversation(${conv.tenant_id})">
                     <div class="flex justify-between items-start mb-1">
                         <h4 class="font-medium text-gray-900 text-sm">${conv.tenant_name}</h4>
-                        <span class="text-xs text-gray-400">${lastTime}</span>
+                        <span class="text-xs text-gray-400 flex-shrink-0 ml-2">${lastTime}</span>
                     </div>
                     <p class="text-xs text-gray-500 truncate">${conv.property_address}</p>
                     <p class="text-sm text-gray-600 truncate mt-1">
@@ -208,6 +230,9 @@ async function selectConversation(tenantId) {
     document.getElementById('chat-input-area').classList.remove('hidden');
     const emptyEl = document.getElementById('messages-empty');
     if (emptyEl) emptyEl.classList.add('hidden');
+
+    // On mobile, slide to chat panel
+    showChatPanel();
 
     // Reload conversations list to update active state
     loadConversations();
@@ -265,7 +290,7 @@ async function loadMessages(tenantId) {
             if (isOutbound) {
                 html += `
                     <div class="flex justify-end">
-                        <div class="max-w-[70%]">
+                        <div class="max-w-[80%] sm:max-w-[70%]">
                             <div class="bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2">
                                 <p class="text-sm">${escapeHtml(msg.body)}</p>
                             </div>
@@ -276,7 +301,7 @@ async function loadMessages(tenantId) {
             } else {
                 html += `
                     <div class="flex justify-start">
-                        <div class="max-w-[70%]">
+                        <div class="max-w-[80%] sm:max-w-[70%]">
                             <div class="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-2 shadow-sm">
                                 <p class="text-sm text-gray-900">${escapeHtml(msg.body)}</p>
                             </div>
@@ -288,8 +313,6 @@ async function loadMessages(tenantId) {
         }
 
         container.innerHTML = html;
-
-        // Scroll to bottom
         container.scrollTop = container.scrollHeight;
 
     } catch (error) {
@@ -387,8 +410,6 @@ function escapeHtml(text) {
 document.addEventListener('DOMContentLoaded', () => {
     loadConversations();
     loadUnmatched();
-
-    // Refresh unmatched messages periodically
     setInterval(loadUnmatched, 30000);
 });
 
