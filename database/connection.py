@@ -25,6 +25,12 @@ async def run_migrations(engine):
         ("properties", "rental_inspection_status", "VARCHAR(20)"),
         # Vendor SMS conversations
         ("sms_messages", "vendor_id", "INTEGER REFERENCES vendors(id) ON DELETE SET NULL"),
+        # Entity bank account manual entry fields
+        ("entity_bank_accounts", "routing_number", "VARCHAR(9)"),
+        ("entity_bank_accounts", "account_number", "VARCHAR(17)"),
+        ("entity_bank_accounts", "is_manual", "BOOLEAN DEFAULT false"),
+        # Entity bank account on rent payments
+        ("rent_payments", "entity_bank_account_id", "INTEGER REFERENCES entity_bank_accounts(id) ON DELETE SET NULL"),
     ]
 
     async with engine.begin() as conn:
@@ -48,6 +54,15 @@ async def run_migrations(engine):
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_sms_messages_vendor ON sms_messages(vendor_id)"
         ))
+
+        # Make Plaid columns nullable on entity_bank_accounts (for manual entries)
+        for col in ["plaid_access_token", "plaid_item_id", "plaid_account_id"]:
+            try:
+                await conn.execute(text(
+                    f"ALTER TABLE entity_bank_accounts ALTER COLUMN {col} DROP NOT NULL"
+                ))
+            except Exception:
+                pass  # Column may already be nullable or table may not exist yet
 
 async def _seed_telegram_admins(engine):
     """Ensure default Telegram admin users exist for Blue Deer alerts"""
