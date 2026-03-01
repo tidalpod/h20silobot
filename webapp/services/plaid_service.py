@@ -61,7 +61,7 @@ async def create_entity_link_token(entity_id: int, entity_name: str) -> dict:
         **_auth_body(),
         "user": {"client_user_id": f"entity_{entity_id}"},
         "client_name": "Blue Deer Property Management",
-        "products": ["auth"],
+        "products": ["transfer"],
         "country_codes": ["US"],
         "language": "en",
     }
