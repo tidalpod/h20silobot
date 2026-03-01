@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Vendor Portal{% endblock %} | Blue Deer</title>
     <link rel="icon" type="image/png" href="/static/images/favicon.png">
-    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <link rel="apple-touch-icon" href="/static/images/icons/icon-192x192.png">
+    <link rel="manifest" href="/vendor/manifest.json">
+    <meta name="theme-color" content="#7e22ce">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Vendor Portal">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -98,5 +103,11 @@
     {% endif %}
 
     {% block scripts %}{% endblock %}
+
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/vendor/sw.js', { scope: '/vendor/' }).catch(() => {});
+    }
+    </script>
 </body>
 </html>

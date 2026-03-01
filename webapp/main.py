@@ -127,9 +127,12 @@ from .routes.projects import router as projects_router
 from .routes.portal_payments import router as portal_payments_router
 from .routes.payments_admin import router as payments_admin_router
 from .routes.lease_builder import router as lease_builder_router
+from .routes.pwa import router as pwa_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
 
+# PWA routes must be registered before portal/vendor prefix routes
+app.include_router(pwa_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(properties_router, prefix="/properties")
