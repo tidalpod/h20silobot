@@ -128,9 +128,9 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                 {% for photo in wo.photos %}
                 <div class="relative group">
-                    <img src="{{ photo.url }}" alt="{{ photo.caption or 'Work order photo' }}" class="w-full h-32 object-cover rounded-lg">
+                    <img src="{{ photo.url }}" alt="{{ photo.caption or 'Work order photo' }}" class="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity" onclick="openLightbox({{ loop.index0 }})">
                     <form method="POST" action="/maintenance/{{ wo.id }}/photos/{{ photo.id }}/delete" class="absolute top-1 right-1 hidden group-hover:block">
-                        <button type="submit" class="bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600" onclick="return confirm('Delete this photo?')">X</button>
+                        <button type="submit" class="bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600" onclick="event.stopPropagation(); return confirm('Delete this photo?')">X</button>
                     </form>
                     {% if photo.uploaded_by_tenant %}
                     <span class="absolute bottom-1 left-1 bg-teal-600 text-white text-xs px-1.5 py-0.5 rounded">Tenant</span>
@@ -139,6 +139,26 @@
                 {% endfor %}
             </div>
             {% endif %}
+
+            <!-- Photo Lightbox Modal -->
+            <div id="lightbox" class="hidden fixed inset-0 z-[200] bg-black/90 flex items-center justify-center" onclick="if(event.target===this)closeLightbox()">
+                <!-- Close -->
+                <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/80 hover:text-white z-10 cursor-pointer">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <!-- Counter -->
+                <div id="lightbox-counter" class="absolute top-4 left-4 text-white/70 text-sm font-medium z-10"></div>
+                <!-- Prev -->
+                <button id="lightbox-prev" onclick="lightboxNav(-1)" class="absolute left-2 sm:left-4 text-white/70 hover:text-white z-10 p-2 cursor-pointer">
+                    <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <!-- Image -->
+                <img id="lightbox-img" src="" alt="" class="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl">
+                <!-- Next -->
+                <button id="lightbox-next" onclick="lightboxNav(1)" class="absolute right-2 sm:right-4 text-white/70 hover:text-white z-10 p-2 cursor-pointer">
+                    <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
 
             <!-- Upload Form -->
             <form id="photo-upload-form" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
@@ -251,6 +271,47 @@
 
 {% block scripts %}
 <script>
+// ── Photo Lightbox ──
+const photos = [
+    {% for photo in wo.photos %}
+    "{{ photo.url }}",
+    {% endfor %}
+];
+let lightboxIdx = 0;
+
+function openLightbox(idx) {
+    lightboxIdx = idx;
+    renderLightbox();
+    document.getElementById('lightbox').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function lightboxNav(dir) {
+    lightboxIdx = (lightboxIdx + dir + photos.length) % photos.length;
+    renderLightbox();
+}
+
+function renderLightbox() {
+    document.getElementById('lightbox-img').src = photos[lightboxIdx];
+    document.getElementById('lightbox-counter').textContent = (lightboxIdx + 1) + ' / ' + photos.length;
+    document.getElementById('lightbox-prev').style.display = photos.length > 1 ? '' : 'none';
+    document.getElementById('lightbox-next').style.display = photos.length > 1 ? '' : 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+    const lb = document.getElementById('lightbox');
+    if (lb.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLightbox();
+    else if (e.key === 'ArrowLeft') lightboxNav(-1);
+    else if (e.key === 'ArrowRight') lightboxNav(1);
+});
+
+// ── Photo Upload ──
 document.getElementById('photo-input').addEventListener('change', async function(e) {
     const file = e.target.files[0];
     if (!file) return;
