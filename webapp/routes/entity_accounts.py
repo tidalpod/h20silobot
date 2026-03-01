@@ -1,5 +1,6 @@
 """Entity bank account management — CRUD for entities + Plaid Link for bank accounts"""
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Form
@@ -13,6 +14,7 @@ from database.models import EntityConfig, EntityBankAccount, Property
 from webapp.auth.dependencies import get_current_user
 from webapp.services import plaid_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["entity-accounts"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -147,6 +149,7 @@ async def delete_entity(request: Request, entity_id: int):
 @router.post("/bank-accounts/link-token")
 async def get_link_token(request: Request):
     """Get a Plaid Link token for an entity."""
+    logger.info("=== Entity link-token route hit ===")
     user = await get_current_user(request)
     if not user:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
@@ -157,6 +160,7 @@ async def get_link_token(request: Request):
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
     entity_id = data.get("entity_id")
+    logger.info(f"Link token request for entity_id={entity_id}")
     if not entity_id:
         return JSONResponse({"error": "entity_id required"}, status_code=400)
 

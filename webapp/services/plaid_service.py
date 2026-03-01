@@ -56,9 +56,11 @@ async def create_link_token(tenant_id: int, tenant_name: str) -> dict:
 
 async def create_entity_link_token(entity_id: int, entity_name: str) -> dict:
     """Create a Plaid Link token for a landlord entity to connect their bank account."""
+    auth = _auth_body()
+    logger.info(f"Entity link token: client_id present={bool(auth.get('client_id'))}, secret present={bool(auth.get('secret'))}, env={web_config.plaid_env}")
     url = f"{_base_url()}/link/token/create"
     payload = {
-        **_auth_body(),
+        **auth,
         "user": {"client_user_id": f"entity_{entity_id}"},
         "client_name": "Blue Deer Property Management",
         "products": ["transfer"],
@@ -71,6 +73,7 @@ async def create_entity_link_token(entity_id: int, entity_name: str) -> dict:
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=payload, headers=_headers()) as resp:
             data = await resp.json()
+            logger.info(f"Plaid entity link response status={resp.status}")
             if resp.status != 200:
                 logger.error(f"Plaid entity link/token/create failed: {data}")
                 return {"error": data.get("error_message", "Failed to create link token")}
