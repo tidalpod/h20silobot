@@ -85,7 +85,10 @@ async def builder_start(request: Request):
         properties = props_result.scalars().all()
 
         tenants_result = await session.execute(
-            select(Tenant).where(Tenant.is_active == True).order_by(Tenant.name)
+            select(Tenant)
+            .where(Tenant.is_active == True)
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
         )
         tenants = tenants_result.scalars().all()
 
