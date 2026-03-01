@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Showing #{{ showing.id }}{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                <a href="/showings" class="hover:text-gray-700">Showings</a>
+                <span>/</span>
+                <span class="text-gray-900">#{{ showing.id }}</span>
+            </nav>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                {{ showing.title }}
+            </h1>
+            <div class="mt-2 flex flex-wrap gap-2">
+                {% if showing.showing_type.value == 'inspector' %}
+                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Inspector</span>
+                {% elif showing.showing_type.value == 'tenant' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Tenant</span>
+                {% elif showing.showing_type.value == 'contractor' %}
+                <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">Contractor</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Other</span>
+                {% endif %}
+
+                {% if showing.status.value == 'scheduled' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Scheduled</span>
+                {% elif showing.status.value == 'confirmed' %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Confirmed</span>
+                {% elif showing.status.value == 'completed' %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Completed</span>
+                {% elif showing.status.value == 'cancelled' %}
+                <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex gap-3 flex-shrink-0">
+            <a href="/showings/{{ showing.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+                <span class="mr-2">✏️</span> Edit
+            </a>
+            <form method="POST" action="/showings/{{ showing.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this showing? This cannot be undone.')">
+                <button type="submit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm ring-1 ring-inset ring-red-300 hover:bg-red-50 transition-colors">
+                    <span class="mr-2">🗑️</span> Delete
+                </button>
+            </form>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Description -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Description</h2>
+            {% if showing.description %}
+            <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ showing.description }}</p>
+            {% else %}
+            <p class="text-sm text-gray-400 italic">No description provided</p>
+            {% endif %}
+        </div>
+
+        <!-- Notes -->
+        {% if showing.notes %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
+            <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ showing.notes }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Quick Status Update -->
+        {% if showing.status.value not in ['completed', 'cancelled'] %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Actions</h2>
+            <div class="flex flex-wrap gap-2">
+                {% if showing.status.value != 'completed' %}
+                <form method="POST" action="/showings/{{ showing.id }}/complete" class="inline">
+                    <button type="submit" class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors bg-green-600 text-white hover:bg-green-500">
+                        ✅ Mark Complete
+                    </button>
+                </form>
+                {% endif %}
+                {% if showing.status.value != 'cancelled' %}
+                <form method="POST" action="/showings/{{ showing.id }}/cancel" class="inline" onsubmit="return confirm('Cancel this showing?')">
+                    <button type="submit" class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors bg-white text-red-600 ring-1 ring-red-300 hover:bg-red-50">
+                        ❌ Cancel Showing
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Property & Vendor Info -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Details</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-xs text-gray-500">Property</dt>
+                    <dd class="text-sm font-medium text-gray-900">
+                        {% if showing.property_ref %}<a href="/properties/{{ showing.property_ref.id }}" class="text-blue-600 hover:underline">{{ showing.property_ref.address }}</a>{% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Vendor</dt>
+                    <dd class="text-sm text-gray-900">{{ showing.vendor.name if showing.vendor else '— Not assigned —' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Type</dt>
+                    <dd class="text-sm text-gray-900">{{ showing.showing_type.value.title() }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Schedule -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Schedule</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-xs text-gray-500">Date</dt>
+                    <dd class="text-sm font-medium text-gray-900">{{ showing.scheduled_date.strftime('%A, %b %d, %Y') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-gray-500">Time</dt>
+                    <dd class="text-sm font-medium text-gray-900">{{ showing.scheduled_time }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Contact Info -->
+        {% if showing.contact_name or showing.contact_phone %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Contact</h2>
+            <dl class="space-y-3">
+                {% if showing.contact_name %}
+                <div>
+                    <dt class="text-xs text-gray-500">Name</dt>
+                    <dd class="text-sm text-gray-900">{{ showing.contact_name }}</dd>
+                </div>
+                {% endif %}
+                {% if showing.contact_phone %}
+                <div>
+                    <dt class="text-xs text-gray-500">Phone</dt>
+                    <dd class="text-sm text-gray-900">
+                        <a href="tel:{{ showing.contact_phone }}" class="text-blue-600 hover:underline">{{ showing.contact_phone }}</a>
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        {% endif %}
+
+        <!-- Timeline -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Timeline</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-xs text-gray-500">Created</dt>
+                    <dd class="text-sm text-gray-900">{{ showing.created_at.strftime('%b %d, %Y %I:%M %p') }}</dd>
+                </div>
+                {% if showing.updated_at and showing.updated_at != showing.created_at %}
+                <div>
+                    <dt class="text-xs text-gray-500">Last Updated</dt>
+                    <dd class="text-sm text-gray-900">{{ showing.updated_at.strftime('%b %d, %Y %I:%M %p') }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

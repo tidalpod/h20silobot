@@ -139,6 +139,30 @@
             </p>
         </div>
     </a>
+
+    <!-- 6. Showings -->
+    <a href="/showings" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-teal-200 transition-all cursor-pointer block">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 p-3 {% if upcoming_showings > 0 %}bg-teal-50{% else %}bg-gray-50{% endif %} rounded-xl">
+                    <span class="text-2xl">🏠</span>
+                </div>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-500">Showings</p>
+                    <p class="text-2xl font-bold {% if upcoming_showings > 0 %}text-teal-600{% else %}text-gray-600{% endif %}">{{ upcoming_showings }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
+            <p class="text-xs text-gray-500">
+                {% if upcoming_showings > 0 %}
+                <span class="font-medium">{{ upcoming_showings }} upcoming (7 days)</span>
+                {% else %}
+                No upcoming showings
+                {% endif %}
+            </p>
+        </div>
+    </a>
 </div>
 
 <!-- Quick Actions -->

@@ -15,6 +15,7 @@ from database.connection import get_session
 from database.models import (
     Vendor, WorkOrder, WorkOrderPhoto, WorkOrderStatus,
     Property, Invoice, InvoiceStatus, SMSMessage, MessageDirection,
+    Showing, ShowingStatus,
 )
 from webapp.auth.vendor_auth import get_current_vendor, login_vendor, logout_vendor
 from webapp.services.vendor_verification_service import (
@@ -497,6 +498,86 @@ async def vendor_invoice_detail(request: Request, inv_id: int):
 
 
 # =============================================================================
+# Showings
+# =============================================================================
+
+@router.get("/showings", response_class=HTMLResponse)
+async def vendor_showings(request: Request):
+    """List vendor's assigned showings"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing)
+            .where(Showing.vendor_id == vendor["id"])
+            .options(selectinload(Showing.property_ref))
+            .order_by(desc(Showing.scheduled_date), desc(Showing.scheduled_time))
+        )
+        showings = result.scalars().all()
+
+    return templates.TemplateResponse("vendor/showings.html", {
+        "request": request,
+        "vendor": vendor,
+        "showings": showings,
+    })
+
+
+@router.get("/showings/{showing_id}", response_class=HTMLResponse)
+async def vendor_showing_detail(request: Request, showing_id: int):
+    """View showing detail"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing)
+            .where(
+                Showing.id == showing_id,
+                Showing.vendor_id == vendor["id"],
+            )
+            .options(selectinload(Showing.property_ref))
+        )
+        showing = result.scalar_one_or_none()
+        if not showing:
+            return RedirectResponse(url="/vendor/showings", status_code=303)
+
+    return templates.TemplateResponse("vendor/showing_detail.html", {
+        "request": request,
+        "vendor": vendor,
+        "showing": showing,
+    })
+
+
+@router.post("/showings/{showing_id}/confirm")
+async def vendor_confirm_showing(request: Request, showing_id: int):
+    """Vendor confirms a showing"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing).where(
+                Showing.id == showing_id,
+                Showing.vendor_id == vendor["id"],
+            )
+        )
+        showing = result.scalar_one_or_none()
+        if not showing:
+            return RedirectResponse(url="/vendor/showings", status_code=303)
+
+        if showing.status == ShowingStatus.SCHEDULED:
+            showing.status = ShowingStatus.CONFIRMED
+            from datetime import datetime
+            showing.updated_at = datetime.utcnow()
+
+    return RedirectResponse(url=f"/vendor/showings/{showing_id}", status_code=303)
+
+
+# =============================================================================
 # Messages
 # =============================================================================
 
@@ -649,6 +730,31 @@ async def vendor_calendar(request: Request):
             "status": wo.status.value,
             "property": wo.property_ref.address if wo.property_ref else "Unknown",
             "priority": wo.priority.value if wo.priority else "normal",
+            "type": "work_order",
+        })
+
+    # Also fetch showings for this vendor
+    async with get_session() as session:
+        showing_result = await session.execute(
+            select(Showing)
+            .where(
+                Showing.vendor_id == vendor["id"],
+                Showing.scheduled_date != None,
+            )
+            .options(selectinload(Showing.property_ref))
+            .order_by(Showing.scheduled_date)
+        )
+        showings = showing_result.scalars().all()
+
+    for s in showings:
+        events.append({
+            "id": s.id,
+            "title": s.title,
+            "date": s.scheduled_date.isoformat() if s.scheduled_date else None,
+            "time": s.scheduled_time,
+            "status": s.status.value,
+            "property": s.property_ref.address if s.property_ref else "Unknown",
+            "type": "showing",
         })
 
     return templates.TemplateResponse("vendor/calendar.html", {

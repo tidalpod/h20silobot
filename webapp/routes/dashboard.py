@@ -12,7 +12,8 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Property, WaterBill, BillStatus, Notification, Tenant,
-    WorkOrder, WorkOrderStatus, WorkOrderPriority, LeaseDocument, LeaseStatus
+    WorkOrder, WorkOrderStatus, WorkOrderPriority, LeaseDocument, LeaseStatus,
+    Showing, ShowingStatus,
 )
 from webapp.auth.dependencies import get_current_user
 
@@ -275,6 +276,17 @@ async def dashboard(request: Request):
         )
         emergency_work_orders = wo_emergency_result.scalar() or 0
 
+        # === UPCOMING SHOWINGS ===
+        showing_threshold = today + timedelta(days=7)
+        upcoming_showings_result = await session.execute(
+            select(func.count(Showing.id)).where(
+                Showing.status.in_([ShowingStatus.SCHEDULED, ShowingStatus.CONFIRMED]),
+                Showing.scheduled_date >= today,
+                Showing.scheduled_date <= showing_threshold,
+            )
+        )
+        upcoming_showings = upcoming_showings_result.scalar() or 0
+
         # === EXPIRING LEASES ===
         today = datetime.now().date()
         threshold_30 = today + timedelta(days=30)
@@ -341,6 +353,8 @@ async def dashboard(request: Request):
             # Work Orders
             "open_work_orders": open_work_orders,
             "emergency_work_orders": emergency_work_orders,
+            # Showings
+            "upcoming_showings": upcoming_showings,
             # Expiring Leases
             "expiring_leases": expiring_leases[:5],
             "today": datetime.now().date(),

@@ -69,6 +69,10 @@
         'new': 'bg-blue-100 text-blue-800',
         'completed': 'bg-green-100 text-green-800',
         'closed': 'bg-gray-100 text-gray-600',
+        // Showing statuses
+        'scheduled': 'bg-teal-100 text-teal-800',
+        'confirmed': 'bg-teal-200 text-teal-900',
+        'cancelled': 'bg-red-100 text-red-600',
     };
 
     function renderCalendar() {
@@ -141,11 +145,16 @@
         let html = '';
         dayEvents.forEach(evt => {
             const cls = statusColors[evt.status] || 'bg-gray-100 text-gray-700';
+            const detailUrl = evt.type === 'showing'
+                ? `/vendor/showings/${evt.id}`
+                : `/vendor/work-orders/${evt.id}`;
+            const typeLabel = evt.type === 'showing' ? '🏠 ' : '🔧 ';
+            const timeLabel = evt.time ? `<span class="text-xs text-gray-400 ml-1">${evt.time}</span>` : '';
             html += `
-            <a href="/vendor/work-orders/${evt.id}" class="portal-card p-3 block hover:shadow-md transition-shadow">
+            <a href="${detailUrl}" class="portal-card p-3 block hover:shadow-md transition-shadow">
                 <div class="flex items-center justify-between">
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-gray-900 truncate">${evt.title}</div>
+                        <div class="text-sm font-medium text-gray-900 truncate">${typeLabel}${evt.title}${timeLabel}</div>
                         <div class="text-xs text-gray-500">${evt.property}</div>
                     </div>
                     <span class="text-xs px-2 py-0.5 rounded-full ${cls} flex-shrink-0 ml-2">${evt.status.replace('_', ' ')}</span>

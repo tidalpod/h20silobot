@@ -95,6 +95,20 @@ class LeaseBuilderStatus(PyEnum):
     VOIDED = "voided"
 
 
+class ShowingType(PyEnum):
+    INSPECTOR = "inspector"
+    TENANT = "tenant"
+    CONTRACTOR = "contractor"
+    OTHER = "other"
+
+
+class ShowingStatus(PyEnum):
+    SCHEDULED = "scheduled"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
 class Property(Base):
     """Property/Account being tracked"""
     __tablename__ = "properties"
@@ -1199,3 +1213,46 @@ class EntityConfig(Base):
 
     def __repr__(self):
         return f"<EntityConfig {self.entity_name}>"
+
+
+class Showing(Base):
+    """Vendor showings - scheduling inspectors, tenant viewings, contractors, etc."""
+    __tablename__ = "showings"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+
+    title = Column(String(200), nullable=False)
+    showing_type = Column(Enum(ShowingType), nullable=False, default=ShowingType.OTHER)
+    description = Column(Text, nullable=True)
+
+    # Scheduling
+    scheduled_date = Column(Date, nullable=False)
+    scheduled_time = Column(String(5), nullable=False)  # "14:30" format
+
+    status = Column(Enum(ShowingStatus), nullable=False, default=ShowingStatus.SCHEDULED)
+
+    # Contact info for the person being shown in
+    contact_name = Column(String(100), nullable=True)
+    contact_phone = Column(String(20), nullable=True)
+
+    notes = Column(Text, nullable=True)
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property", backref="showings")
+    vendor = relationship("Vendor", backref="showings")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_showings_property", "property_id"),
+        Index("ix_showings_vendor", "vendor_id"),
+        Index("ix_showings_date", "scheduled_date"),
+    )
+
+    def __repr__(self):
+        return f"<Showing {self.id}: {self.title}>"

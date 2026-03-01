@@ -1,0 +1,65 @@
+{% extends "vendor/base.html" %}
+
+{% block title %}My Showings{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-bold text-gray-900">My Showings</h1>
+</div>
+
+{% if showings %}
+<div class="space-y-3">
+    {% for s in showings %}
+    <a href="/vendor/showings/{{ s.id }}" class="portal-card p-4 block hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="min-w-0">
+                <div class="text-sm font-semibold text-gray-900">{{ s.title }}</div>
+                <div class="text-xs text-gray-500 mt-0.5">
+                    {% if s.property_ref %}{{ s.property_ref.address }}{% endif %}
+                </div>
+            </div>
+            {% if s.status.value == 'scheduled' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex-shrink-0">Scheduled</span>
+            {% elif s.status.value == 'confirmed' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 flex-shrink-0">Confirmed</span>
+            {% elif s.status.value == 'completed' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">Completed</span>
+            {% elif s.status.value == 'cancelled' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex-shrink-0">Cancelled</span>
+            {% endif %}
+        </div>
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                </svg>
+                {{ s.scheduled_date.strftime('%b %d, %Y') }} at {{ s.scheduled_time }}
+            </div>
+            <div>
+                {% if s.showing_type.value == 'inspector' %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Inspector</span>
+                {% elif s.showing_type.value == 'tenant' %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Tenant</span>
+                {% elif s.showing_type.value == 'contractor' %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Contractor</span>
+                {% else %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Other</span>
+                {% endif %}
+            </div>
+        </div>
+        {% if s.status.value == 'scheduled' %}
+        <div class="mt-2 pt-2 border-t border-gray-100">
+            <span class="text-xs text-purple-600 font-medium">Tap to view & confirm</span>
+        </div>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="portal-card p-8 text-center">
+    <div class="text-3xl mb-2">🏠</div>
+    <h3 class="text-base font-semibold text-gray-900">No showings assigned</h3>
+    <p class="text-sm text-gray-500 mt-1">You'll see showings here when they are assigned to you.</p>
+</div>
+{% endif %}
+{% endblock %}
