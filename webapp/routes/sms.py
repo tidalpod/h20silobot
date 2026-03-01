@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 from sqlalchemy.orm import selectinload
 from pathlib import Path
 
@@ -165,6 +165,16 @@ async def get_conversation(tenant_id: int, request: Request):
             .order_by(SMSMessage.created_at.asc())
         )
         messages = result.scalars().all()
+
+        # Mark inbound messages as read
+        inbound_ids = [m.id for m in messages if m.direction == MessageDirection.INBOUND and m.status == "received"]
+        if inbound_ids:
+            await session.execute(
+                update(SMSMessage)
+                .where(SMSMessage.id.in_(inbound_ids))
+                .values(status="read")
+            )
+            await session.commit()
 
         return JSONResponse({
             "tenant": {
