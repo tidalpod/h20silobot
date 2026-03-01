@@ -369,8 +369,8 @@ class NotificationStatus(PyEnum):
 
 class MessageDirection(PyEnum):
     """SMS message direction"""
-    INBOUND = "inbound"    # From tenant to us
-    OUTBOUND = "outbound"  # From us to tenant
+    INBOUND = "inbound"    # From tenant/vendor to us
+    OUTBOUND = "outbound"  # From us to tenant/vendor
 
 
 class WebUser(Base):
@@ -660,6 +660,7 @@ class SMSMessage(Base):
 
     id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True, index=True)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="SET NULL"), nullable=True)
 
     # Phone numbers (E.164 format: +12481234567)
@@ -680,11 +681,13 @@ class SMSMessage(Base):
 
     # Relationships
     tenant = relationship("Tenant", back_populates="sms_messages")
+    vendor = relationship("Vendor", back_populates="sms_messages")
     property = relationship("Property", back_populates="sms_messages")
 
     # Indexes for fast conversation lookups
     __table_args__ = (
         Index("ix_sms_messages_tenant", "tenant_id"),
+        Index("ix_sms_messages_vendor", "vendor_id"),
         Index("ix_sms_messages_from_number", "from_number"),
         Index("ix_sms_messages_created", "created_at"),
     )
@@ -744,6 +747,7 @@ class Vendor(Base):
     work_orders = relationship("WorkOrder", back_populates="vendor_ref")
     invoices = relationship("Invoice", back_populates="vendor_ref")
     projects = relationship("Project", back_populates="vendor_ref")
+    sms_messages = relationship("SMSMessage", back_populates="vendor", lazy="selectin")
 
     def __repr__(self):
         return f"<Vendor {self.name}>"

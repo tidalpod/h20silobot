@@ -23,6 +23,8 @@ async def run_migrations(engine):
         ("inspection_violations", "image_url", "VARCHAR(500)"),
         # Rental inspection pass/fail status
         ("properties", "rental_inspection_status", "VARCHAR(20)"),
+        # Vendor SMS conversations
+        ("sms_messages", "vendor_id", "INTEGER REFERENCES vendors(id) ON DELETE SET NULL"),
     ]
 
     async with engine.begin() as conn:
@@ -41,6 +43,11 @@ async def run_migrations(engine):
                     ADD COLUMN {column} {col_type}
                 """))
                 print(f"[DB] Column '{column}' added successfully")
+
+        # Create indexes for new columns (idempotent)
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_sms_messages_vendor ON sms_messages(vendor_id)"
+        ))
 
 async def _seed_telegram_admins(engine):
     """Ensure default Telegram admin users exist for Blue Deer alerts"""

@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     WorkOrder, WorkOrderPhoto, WorkOrderStatus, WorkOrderPriority,
-    WorkOrderCategory, Vendor, Property, Tenant
+    WorkOrderCategory, Vendor, Property, Tenant, SMSMessage, MessageDirection
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -35,6 +35,22 @@ UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
 )
 UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _normalize_phone(phone):
+    """Normalize phone number to E.164 format"""
+    if not phone:
+        return None
+    digits = ''.join(c for c in phone if c.isdigit() or c == '+')
+    if not digits:
+        return None
+    if digits.startswith('+'):
+        return digits
+    elif digits.startswith('1') and len(digits) == 11:
+        return f"+{digits}"
+    elif len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}"
 
 
 async def _notify_vendor_sms(vendor_id: int, wo, session):
@@ -76,6 +92,26 @@ async def _notify_vendor_sms(vendor_id: int, wo, session):
             logger.info(f"Vendor SMS sent to {vendor.name} for WO #{wo.id}")
         else:
             logger.error(f"Failed to SMS vendor {vendor.name}: {sms_result.error_message}")
+
+        # Store outbound message in DB for conversation tracking
+        try:
+            from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+            to_number = _normalize_phone(vendor.phone)
+            sms_message = SMSMessage(
+                vendor_id=vendor_id,
+                from_number=from_number,
+                to_number=to_number,
+                body=msg,
+                direction=MessageDirection.OUTBOUND,
+                twilio_sid=sms_result.message_sid if sms_result.success else None,
+                status="sent" if sms_result.success else "failed",
+                created_at=datetime.utcnow()
+            )
+            session.add(sms_message)
+            await session.flush()
+        except Exception as db_err:
+            logger.error(f"Failed to store vendor SMS in DB: {db_err}")
+
         return sms_result.success
     except Exception as e:
         logger.error(f"Error sending vendor SMS: {e}")

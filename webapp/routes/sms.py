@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from pathlib import Path
 
 from database.connection import get_session
-from database.models import SMSMessage, Tenant, Property, MessageDirection
+from database.models import SMSMessage, Tenant, Vendor, Property, MessageDirection
 from webapp.services.twilio_service import twilio_service
 from webapp.auth.dependencies import get_current_user
 
@@ -70,6 +70,7 @@ async def twilio_incoming_webhook(
 
             # Try to find the tenant by phone number
             tenant_id = None
+            vendor_id = None
             property_id = None
 
             if from_number:
@@ -90,9 +91,21 @@ async def twilio_incoming_webhook(
                             logger.info(f"Matched incoming SMS to tenant: {tenant.name}")
                             break
 
+                # If no tenant match, try matching against vendors
+                if not tenant_id:
+                    result = await session.execute(
+                        select(Vendor).where(Vendor.is_active == True)
+                    )
+                    for vendor in result.scalars().all():
+                        if vendor.phone and normalize_phone(vendor.phone) == from_number:
+                            vendor_id = vendor.id
+                            logger.info(f"Matched incoming SMS to vendor: {vendor.name}")
+                            break
+
             # Store the incoming message
             sms_message = SMSMessage(
                 tenant_id=tenant_id,
+                vendor_id=vendor_id,
                 property_id=property_id,
                 from_number=from_number or From,
                 to_number=to_number or To,
@@ -313,7 +326,44 @@ async def get_recent_conversations(request: Request):
             reverse=True
         )
 
-        return JSONResponse({"conversations": conversations})
+        # Get vendor conversations
+        vendor_result = await session.execute(
+            select(Vendor)
+            .where(Vendor.is_active == True)
+            .where(Vendor.phone != None)
+            .options(selectinload(Vendor.sms_messages))
+        )
+        vendors = vendor_result.scalars().all()
+
+        vendor_conversations = []
+        for vendor in vendors:
+            if vendor.sms_messages:
+                latest_msg = max(vendor.sms_messages, key=lambda m: m.created_at or datetime.min)
+                unread_count = sum(
+                    1 for m in vendor.sms_messages
+                    if m.direction == MessageDirection.INBOUND and m.status == "received"
+                )
+                vendor_conversations.append({
+                    "vendor_id": vendor.id,
+                    "vendor_name": vendor.name,
+                    "vendor_phone": vendor.phone,
+                    "specialty": vendor.specialty or "",
+                    "last_message": latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body,
+                    "last_message_time": latest_msg.created_at.isoformat() if latest_msg.created_at else None,
+                    "last_direction": latest_msg.direction.value,
+                    "message_count": len(vendor.sms_messages),
+                    "unread_count": unread_count
+                })
+
+        vendor_conversations.sort(
+            key=lambda c: c["last_message_time"] or "",
+            reverse=True
+        )
+
+        return JSONResponse({
+            "conversations": conversations,
+            "vendor_conversations": vendor_conversations
+        })
 
 
 # =============================================================================
@@ -331,6 +381,7 @@ async def get_unmatched_messages(request: Request):
         result = await session.execute(
             select(SMSMessage)
             .where(SMSMessage.tenant_id == None)
+            .where(SMSMessage.vendor_id == None)
             .where(SMSMessage.direction == MessageDirection.INBOUND)
             .order_by(SMSMessage.created_at.desc())
             .limit(50)
@@ -393,5 +444,189 @@ async def get_tenants_with_phone(request: Request, search: str = ""):
                     "property_address": tenant.property_ref.address if tenant.property_ref else "No property"
                 }
                 for tenant in tenants
+            ]
+        })
+
+
+# =============================================================================
+# Vendor Conversation API
+# =============================================================================
+
+@router.get("/conversation/vendor/{vendor_id}")
+async def get_vendor_conversation(vendor_id: int, request: Request):
+    """Get SMS conversation history for a vendor"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
+        )
+        vendor = result.scalar_one_or_none()
+
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
+
+        if not vendor.phone:
+            return JSONResponse({
+                "vendor": {"id": vendor.id, "name": vendor.name, "phone": None},
+                "messages": [],
+                "error": "Vendor has no phone number"
+            })
+
+        vendor_phone = normalize_phone(vendor.phone)
+        our_phone = normalize_phone(twilio_service.from_number) if twilio_service.from_number else None
+
+        # Get all messages for this vendor by vendor_id OR phone number match
+        result = await session.execute(
+            select(SMSMessage)
+            .where(
+                or_(
+                    SMSMessage.vendor_id == vendor_id,
+                    SMSMessage.from_number == vendor_phone,
+                    SMSMessage.to_number == vendor_phone
+                )
+            )
+            .where(SMSMessage.tenant_id == None)
+            .order_by(SMSMessage.created_at.asc())
+        )
+        messages = result.scalars().all()
+
+        # Mark inbound messages as read
+        inbound_ids = [m.id for m in messages if m.direction == MessageDirection.INBOUND and m.status == "received"]
+        if inbound_ids:
+            await session.execute(
+                update(SMSMessage)
+                .where(SMSMessage.id.in_(inbound_ids))
+                .values(status="read")
+            )
+            await session.commit()
+
+        return JSONResponse({
+            "vendor": {
+                "id": vendor.id,
+                "name": vendor.name,
+                "phone": vendor.phone,
+                "specialty": vendor.specialty or ""
+            },
+            "our_phone": our_phone,
+            "messages": [
+                {
+                    "id": msg.id,
+                    "body": msg.body,
+                    "direction": msg.direction.value,
+                    "status": msg.status,
+                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "from_number": msg.from_number,
+                    "to_number": msg.to_number
+                }
+                for msg in messages
+            ]
+        })
+
+
+@router.post("/send/vendor/{vendor_id}")
+async def send_sms_to_vendor(
+    vendor_id: int,
+    request: Request,
+    message: str = Form(...)
+):
+    """Send an SMS to a vendor and store in conversation"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
+        )
+        vendor = result.scalar_one_or_none()
+
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
+
+        if not vendor.phone:
+            raise HTTPException(status_code=400, detail="Vendor has no phone number")
+
+        # Send SMS via Twilio
+        result = await twilio_service.send_sms(vendor.phone, message)
+
+        # Store outbound message
+        from_number = normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+        to_number = normalize_phone(vendor.phone)
+
+        sms_message = SMSMessage(
+            vendor_id=vendor_id,
+            from_number=from_number,
+            to_number=to_number,
+            body=message,
+            direction=MessageDirection.OUTBOUND,
+            twilio_sid=result.message_sid if result.success else None,
+            status="sent" if result.success else "failed",
+            created_at=datetime.utcnow()
+        )
+        session.add(sms_message)
+        await session.commit()
+
+        if result.success:
+            return JSONResponse({
+                "success": True,
+                "message_id": sms_message.id,
+                "twilio_sid": result.message_sid
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "error": result.error_message
+            }, status_code=400)
+
+
+# =============================================================================
+# Vendors with Phone Numbers (for new conversation)
+# =============================================================================
+
+@router.get("/vendors-with-phone")
+async def get_vendors_with_phone(request: Request, search: str = ""):
+    """Get all active vendors with phone numbers for starting new conversations"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with get_session() as session:
+        query = (
+            select(Vendor)
+            .where(Vendor.is_active == True)
+            .where(Vendor.phone != None)
+            .where(Vendor.phone != "")
+            .order_by(Vendor.name)
+        )
+
+        result = await session.execute(query)
+        vendors = result.scalars().all()
+
+        if search:
+            search_lower = search.lower()
+            vendors = [
+                v for v in vendors
+                if search_lower in v.name.lower()
+                or (v.specialty and search_lower in v.specialty.lower())
+                or (v.company and search_lower in v.company.lower())
+                or search_lower in (v.phone or "")
+            ]
+
+        return JSONResponse({
+            "vendors": [
+                {
+                    "id": vendor.id,
+                    "name": vendor.name,
+                    "phone": vendor.phone,
+                    "specialty": vendor.specialty or "",
+                    "company": vendor.company or ""
+                }
+                for vendor in vendors
             ]
         })

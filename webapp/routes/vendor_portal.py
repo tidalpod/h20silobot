@@ -552,10 +552,12 @@ async def vendor_messages_conversation(request: Request):
             select(SMSMessage)
             .where(
                 or_(
+                    SMSMessage.vendor_id == vendor["id"],
                     SMSMessage.from_number == vendor_phone,
                     SMSMessage.to_number == vendor_phone,
                 )
             )
+            .where(SMSMessage.tenant_id == None)
             .order_by(SMSMessage.created_at.asc())
         )
         messages = result.scalars().all()
@@ -600,6 +602,7 @@ async def vendor_messages_send(request: Request):
         our_phone = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "vendor-portal"
 
         sms_message = SMSMessage(
+            vendor_id=vendor["id"],
             from_number=vendor_phone,
             to_number=our_phone,
             body=f"[Vendor: {vendor['name']}] {body}",
