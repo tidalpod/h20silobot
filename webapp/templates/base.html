@@ -427,6 +427,13 @@
 
                     <!-- Mobile: right side buttons -->
                     <div class="flex items-center gap-2 lg:hidden">
+                        <!-- Mobile messages -->
+                        <a href="/notifications/chat" class="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                            </svg>
+                            <span id="mobile-header-unread-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none"></span>
+                        </a>
                         <!-- Mobile search -->
                         <button onclick="openSearchModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -811,13 +818,16 @@
                 const data = await resp.json();
                 const badge = document.getElementById('unread-badge');
                 const mobileBadge = document.getElementById('mobile-unread-badge');
+                const mobileHeaderBadge = document.getElementById('mobile-header-unread-badge');
                 if (data.unread > 0) {
                     const text = data.unread > 99 ? '99+' : String(data.unread);
                     if (badge) { badge.textContent = text; badge.classList.remove('hidden'); }
                     if (mobileBadge) { mobileBadge.textContent = text; mobileBadge.classList.remove('hidden'); }
+                    if (mobileHeaderBadge) { mobileHeaderBadge.textContent = text; mobileHeaderBadge.classList.remove('hidden'); }
                 } else {
                     if (badge) badge.classList.add('hidden');
                     if (mobileBadge) mobileBadge.classList.add('hidden');
+                    if (mobileHeaderBadge) mobileHeaderBadge.classList.add('hidden');
                 }
             } catch (e) { /* silent */ }
         }
