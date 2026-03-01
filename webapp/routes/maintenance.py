@@ -551,6 +551,42 @@ async def notify_vendor(request: Request, wo_id: int):
     return RedirectResponse(url=f"/maintenance/{wo_id}?sms={'sent' if sent else 'failed'}", status_code=303)
 
 
+@router.post("/{wo_id}/assign-vendor")
+async def assign_vendor(request: Request, wo_id: int):
+    """Quick vendor assignment from detail page"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    vendor_str = form.get("vendor_id", "").strip()
+    new_vendor_id = int(vendor_str) if vendor_str else None
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkOrder).where(WorkOrder.id == wo_id)
+        )
+        wo = result.scalar_one_or_none()
+        if not wo:
+            return RedirectResponse(url="/maintenance", status_code=303)
+
+        old_vendor_id = wo.vendor_id
+        wo.vendor_id = new_vendor_id
+        wo.updated_at = datetime.utcnow()
+
+        # Auto-set status to assigned when a vendor is assigned and status is still new
+        if new_vendor_id and wo.status == WorkOrderStatus.NEW:
+            wo.status = WorkOrderStatus.ASSIGNED
+
+        # SMS notify vendor if requested and vendor changed
+        sms_param = ""
+        if new_vendor_id and form.get("notify_vendor") and new_vendor_id != old_vendor_id:
+            sent = await _notify_vendor_sms(new_vendor_id, wo, session)
+            sms_param = f"&sms={'sent' if sent else 'failed'}"
+
+    return RedirectResponse(url=f"/maintenance/{wo_id}?assigned=1{sms_param}", status_code=303)
+
+
 @router.post("/{wo_id}/status")
 async def update_work_order_status(request: Request, wo_id: int):
     """Quick status change"""

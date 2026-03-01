@@ -69,6 +69,12 @@
 
 {% block content %}
 {% set sms_status = request.query_params.get('sms', '') %}
+{% set assigned = request.query_params.get('assigned', '') %}
+{% if assigned == '1' %}
+<div class="mb-4 bg-blue-50 text-blue-700 text-sm rounded-lg p-3 flex items-center gap-2">
+    <span>📋</span> Vendor assignment updated.
+</div>
+{% endif %}
 {% if sms_status == 'sent' %}
 <div class="mb-4 bg-green-50 text-green-700 text-sm rounded-lg p-3 flex items-center gap-2">
     <span>📱</span> SMS notification sent to vendor successfully.
@@ -171,8 +177,28 @@
                     <dd class="text-sm text-gray-900">{{ wo.tenant_ref.name if wo.tenant_ref else '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-xs text-gray-500">Vendor</dt>
-                    <dd class="text-sm text-gray-900">{{ wo.vendor_ref.name if wo.vendor_ref else 'Not assigned' }}</dd>
+                    <dt class="text-xs text-gray-500 mb-1">Vendor</dt>
+                    <dd>
+                        <form method="POST" action="/maintenance/{{ wo.id }}/assign-vendor" class="space-y-2">
+                            <select name="vendor_id" class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5">
+                                <option value="">— Not assigned —</option>
+                                {% for v in vendors %}
+                                <option value="{{ v.id }}" {% if wo.vendor_id == v.id %}selected{% endif %}>
+                                    {{ v.name }}{% if v.specialty %} ({{ v.specialty }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="flex items-center gap-2">
+                                <button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+                                    Assign
+                                </button>
+                                <label class="flex items-center gap-1 text-xs text-gray-500">
+                                    <input type="checkbox" name="notify_vendor" value="1" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5">
+                                    SMS notify
+                                </label>
+                            </div>
+                        </form>
+                    </dd>
                 </div>
                 <div>
                     <dt class="text-xs text-gray-500">Unit / Area</dt>
