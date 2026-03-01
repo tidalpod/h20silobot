@@ -206,7 +206,8 @@ async function selectConversation(tenantId) {
     document.getElementById('chat-header-content').classList.remove('hidden');
     document.getElementById('chat-header-empty').classList.add('hidden');
     document.getElementById('chat-input-area').classList.remove('hidden');
-    document.getElementById('messages-empty').classList.add('hidden');
+    const emptyEl = document.getElementById('messages-empty');
+    if (emptyEl) emptyEl.classList.add('hidden');
 
     // Reload conversations list to update active state
     loadConversations();
