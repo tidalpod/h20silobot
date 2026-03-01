@@ -1091,6 +1091,7 @@ class RentPayment(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
     bank_account_id = Column(Integer, ForeignKey("tenant_bank_accounts.id", ondelete="SET NULL"), nullable=True)
+    entity_bank_account_id = Column(Integer, ForeignKey("entity_bank_accounts.id", ondelete="SET NULL"), nullable=True)
 
     # Amounts
     amount = Column(Numeric(10, 2), nullable=False)
@@ -1116,6 +1117,7 @@ class RentPayment(Base):
     tenant_ref = relationship("Tenant", back_populates="rent_payments")
     property_ref = relationship("Property")
     bank_account_ref = relationship("TenantBankAccount", back_populates="payments")
+    entity_bank_account_ref = relationship("EntityBankAccount")
 
     __table_args__ = (
         Index("ix_rent_payments_tenant", "tenant_id"),
@@ -1213,6 +1215,40 @@ class EntityConfig(Base):
 
     def __repr__(self):
         return f"<EntityConfig {self.entity_name}>"
+
+
+class EntityBankAccount(Base):
+    """Plaid-linked bank accounts for landlord entities (receiving accounts)"""
+    __tablename__ = "entity_bank_accounts"
+
+    id = Column(Integer, primary_key=True)
+    entity_id = Column(Integer, ForeignKey("entity_configs.id", ondelete="CASCADE"), nullable=False)
+
+    # Plaid tokens
+    plaid_access_token = Column(String(255), nullable=False)
+    plaid_item_id = Column(String(255), nullable=False)
+    plaid_account_id = Column(String(255), nullable=False)
+
+    # Display info
+    account_name = Column(String(255), nullable=True)
+    account_mask = Column(String(4), nullable=True)
+    institution_name = Column(String(255), nullable=True)
+    account_type = Column(String(50), nullable=True)  # "checking", "savings"
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    is_default = Column(Boolean, default=False)
+    linked_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    entity_ref = relationship("EntityConfig", backref="bank_accounts")
+
+    __table_args__ = (
+        Index("ix_entity_bank_accounts_entity", "entity_id"),
+    )
+
+    def __repr__(self):
+        return f"<EntityBankAccount {self.institution_name} ...{self.account_mask}>"
 
 
 class Showing(Base):

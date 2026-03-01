@@ -54,6 +54,29 @@ async def create_link_token(tenant_id: int, tenant_name: str) -> dict:
             return {"link_token": data["link_token"]}
 
 
+async def create_entity_link_token(entity_id: int, entity_name: str) -> dict:
+    """Create a Plaid Link token for a landlord entity to connect their bank account."""
+    url = f"{_base_url()}/link/token/create"
+    payload = {
+        **_auth_body(),
+        "user": {"client_user_id": f"entity_{entity_id}"},
+        "client_name": "Blue Deer Property Management",
+        "products": ["auth"],
+        "country_codes": ["US"],
+        "language": "en",
+    }
+    if web_config.plaid_webhook_url:
+        payload["webhook"] = web_config.plaid_webhook_url
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=_headers()) as resp:
+            data = await resp.json()
+            if resp.status != 200:
+                logger.error(f"Plaid entity link/token/create failed: {data}")
+                return {"error": data.get("error_message", "Failed to create link token")}
+            return {"link_token": data["link_token"]}
+
+
 async def exchange_public_token(public_token: str) -> dict:
     """Exchange a public token from Plaid Link for an access token."""
     url = f"{_base_url()}/item/public_token/exchange"

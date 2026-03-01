@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}Entity Bank Accounts{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                Entity Bank Accounts
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Manage entity bank accounts for payment routing</p>
+        </div>
+        <button onclick="document.getElementById('add-entity-modal').classList.remove('hidden')"
+                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Entity
+        </button>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Total Entities</p>
+        <p class="text-2xl font-bold text-gray-900">{{ entities|length }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Linked Accounts</p>
+        {%- set ns = namespace(count=0) -%}
+        {%- for e in entities -%}
+            {%- for a in e.bank_accounts if a.is_active -%}
+                {%- set ns.count = ns.count + 1 -%}
+            {%- endfor -%}
+        {%- endfor -%}
+        <p class="text-2xl font-bold text-blue-600">{{ ns.count }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <p class="text-sm text-gray-500">Properties Assigned</p>
+        <p class="text-2xl font-bold text-green-600">{{ property_counts.values()|sum }}</p>
+    </div>
+</div>
+
+{% if not entities %}
+<!-- Empty State -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+    </svg>
+    <h3 class="text-lg font-semibold text-gray-900 mb-1">No entities yet</h3>
+    <p class="text-sm text-gray-500 mb-4">Create an entity (LLC) and link its bank account for payment routing.</p>
+    <button onclick="document.getElementById('add-entity-modal').classList.remove('hidden')"
+            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Add Entity
+    </button>
+</div>
+{% endif %}
+
+<!-- Entity Cards -->
+<div class="space-y-6">
+{% for entity in entities %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="entity-{{ entity.id }}">
+    <!-- Entity Header -->
+    <div class="p-5 border-b border-gray-100">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">{{ entity.entity_name }}</h3>
+                    <div class="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                        {% if entity.owner_name %}<span>{{ entity.owner_name }}</span>{% endif %}
+                        {% if entity.email %}<span>&middot; {{ entity.email }}</span>{% endif %}
+                        {% if entity.phone %}<span>&middot; {{ entity.phone }}</span>{% endif %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            {{ property_counts.get(entity.id, 0) }} propert{{ 'ies' if property_counts.get(entity.id, 0) != 1 else 'y' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openEditModal({{ entity.id }}, '{{ entity.entity_name|e }}', '{{ (entity.owner_name or '')|e }}', '{{ (entity.email or '')|e }}', '{{ (entity.phone or '')|e }}', '{{ (entity.mailing_address or '')|e }}')"
+                        class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit entity">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                    </svg>
+                </button>
+                <form method="POST" action="/payments/bank-accounts/entities/{{ entity.id }}/delete"
+                      onsubmit="return confirm('Delete {{ entity.entity_name|e }}? This will unlink all bank accounts.')">
+                    <button type="submit" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete entity">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Accounts -->
+    <div class="p-5">
+        {% set active_accounts = entity.bank_accounts|selectattr('is_active')|list %}
+        {% if active_accounts %}
+        <div class="space-y-3 mb-4">
+            {% for account in active_accounts %}
+            <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-900">{{ account.institution_name or 'Bank Account' }}</span>
+                            {% if account.is_default %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Default</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            {{ account.account_name or '' }}
+                            {% if account.account_mask %}&middot; ...{{ account.account_mask }}{% endif %}
+                            {% if account.account_type %}&middot; {{ account.account_type|capitalize }}{% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if not account.is_default %}
+                    <form method="POST" action="/payments/bank-accounts/accounts/{{ account.id }}/set-default">
+                        <button type="submit" class="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors">
+                            Set Default
+                        </button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="/payments/bank-accounts/accounts/{{ account.id }}/unlink"
+                          onsubmit="return confirm('Unlink this bank account?')">
+                        <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                            Unlink
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Link Bank Account Button -->
+        <button onclick="openPlaidLink({{ entity.id }})" id="link-btn-{{ entity.id }}"
+                class="w-full p-3 text-center rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+            <span class="text-sm font-medium text-gray-600">+ Link Bank Account</span>
+            <p class="text-xs text-gray-400 mt-0.5">Securely connect via Plaid</p>
+        </button>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+<!-- Add Entity Modal -->
+<div id="add-entity-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-gray-500/75 transition-opacity" onclick="document.getElementById('add-entity-modal').classList.add('hidden')"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-semibold text-gray-900">Add Entity</h3>
+                <button onclick="document.getElementById('add-entity-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form method="POST" action="/payments/bank-accounts/entities/create">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
+                        <input type="text" name="entity_name" required placeholder="e.g. Blue Deer Holdings LLC"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+                        <input type="text" name="owner_name" placeholder="e.g. John Smith"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" placeholder="entity@example.com"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" name="phone" placeholder="(555) 555-5555"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
+                        <textarea name="mailing_address" rows="2" placeholder="123 Main St, Detroit, MI 48201"
+                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('add-entity-modal').classList.add('hidden')"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 shadow-sm">
+                        Create Entity
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Entity Modal -->
+<div id="edit-entity-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-gray-500/75 transition-opacity" onclick="document.getElementById('edit-entity-modal').classList.add('hidden')"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Entity</h3>
+                <button onclick="document.getElementById('edit-entity-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form id="edit-entity-form" method="POST" action="">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
+                        <input type="text" name="entity_name" id="edit-entity-name" required
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+                        <input type="text" name="owner_name" id="edit-owner-name"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" id="edit-email"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" name="phone" id="edit-phone"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
+                        <textarea name="mailing_address" id="edit-mailing-address" rows="2"
+                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('edit-entity-modal').classList.add('hidden')"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 shadow-sm">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditModal(id, name, owner, email, phone, address) {
+    document.getElementById('edit-entity-form').action = '/payments/bank-accounts/entities/' + id + '/update';
+    document.getElementById('edit-entity-name').value = name;
+    document.getElementById('edit-owner-name').value = owner;
+    document.getElementById('edit-email').value = email;
+    document.getElementById('edit-phone').value = phone;
+    document.getElementById('edit-mailing-address').value = address;
+    document.getElementById('edit-entity-modal').classList.remove('hidden');
+}
+
+async function openPlaidLink(entityId) {
+    const btn = document.getElementById('link-btn-' + entityId);
+    const origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="text-sm text-gray-500">Loading Plaid...</span>';
+
+    try {
+        const resp = await fetch('/payments/bank-accounts/link-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity_id: entityId }),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+            return;
+        }
+
+        const handler = Plaid.create({
+            token: data.link_token,
+            onSuccess: async (public_token, metadata) => {
+                btn.innerHTML = '<span class="text-sm text-gray-500">Linking account...</span>';
+                const selectedAccount = metadata.accounts && metadata.accounts.length > 0
+                    ? metadata.accounts[0].id : null;
+                const result = await fetch('/payments/bank-accounts/link-complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        public_token: public_token,
+                        entity_id: entityId,
+                        account_id: selectedAccount,
+                    }),
+                });
+                const resultData = await result.json();
+                if (resultData.success) {
+                    location.reload();
+                } else {
+                    alert('Error linking account: ' + (resultData.error || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.innerHTML = origHTML;
+                }
+            },
+            onExit: () => {
+                btn.disabled = false;
+                btn.innerHTML = origHTML;
+            },
+        });
+        handler.open();
+    } catch (e) {
+        alert('Error connecting to Plaid: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    }
+}
+</script>
+{% endblock %}

@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Tenant, TenantBankAccount, RentPayment, TenantAutopay,
-    PaymentStatus, AutopayStatus,
+    PaymentStatus, AutopayStatus, EntityConfig, EntityBankAccount,
 )
 from webapp.services import plaid_service
 
@@ -118,11 +118,31 @@ async def initiate_payment(
         late_fee = calculate_late_fee()
         total_amount = amount + late_fee
 
+        # Look up entity bank account for payment routing
+        entity_bank_account_id = None
+        if tenant.property_ref and tenant.property_ref.entity:
+            entity_result = await session.execute(
+                select(EntityConfig)
+                .where(EntityConfig.entity_name == tenant.property_ref.entity)
+            )
+            entity_config = entity_result.scalar_one_or_none()
+            if entity_config:
+                acct_result = await session.execute(
+                    select(EntityBankAccount)
+                    .where(EntityBankAccount.entity_id == entity_config.id)
+                    .where(EntityBankAccount.is_default == True)
+                    .where(EntityBankAccount.is_active == True)
+                )
+                entity_acct = acct_result.scalar_one_or_none()
+                if entity_acct:
+                    entity_bank_account_id = entity_acct.id
+
         # Create payment record
         payment = RentPayment(
             tenant_id=tenant_id,
             property_id=tenant.property_id,
             bank_account_id=bank_account_id,
+            entity_bank_account_id=entity_bank_account_id,
             amount=amount,
             late_fee=late_fee,
             total_amount=total_amount,
