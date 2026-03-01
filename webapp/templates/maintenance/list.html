@@ -4,20 +4,22 @@
 
 {% block header %}
 <header class="bg-white shadow-sm">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-                <span>🔧</span> Maintenance
-            </h1>
-            <p class="mt-1 text-sm text-gray-500">Work orders and maintenance requests</p>
-        </div>
-        <div class="flex gap-3">
-            <a href="/maintenance/vendors" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
-                <span class="mr-2">👷</span> Vendors
-            </a>
-            <a href="/maintenance/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
-                <span class="mr-2">➕</span> New Work Order
-            </a>
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 sm:gap-3">
+                    <span>🔧</span> Maintenance
+                </h1>
+                <p class="mt-1 text-sm text-gray-500 hidden sm:block">Work orders and maintenance requests</p>
+            </div>
+            <div class="flex gap-2 sm:gap-3 flex-shrink-0">
+                <a href="/maintenance/vendors" class="inline-flex items-center rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+                    <span class="sm:mr-2">👷</span><span class="hidden sm:inline"> Vendors</span>
+                </a>
+                <a href="/maintenance/new" class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+                    <span class="sm:mr-2">+</span><span class="hidden sm:inline"> New Work Order</span>
+                </a>
+            </div>
         </div>
     </div>
 </header>
@@ -74,9 +76,52 @@
     </form>
 </div>
 
-<!-- Work Orders Table -->
+<!-- Work Orders — Mobile Cards -->
 {% if work_orders %}
-<div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+<div class="md:hidden space-y-3">
+    {% for wo in work_orders %}
+    <a href="/maintenance/{{ wo.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:bg-gray-50 transition-colors">
+        <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-900">{{ wo.title }}</div>
+                {% if wo.tenant_ref %}<div class="text-xs text-gray-500">{{ wo.tenant_ref.name }}</div>{% endif %}
+            </div>
+            <span class="text-xs text-gray-400 flex-shrink-0">#{{ wo.id }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+            <div class="text-xs text-gray-500 truncate">
+                {% if wo.property_ref %}{{ wo.property_ref.address }}{% endif %}
+            </div>
+            <div class="flex gap-1.5 flex-shrink-0">
+                {% if wo.priority.value == 'emergency' %}
+                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Emergency</span>
+                {% elif wo.priority.value == 'high' %}
+                <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">High</span>
+                {% elif wo.priority.value == 'normal' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Normal</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">Low</span>
+                {% endif %}
+                {% if wo.status.value == 'new' %}
+                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">New</span>
+                {% elif wo.status.value == 'assigned' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Assigned</span>
+                {% elif wo.status.value == 'in_progress' %}
+                <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">In Progress</span>
+                {% elif wo.status.value == 'completed' %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                {% elif wo.status.value == 'closed' %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="text-xs text-gray-400 mt-1.5">{{ wo.created_at.strftime('%b %d, %Y') }}{% if wo.category %} · {{ wo.category.value.replace('_', ' ').title() }}{% endif %}</div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Work Orders — Desktop Table -->
+<div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>

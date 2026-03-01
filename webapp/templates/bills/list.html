@@ -39,8 +39,36 @@
 </div>
 
 <!-- Bills list -->
-<div class="bg-white shadow rounded-lg overflow-hidden">
-    {% if bills %}
+{% if bills %}
+<!-- Mobile Cards -->
+<div class="md:hidden space-y-3">
+    {% for bill in bills %}
+    {% set bill_status = bill.calculate_status() %}
+    <a href="/properties/{{ bill.property.id }}" class="block bg-white shadow rounded-lg p-4 hover:bg-gray-50 transition-colors">
+        <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="text-sm font-medium text-blue-600 min-w-0 truncate">{{ bill.property.address }}</div>
+            <span class="text-sm font-semibold text-gray-900 flex-shrink-0">${{ "%.2f"|format(bill.amount_due) }}</span>
+        </div>
+        <div class="flex items-center justify-between text-xs text-gray-500">
+            <span>Due: {{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else 'N/A' }}</span>
+            {% if bill_status.value == 'overdue' %}
+            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Overdue</span>
+            {% elif bill_status.value == 'due_soon' %}
+            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Due Soon</span>
+            {% elif bill_status.value == 'current' %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Current</span>
+            {% elif bill_status.value == 'paid' %}
+            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Paid</span>
+            {% else %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">Unknown</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Desktop Table -->
+<div class="hidden md:block bg-white shadow rounded-lg overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
@@ -90,6 +118,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
     {% else %}
     <div class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -24,7 +24,35 @@
 
 {% block content %}
 {% if vendors %}
-<div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+<!-- Mobile Cards -->
+<div class="md:hidden space-y-3">
+    {% for v in vendors %}
+    <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-4">
+        <div class="flex items-start justify-between gap-2 mb-1">
+            <div>
+                <div class="text-sm font-medium text-gray-900">{{ v.name }}</div>
+                {% if v.company %}<div class="text-xs text-gray-500">{{ v.company }}</div>{% endif %}
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                {% if v.is_active %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Active</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
+                {% endif %}
+                <a href="/maintenance/vendors/{{ v.id }}/edit" class="text-blue-600 hover:text-blue-500 text-xs font-medium">Edit</a>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500 mt-1.5">
+            {% if v.specialty %}<span>{{ v.specialty }}</span>{% endif %}
+            {% if v.phone %}<a href="tel:{{ v.phone }}" class="text-blue-600">{{ v.phone }}</a>{% endif %}
+            {% if v.email %}<span class="truncate">{{ v.email }}</span>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Desktop Table -->
+<div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>

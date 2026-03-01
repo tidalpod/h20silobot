@@ -4,19 +4,19 @@
 
 {% block header %}
 <header class="bg-white shadow">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Properties</h1>
-        <div class="flex gap-2">
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Properties</h1>
+        <div class="flex gap-2 flex-shrink-0">
             <button hx-post="/api/refresh-bills" hx-swap="none"
-                    onclick="this.innerHTML='<span class=\'animate-pulse\'>Refreshing...</span>'; this.disabled=true; setTimeout(() => { this.innerHTML='🔄 Refresh Bills'; this.disabled=false; location.reload(); }, 15000);"
+                    onclick="this.innerHTML='<span class=\'animate-pulse\'>...</span>'; this.disabled=true; setTimeout(() => { this.innerHTML='🔄'; this.disabled=false; location.reload(); }, 15000);"
                     class="inline-flex items-center rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
-                🔄 Refresh Bills
+                <span class="sm:hidden">🔄</span><span class="hidden sm:inline">🔄 Refresh Bills</span>
             </button>
             <a href="/properties/new" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
-                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <svg class="h-4 w-4 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
-                Add Property
+                <span class="hidden sm:inline">Add Property</span>
             </a>
         </div>
     </div>
@@ -67,15 +67,15 @@
     {% endif %}
 {% endfor %}
 
-<div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow mb-6 px-6 py-4">
-    <div class="flex items-center justify-between">
+<div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow mb-6 px-4 sm:px-6 py-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
             <p class="text-blue-100 text-sm font-medium">
                 {% if entity_filter %}{{ entity_filter }}{% else %}All Portfolios{% endif %} - Monthly Rent
             </p>
             <p class="text-white text-3xl font-bold">${{ "{:,.0f}".format(total_rent.amount) }}<span class="text-lg font-normal text-blue-200">/mo</span></p>
         </div>
-        <div class="flex gap-6 text-right">
+        <div class="grid grid-cols-3 sm:flex gap-4 sm:gap-6 text-left sm:text-right">
             {% if total_rent.section8 > 0 %}
             <div>
                 <p class="text-blue-200 text-xs">Section 8</p>
@@ -146,8 +146,85 @@ function filterByEntity(entity) {
 </div>
 
 <!-- Properties list -->
-<div class="bg-white shadow rounded-lg overflow-hidden">
-    {% if properties %}
+{% if properties %}
+    {% for item in properties %}
+    {# Compute operational status #}
+    {% set active_tenants = item.property.tenants | selectattr('is_active', 'true') | list %}
+    {% set is_vacant = active_tenants | length == 0 %}
+    {% set no_license = not item.property.has_rental_license %}
+    {% set failed_inspection = item.property.section8_inspection_status == 'failed' %}
+    {% set has_section8 = active_tenants | selectattr('is_section8', 'true') | list | length > 0 %}
+
+    {% if not item.property.is_active %}
+        {% set op_status = 'inactive' %}
+    {% elif failed_inspection %}
+        {% set op_status = 'issue' %}
+    {% elif is_vacant or no_license %}
+        {% set op_status = 'attention' %}
+    {% else %}
+        {% set op_status = 'ok' %}
+    {% endif %}
+
+    <!-- Mobile Card -->
+    <a href="/properties/{{ item.property.id }}" class="block md:hidden bg-white shadow rounded-lg p-4 mb-3 hover:bg-gray-50 transition-colors">
+        <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex items-start gap-2 min-w-0">
+                {% if op_status == 'inactive' %}<span class="text-sm mt-0.5">⚪</span>
+                {% elif op_status == 'issue' %}<span class="text-sm mt-0.5">🔴</span>
+                {% elif op_status == 'attention' %}<span class="text-sm mt-0.5">🟡</span>
+                {% else %}<span class="text-sm mt-0.5">🟢</span>{% endif %}
+                <div class="min-w-0">
+                    <div class="text-sm font-medium text-blue-600 truncate">
+                        {{ item.property.address }}{% if item.property.city %}, {{ item.property.city }}{% endif %}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1 mt-1">
+                        {% if is_vacant %}
+                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Vacant</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Occupied ({{ active_tenants|length }})</span>
+                        {% endif %}
+                        {% if has_section8 %}
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">S8</span>
+                        {% endif %}
+                        {% if item.property.entity %}
+                        <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">{{ item.property.entity.split(' ')[0] }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-sm pl-6">
+            <div class="text-gray-600">
+                {% if active_tenants %}
+                    {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+                    {% set display_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+                    {{ display_tenant.name }}
+                {% else %}
+                    <span class="text-gray-400">No tenant</span>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-4 text-right">
+                {% if active_tenants %}
+                    {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
+                    {% set rent_tenant = primary_tenant if primary_tenant else active_tenants[0] %}
+                    {% if rent_tenant.is_section8 and (rent_tenant.voucher_amount or rent_tenant.tenant_portion) %}
+                        {% set voucher = rent_tenant.voucher_amount|float if rent_tenant.voucher_amount else 0 %}
+                        {% set portion = rent_tenant.tenant_portion|float if rent_tenant.tenant_portion else 0 %}
+                        <span class="font-semibold text-gray-900">${{ "%.0f"|format(voucher + portion) }}</span>
+                    {% elif rent_tenant.current_rent %}
+                        <span class="font-semibold text-gray-900">${{ "%.0f"|format(rent_tenant.current_rent|float) }}</span>
+                    {% endif %}
+                {% endif %}
+                {% if item.property.bills and item.property.bills[0].amount_due %}
+                <span class="text-gray-400 font-light">💧 ${{ "%.0f"|format(item.property.bills[0].amount_due) }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+
+    <!-- Desktop Table -->
+    <div class="hidden md:block bg-white shadow rounded-lg overflow-hidden">
     <table class="min-w-full">
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -162,15 +239,12 @@ function filterByEntity(entity) {
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for item in properties %}
-            {# Compute operational status #}
             {% set active_tenants = item.property.tenants | selectattr('is_active', 'true') | list %}
             {% set is_vacant = active_tenants | length == 0 %}
             {% set no_license = not item.property.has_rental_license %}
             {% set failed_inspection = item.property.section8_inspection_status == 'failed' %}
             {% set has_section8 = active_tenants | selectattr('is_section8', 'true') | list | length > 0 %}
-            {% set needs_attention = is_vacant or no_license or failed_inspection %}
 
-            {# Determine computed status #}
             {% if not item.property.is_active %}
                 {% set op_status = 'inactive' %}
             {% elif failed_inspection %}
@@ -182,7 +256,6 @@ function filterByEntity(entity) {
             {% endif %}
 
             <tr class="hover:bg-gray-50 transition-colors">
-                <!-- Property Info -->
                 <td class="px-6 py-4">
                     <div class="flex items-start gap-2">
                         <span class="text-lg">🏠</span>
@@ -190,49 +263,27 @@ function filterByEntity(entity) {
                             <a href="/properties/{{ item.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                                 {{ item.property.address }}{% if item.property.city %}, {{ item.property.city }}{% endif %}{% if item.property.state %}, {{ item.property.state }}{% endif %}{% if item.property.zip_code %} {{ item.property.zip_code }}{% endif %}
                             </a>
-                            <!-- Tags: Max 3, ordered: Occupancy · Compliance · Section 8 -->
                             <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                {# Tag 1: Occupancy #}
                                 {% if is_vacant %}
-                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                                    🔑 Vacant
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">🔑 Vacant</span>
                                 {% else %}
-                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                                    👥 Occupied ({{ active_tenants|length }})
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">👥 Occupied ({{ active_tenants|length }})</span>
                                 {% endif %}
-
-                                {# Tag 2: Compliance #}
                                 {% if no_license %}
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                                    📜 No License
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">📜 No License</span>
                                 {% elif item.property.has_rental_license %}
-                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                                    📜 Licensed
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">📜 Licensed</span>
                                 {% endif %}
-
-                                {# Tag 3: Entity (optional) #}
                                 {% if item.property.entity %}
-                                <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700" title="{{ item.property.entity }}">
-                                    🏢 {{ item.property.entity.split(' ')[0] }}
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700" title="{{ item.property.entity }}">🏢 {{ item.property.entity.split(' ')[0] }}</span>
                                 {% endif %}
-
-                                {# Tag 4: Section 8 (optional) #}
                                 {% if has_section8 %}
-                                <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-                                    🏛️ Section 8
-                                </span>
+                                <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">🏛️ Section 8</span>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                 </td>
-
-                <!-- Tenant -->
                 <td class="px-4 py-4">
                     {% if active_tenants %}
                     {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
@@ -245,8 +296,6 @@ function filterByEntity(entity) {
                     <span class="text-sm text-gray-300">—</span>
                     {% endif %}
                 </td>
-
-                <!-- Property Details -->
                 <td class="px-4 py-4 text-center">
                     <div class="text-xs text-gray-500 space-y-0.5">
                         {% if item.property.bedrooms or item.property.bathrooms %}
@@ -267,29 +316,17 @@ function filterByEntity(entity) {
                         {% endif %}
                     </div>
                 </td>
-
-                <!-- Computed Status Chip -->
                 <td class="px-4 py-4 text-center">
                     {% if op_status == 'inactive' %}
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100" title="Inactive">
-                        <span class="text-sm">⚪</span>
-                    </span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100" title="Inactive"><span class="text-sm">⚪</span></span>
                     {% elif op_status == 'issue' %}
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-100" title="Issue - Needs action">
-                        <span class="text-sm">🔴</span>
-                    </span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-100" title="Issue"><span class="text-sm">🔴</span></span>
                     {% elif op_status == 'attention' %}
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100" title="Attention needed">
-                        <span class="text-sm">🟡</span>
-                    </span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100" title="Attention"><span class="text-sm">🟡</span></span>
                     {% else %}
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100" title="OK">
-                        <span class="text-sm">🟢</span>
-                    </span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100" title="OK"><span class="text-sm">🟢</span></span>
                     {% endif %}
                 </td>
-
-                <!-- Rent -->
                 <td class="px-4 py-4 text-right">
                     {% if active_tenants %}
                     {% set primary_tenant = active_tenants | selectattr('is_primary', 'true') | first %}
@@ -299,9 +336,7 @@ function filterByEntity(entity) {
                         {% set portion = rent_tenant.tenant_portion|float if rent_tenant.tenant_portion else 0 %}
                         {% set total_rent = voucher + portion %}
                         <div class="text-sm font-semibold text-gray-900">${{ "%.0f"|format(total_rent) }}<span class="text-xs font-normal text-gray-400">/mo</span></div>
-                        <div class="text-xs text-gray-400" title="Voucher: ${{ "%.0f"|format(voucher) }} + Tenant: ${{ "%.0f"|format(portion) }}">
-                            S8: ${{ "%.0f"|format(voucher) }} + ${{ "%.0f"|format(portion) }}
-                        </div>
+                        <div class="text-xs text-gray-400">S8: ${{ "%.0f"|format(voucher) }} + ${{ "%.0f"|format(portion) }}</div>
                     {% elif rent_tenant.current_rent %}
                         <div class="text-sm font-semibold text-gray-900">${{ "%.0f"|format(rent_tenant.current_rent|float) }}<span class="text-xs font-normal text-gray-400">/mo</span></div>
                     {% else %}
@@ -311,20 +346,14 @@ function filterByEntity(entity) {
                     <span class="text-sm text-gray-300">—</span>
                     {% endif %}
                 </td>
-
-                <!-- Water Bill -->
                 <td class="px-4 py-4 text-right">
                     {% if item.property.bills and item.property.bills[0].amount_due %}
                     {% set amount = item.property.bills[0].amount_due %}
-                    <span class="text-sm {% if amount > 100 %}text-gray-700{% else %}text-gray-400{% endif %} font-light">
-                        💧 ${{ "%.0f"|format(amount) }}
-                    </span>
+                    <span class="text-sm {% if amount > 100 %}text-gray-700{% else %}text-gray-400{% endif %} font-light">💧 ${{ "%.0f"|format(amount) }}</span>
                     {% else %}
                     <span class="text-sm text-gray-300">—</span>
                     {% endif %}
                 </td>
-
-                <!-- Actions -->
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <a href="/listings/{{ item.property.id }}" target="_blank" class="text-gray-500 hover:text-blue-600 mr-3" title="View public listing">🌐</a>
                     <a href="/properties/{{ item.property.id }}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
@@ -337,13 +366,15 @@ function filterByEntity(entity) {
             {% endfor %}
         </tbody>
     </table>
+    </div>
 
     <!-- Summary footer -->
-    <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+    <div class="px-4 sm:px-6 py-3 bg-white md:bg-gray-50 md:border-t border-gray-200 text-xs text-gray-500 md:rounded-b-lg md:shadow">
         {{ properties|length }} propert{{ 'y' if properties|length == 1 else 'ies' }}
     </div>
 
-    {% else %}
+{% else %}
+<div class="bg-white shadow rounded-lg overflow-hidden">
     <div class="text-center py-16">
         <div class="text-4xl mb-3">🏠</div>
         <h3 class="text-sm font-medium text-gray-900">No properties found</h3>
@@ -354,7 +385,7 @@ function filterByEntity(entity) {
             </a>
         </div>
     </div>
-    {% endif %}
 </div>
+{% endif %}
 
 {% endblock %}
