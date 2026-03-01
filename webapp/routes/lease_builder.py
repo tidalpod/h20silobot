@@ -46,6 +46,7 @@ def _save_lease_data(builder: LeaseBuilder, data: dict):
 # List / Start
 # =============================================================================
 
+@router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 async def builder_list(request: Request):
     """List all lease builder drafts."""
