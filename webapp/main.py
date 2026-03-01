@@ -156,8 +156,8 @@ app.include_router(invoices_router, prefix="/invoices")
 app.include_router(projects_router, prefix="/projects")
 app.include_router(showings_router, prefix="/showings")
 app.include_router(portal_payments_router, prefix="/portal")
-app.include_router(payments_admin_router, prefix="/payments")
 app.include_router(entity_accounts_router, prefix="/payments")
+app.include_router(payments_admin_router, prefix="/payments")
 # Recertification routes removed - dates tracked on property/tenant directly
 # app.include_router(recertifications_router, prefix="/recertifications")
 
