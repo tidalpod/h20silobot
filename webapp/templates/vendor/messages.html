@@ -4,85 +4,144 @@
 
 {% block head %}
 <style>
+    /* Telegram-style chat background */
+    .chat-bg {
+        background-color: #0e0e2c;
+        background-image:
+            radial-gradient(ellipse at 20% 50%, rgba(120, 60, 200, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 20%, rgba(100, 40, 180, 0.1) 0%, transparent 50%);
+    }
+
+    /* Bubbles */
     .msg-bubble {
-        max-width: 80%;
+        max-width: 85%;
         word-wrap: break-word;
         overflow-wrap: break-word;
+        position: relative;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.08);
     }
-    .msg-inbound {
-        background: #e5e7eb;
+    .msg-in {
+        background: white;
         color: #1f2937;
-        border-radius: 1rem 1rem 1rem 0.25rem;
+        border-radius: 0 12px 12px 12px;
+        margin-left: 8px;
     }
-    .msg-outbound {
-        background: #6b21a8;
+    .msg-in::before {
+        content: '';
+        position: absolute;
+        left: -7px;
+        top: 0;
+        border-width: 0 8px 8px 0;
+        border-style: solid;
+        border-color: transparent white transparent transparent;
+    }
+    .msg-out {
+        background: #7c3aed;
         color: white;
-        border-radius: 1rem 1rem 0.25rem 1rem;
+        border-radius: 12px 0 12px 12px;
+        margin-right: 8px;
     }
+    .msg-out::before {
+        content: '';
+        position: absolute;
+        right: -7px;
+        top: 0;
+        border-width: 8px 8px 0 0;
+        border-style: solid;
+        border-color: #7c3aed transparent transparent transparent;
+    }
+
+    /* Inline timestamp (Telegram-style float) */
+    .msg-meta {
+        float: right;
+        margin-left: 12px;
+        margin-top: 4px;
+        position: relative;
+        top: 5px;
+    }
+
+    /* Date pill */
+    .date-pill {
+        display: inline-block;
+        background: rgba(0,0,0,0.35);
+        color: white;
+        font-size: 0.75rem;
+        padding: 3px 12px;
+        border-radius: 999px;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Chat scroll area */
     #chat-container {
         overflow-y: auto;
         flex: 1;
         min-height: 0;
+        -webkit-overflow-scrolling: touch;
     }
-    #chat-container::-webkit-scrollbar {
-        width: 4px;
+    #chat-container::-webkit-scrollbar { width: 0; }
+
+    /* Input bar */
+    .input-bar {
+        background: #1a1a3e;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        padding: 8px 12px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     }
-    #chat-container::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 2px;
+    .input-bar input {
+        background: rgba(255,255,255,0.1);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 10px 16px;
+        font-size: 15px;
+        width: 100%;
+    }
+    .input-bar input::placeholder {
+        color: rgba(255,255,255,0.4);
+    }
+    .input-bar input:focus {
+        outline: none;
+        background: rgba(255,255,255,0.15);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="flex flex-col" style="height: calc(100vh - 200px - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 200px);">
-    <!-- Header -->
-    <div class="flex items-center gap-3 mb-4">
-        <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-            <svg class="w-5 h-5 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-            </svg>
-        </div>
-        <div>
-            <h1 class="text-lg font-bold text-gray-900">Messages</h1>
-            <p class="text-xs text-gray-500">Chat with Blue Deer Property Management</p>
-        </div>
-    </div>
-
+<div class="flex flex-col -mx-4 -mt-6" style="height: calc(100dvh - 130px); height: calc(100vh - 130px - env(safe-area-inset-bottom, 0px));">
     <!-- Chat Messages -->
-    <div id="chat-container" class="flex-1 overflow-y-auto portal-card p-4 mb-3 space-y-3">
+    <div id="chat-container" class="chat-bg flex-1 overflow-y-auto px-3 py-3">
         <div id="messages-area">
-            <div id="loading-state" class="flex items-center justify-center py-12">
-                <div class="text-center text-gray-400">
-                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-                    </svg>
-                    <span class="text-sm">Loading messages...</span>
+            <div id="loading-state" class="flex items-center justify-center py-16">
+                <div class="text-center">
+                    <div class="inline-block w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <p class="text-sm text-purple-300">Loading messages...</p>
                 </div>
             </div>
         </div>
-        <div id="empty-state" class="hidden flex items-center justify-center py-12">
-            <div class="text-center text-gray-400">
-                <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-                </svg>
-                <p class="font-medium text-gray-600">No messages yet</p>
-                <p class="text-sm mt-1">Send a message to get started!</p>
+        <div id="empty-state" class="hidden flex items-center justify-center py-16">
+            <div class="text-center">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-900/50 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                </div>
+                <p class="font-medium text-white">No messages yet</p>
+                <p class="text-sm text-purple-300 mt-1">Send a message to get started</p>
             </div>
         </div>
     </div>
 
-    <!-- Send Input -->
-    <div class="portal-card p-3">
+    <!-- Input Bar -->
+    <div class="input-bar">
         <form id="send-form" class="flex items-center gap-2">
             <input type="text" id="message-input"
-                   placeholder="Type a message..."
-                   class="flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="Message..."
                    autocomplete="off">
             <button type="submit" id="send-btn"
-                    class="bg-purple-700 hover:bg-purple-800 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center transition-colors disabled:opacity-40">
+                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
             </button>
         </form>
@@ -104,13 +163,17 @@
     function formatTime(isoString) {
         if (!isoString) return '';
         const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function formatDatePill(isoString) {
+        const date = new Date(isoString);
         const now = new Date();
         const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-        const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        if (diffDays === 0) return time;
-        if (diffDays === 1) return 'Yesterday ' + time;
-        if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'short' }) + ' ' + time;
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'long' });
+        return date.toLocaleDateString([], { month: 'long', day: 'numeric' });
     }
 
     function scrollToBottom(smooth) {
@@ -129,7 +192,7 @@
             const data = await resp.json();
 
             if (data.error) {
-                messagesArea.innerHTML = `<div class="flex items-center justify-center py-12"><div class="text-center text-gray-400"><p class="text-sm">${data.error}</p></div></div>`;
+                messagesArea.innerHTML = `<div class="flex items-center justify-center py-12"><p class="text-sm text-purple-300">${data.error}</p></div>`;
                 return;
             }
 
@@ -149,25 +212,25 @@
             let lastDate = '';
 
             data.messages.forEach(msg => {
+                // Date separator
                 if (msg.created_at) {
                     const msgDate = new Date(msg.created_at).toLocaleDateString();
                     if (msgDate !== lastDate) {
                         lastDate = msgDate;
-                        const dateLabel = new Date(msg.created_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
-                        html += `<div class="text-center my-4"><span class="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">${dateLabel}</span></div>`;
+                        html += `<div class="text-center my-4"><span class="date-pill">${formatDatePill(msg.created_at)}</span></div>`;
                     }
                 }
 
                 const isFromMe = msg.direction === 'inbound';
                 const align = isFromMe ? 'justify-end' : 'justify-start';
-                const bubbleClass = isFromMe ? 'msg-outbound' : 'msg-inbound';
-                const label = isFromMe ? '' : '<span class="text-xs text-gray-400 mb-1 block">Blue Deer</span>';
+                const bubbleClass = isFromMe ? 'msg-out' : 'msg-in';
+                const timeColor = isFromMe ? 'text-purple-200' : 'text-gray-400';
+                const sender = isFromMe ? '' : '<span class="text-xs font-medium text-purple-600 block mb-0.5">Blue Deer</span>';
 
-                html += `<div class="flex ${align}">
-                    <div class="msg-bubble ${bubbleClass} px-4 py-2.5">
-                        ${label}
-                        <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.body)}</p>
-                        <p class="text-xs mt-1 ${isFromMe ? 'text-purple-200' : 'text-gray-400'} text-right">${formatTime(msg.created_at)}</p>
+                html += `<div class="flex ${align} mb-1.5">
+                    <div class="msg-bubble ${bubbleClass} px-3 py-1.5">
+                        ${sender}
+                        <span class="text-[15px] leading-relaxed whitespace-pre-wrap">${escapeHtml(msg.body)}<span class="msg-meta"><span class="text-[11px] ${timeColor}">${formatTime(msg.created_at)}</span></span></span>
                     </div>
                 </div>`;
             });
