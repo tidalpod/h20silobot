@@ -1218,22 +1218,27 @@ class EntityConfig(Base):
 
 
 class EntityBankAccount(Base):
-    """Plaid-linked bank accounts for landlord entities (receiving accounts)"""
+    """Bank accounts for landlord entities (receiving accounts) — via Plaid or manual entry"""
     __tablename__ = "entity_bank_accounts"
 
     id = Column(Integer, primary_key=True)
     entity_id = Column(Integer, ForeignKey("entity_configs.id", ondelete="CASCADE"), nullable=False)
 
-    # Plaid tokens
-    plaid_access_token = Column(String(255), nullable=False)
-    plaid_item_id = Column(String(255), nullable=False)
-    plaid_account_id = Column(String(255), nullable=False)
+    # Plaid tokens (nullable for manual entries)
+    plaid_access_token = Column(String(255), nullable=True)
+    plaid_item_id = Column(String(255), nullable=True)
+    plaid_account_id = Column(String(255), nullable=True)
+
+    # Manual entry fields
+    routing_number = Column(String(9), nullable=True)
+    account_number = Column(String(17), nullable=True)
 
     # Display info
     account_name = Column(String(255), nullable=True)
     account_mask = Column(String(4), nullable=True)
     institution_name = Column(String(255), nullable=True)
     account_type = Column(String(50), nullable=True)  # "checking", "savings"
+    is_manual = Column(Boolean, default=False)
 
     # Status
     is_active = Column(Boolean, default=True)

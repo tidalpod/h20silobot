@@ -146,6 +146,73 @@ async def delete_entity(request: Request, entity_id: int):
     return RedirectResponse(url="/payments/bank-accounts", status_code=303)
 
 
+@router.get("/bank-accounts/add", response_class=HTMLResponse)
+async def add_bank_account_page(request: Request, entity_id: int = None):
+    """Add bank account page — select entity, then connect via Plaid or enter manually."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(EntityConfig).order_by(EntityConfig.entity_name)
+        )
+        entities = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "payments/add_bank_account.html",
+        {
+            "request": request,
+            "user": user,
+            "entities": entities,
+            "selected_entity_id": entity_id,
+        },
+    )
+
+
+@router.post("/bank-accounts/manual")
+async def add_manual_bank_account(
+    request: Request,
+    entity_id: int = Form(...),
+    institution_name: str = Form(...),
+    account_name: str = Form(...),
+    account_type: str = Form(...),
+    routing_number: str = Form(...),
+    account_number: str = Form(...),
+):
+    """Save a manually entered bank account."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Get last 4 digits as mask
+    account_mask = account_number[-4:] if len(account_number) >= 4 else account_number
+
+    async with get_session() as session:
+        # Check if first account for this entity
+        count_result = await session.execute(
+            select(func.count(EntityBankAccount.id))
+            .where(EntityBankAccount.entity_id == entity_id)
+            .where(EntityBankAccount.is_active == True)
+        )
+        existing_count = count_result.scalar() or 0
+
+        bank_account = EntityBankAccount(
+            entity_id=entity_id,
+            institution_name=institution_name,
+            account_name=account_name,
+            account_type=account_type,
+            routing_number=routing_number,
+            account_number=account_number,
+            account_mask=account_mask,
+            is_manual=True,
+            is_default=(existing_count == 0),
+        )
+        session.add(bank_account)
+
+    return RedirectResponse(url="/payments/bank-accounts", status_code=303)
+
+
 @router.post("/bank-accounts/link-token")
 async def get_link_token(request: Request):
     """Get a Plaid Link token for an entity."""

@@ -2,10 +2,6 @@
 
 {% block title %}Entity Bank Accounts{% endblock %}
 
-{% block head %}
-<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
-{% endblock %}
-
 {% block header %}
 <header class="bg-white shadow-sm">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
@@ -130,6 +126,9 @@
                             {% if account.is_default %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Default</span>
                             {% endif %}
+                            {% if account.is_manual %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">Manual</span>
+                            {% endif %}
                         </div>
                         <p class="text-xs text-gray-500">
                             {{ account.account_name or '' }}
@@ -159,11 +158,11 @@
         {% endif %}
 
         <!-- Link Bank Account Button -->
-        <button onclick="openPlaidLink({{ entity.id }})" id="link-btn-{{ entity.id }}"
-                class="w-full p-3 text-center rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+        <a href="/payments/bank-accounts/add?entity_id={{ entity.id }}"
+           class="block w-full p-3 text-center rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors">
             <span class="text-sm font-medium text-gray-600">+ Link Bank Account</span>
-            <p class="text-xs text-gray-400 mt-0.5">Securely connect via Plaid</p>
-        </button>
+            <p class="text-xs text-gray-400 mt-0.5">Connect via Plaid or enter manually</p>
+        </a>
     </div>
 </div>
 {% endfor %}
@@ -292,64 +291,6 @@ function openEditModal(id, name, owner, email, phone, address) {
     document.getElementById('edit-phone').value = phone;
     document.getElementById('edit-mailing-address').value = address;
     document.getElementById('edit-entity-modal').classList.remove('hidden');
-}
-
-async function openPlaidLink(entityId) {
-    const btn = document.getElementById('link-btn-' + entityId);
-    const origHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="text-sm text-gray-500">Loading Plaid...</span>';
-
-    try {
-        const resp = await fetch('/payments/bank-accounts/link-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entity_id: entityId }),
-        });
-        const data = await resp.json();
-
-        if (data.error) {
-            alert('Error: ' + data.error);
-            btn.disabled = false;
-            btn.innerHTML = origHTML;
-            return;
-        }
-
-        const handler = Plaid.create({
-            token: data.link_token,
-            onSuccess: async (public_token, metadata) => {
-                btn.innerHTML = '<span class="text-sm text-gray-500">Linking account...</span>';
-                const selectedAccount = metadata.accounts && metadata.accounts.length > 0
-                    ? metadata.accounts[0].id : null;
-                const result = await fetch('/payments/bank-accounts/link-complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        public_token: public_token,
-                        entity_id: entityId,
-                        account_id: selectedAccount,
-                    }),
-                });
-                const resultData = await result.json();
-                if (resultData.success) {
-                    location.reload();
-                } else {
-                    alert('Error linking account: ' + (resultData.error || 'Unknown error'));
-                    btn.disabled = false;
-                    btn.innerHTML = origHTML;
-                }
-            },
-            onExit: () => {
-                btn.disabled = false;
-                btn.innerHTML = origHTML;
-            },
-        });
-        handler.open();
-    } catch (e) {
-        alert('Error connecting to Plaid: ' + e.message);
-        btn.disabled = false;
-        btn.innerHTML = origHTML;
-    }
 }
 </script>
 {% endblock %}

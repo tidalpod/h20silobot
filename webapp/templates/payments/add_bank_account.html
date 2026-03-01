@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Add Bank Account{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <a href="/payments/bank-accounts" class="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium mb-3">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+            Back
+        </a>
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Add a Bank Account</h1>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8">
+        <!-- Entity Selector -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-900 mb-2">Select an Entity</label>
+            <select id="entity-select" onchange="updateEntityInfo()"
+                    class="w-full sm:w-96 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                {% for entity in entities %}
+                <option value="{{ entity.id }}" {{ 'selected' if entity.id == selected_entity_id }}>{{ entity.entity_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Info Banner -->
+        <div id="entity-info" class="mb-8 p-4 rounded-lg bg-blue-50 border border-blue-200 flex items-center gap-3">
+            <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-sm font-medium text-blue-900">This bank account must be connected to <strong id="entity-name-display">{{ entities[0].entity_name if entities else '' }}</strong>.</span>
+        </div>
+
+        <!-- Two Options -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Plaid Connect -->
+            <div class="border-2 border-gray-200 rounded-xl p-6 text-center hover:border-blue-400 hover:shadow-md transition-all flex flex-col items-center">
+                <div class="mb-4">
+                    <svg class="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-1">Connect bank with Plaid</h3>
+                <p class="text-sm text-gray-500 mb-5">Securely connect your online account in seconds</p>
+                <button id="plaid-btn" onclick="openPlaidLink()"
+                        class="w-full rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-500 transition-colors uppercase tracking-wide">
+                    Connect via Plaid
+                </button>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="border-2 border-gray-200 rounded-xl p-6 text-center hover:border-blue-400 hover:shadow-md transition-all flex flex-col items-center">
+                <div class="mb-4">
+                    <svg class="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-1">Enter Bank Info Manually</h3>
+                <p class="text-sm text-gray-500 mb-5">Add your account and routing numbers in minutes</p>
+                <button onclick="showManualForm()"
+                        class="w-full rounded-full border-2 border-gray-800 px-6 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50 transition-colors uppercase tracking-wide">
+                    Enter Manually
+                </button>
+            </div>
+        </div>
+
+        <!-- Manual Entry Form (hidden by default) -->
+        <div id="manual-form" class="hidden mt-8 pt-8 border-t border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-5">Enter Bank Account Details</h3>
+            <form method="POST" action="/payments/bank-accounts/manual">
+                <input type="hidden" name="entity_id" id="manual-entity-id" value="{{ selected_entity_id or (entities[0].id if entities else '') }}">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bank / Institution Name *</label>
+                        <input type="text" name="institution_name" required placeholder="e.g. Chase, Bank of America"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Account Nickname *</label>
+                        <input type="text" name="account_name" required placeholder="e.g. Main Operating Account"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Account Type *</label>
+                        <select name="account_type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            <option value="checking">Checking</option>
+                            <option value="savings">Savings</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Routing Number *</label>
+                            <input type="text" name="routing_number" required pattern="[0-9]{9}" maxlength="9" placeholder="9 digits"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
+                            <input type="text" name="account_number" required pattern="[0-9]{4,17}" maxlength="17" placeholder="4-17 digits"
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm font-mono">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex items-center gap-3">
+                    <button type="submit"
+                            class="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
+                        Save Bank Account
+                    </button>
+                    <button type="button" onclick="document.getElementById('manual-form').classList.add('hidden')"
+                            class="px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-200">
+        <p class="text-xs text-gray-500 text-center">
+            Bank credentials via Plaid are securely handled and never stored on our servers.
+            Manual entries are encrypted and stored for payment routing reference only.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const entities = [
+    {% for entity in entities %}
+    { id: {{ entity.id }}, name: "{{ entity.entity_name|e }}" },
+    {% endfor %}
+];
+
+function updateEntityInfo() {
+    const select = document.getElementById('entity-select');
+    const entityId = select.value;
+    const entity = entities.find(e => e.id == entityId);
+    if (entity) {
+        document.getElementById('entity-name-display').textContent = entity.name;
+        document.getElementById('manual-entity-id').value = entity.id;
+    }
+}
+
+function showManualForm() {
+    document.getElementById('manual-form').classList.remove('hidden');
+    document.getElementById('manual-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function openPlaidLink() {
+    const entityId = document.getElementById('entity-select').value;
+    const btn = document.getElementById('plaid-btn');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+
+    try {
+        const resp = await fetch('/payments/bank-accounts/link-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entity_id: parseInt(entityId) }),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        const handler = Plaid.create({
+            token: data.link_token,
+            onSuccess: async (public_token, metadata) => {
+                btn.textContent = 'Linking account...';
+                const selectedAccount = metadata.accounts && metadata.accounts.length > 0
+                    ? metadata.accounts[0].id : null;
+                const result = await fetch('/payments/bank-accounts/link-complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        public_token: public_token,
+                        entity_id: parseInt(entityId),
+                        account_id: selectedAccount,
+                    }),
+                });
+                const resultData = await result.json();
+                if (resultData.success) {
+                    window.location.href = '/payments/bank-accounts';
+                } else {
+                    alert('Error linking account: ' + (resultData.error || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                }
+            },
+            onExit: () => {
+                btn.disabled = false;
+                btn.textContent = origText;
+            },
+        });
+        handler.open();
+    } catch (e) {
+        alert('Error connecting to Plaid: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+</script>
+{% endblock %}
