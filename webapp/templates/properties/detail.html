@@ -657,73 +657,61 @@
                     <h3 class="text-base font-semibold text-gray-900">🏗️ Certificate of Occupancy Inspections</h3>
                     {% set has_any_co = property.co_mechanical_date or property.co_electrical_date or property.co_plumbing_date or property.co_zoning_date or property.co_building_date %}
                     {% if has_any_co %}
+                    {% set all_passed = true %}
+                    {% for t in ['mechanical', 'electrical', 'plumbing', 'zoning', 'building'] %}
+                        {% if attribute(property, 'co_' ~ t ~ '_date') and attribute(property, 'co_' ~ t ~ '_status') != 'passed' %}{% set all_passed = false %}{% endif %}
+                    {% endfor %}
+                    {% if all_passed and has_any_co %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">All Passed</span>
+                    {% else %}
                     <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">Scheduled</span>
+                    {% endif %}
                     {% else %}
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">Not Scheduled</span>
                     {% endif %}
                 </div>
                 <div class="px-5 py-4">
-                    {% if has_any_co %}
-                    <dl class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">⚙️ Mechanical</dt>
-                            <dd class="mt-1 text-sm {% if property.co_mechanical_date %}{% if property.co_mechanical_date < today %}text-green-600{% elif (property.co_mechanical_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
-                                {{ property.co_mechanical_date.strftime('%b %d, %Y') if property.co_mechanical_date else 'Not set' }}
-                            </dd>
-                            {% if property.co_mechanical_status == 'passed' %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 mt-1">Passed</span>
-                            {% elif property.co_mechanical_status == 'failed' %}
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 mt-1">Failed</span>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">⚡ Electrical</dt>
-                            <dd class="mt-1 text-sm {% if property.co_electrical_date %}{% if property.co_electrical_date < today %}text-green-600{% elif (property.co_electrical_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
-                                {{ property.co_electrical_date.strftime('%b %d, %Y') if property.co_electrical_date else 'Not set' }}
-                            </dd>
-                            {% if property.co_electrical_status == 'passed' %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 mt-1">Passed</span>
-                            {% elif property.co_electrical_status == 'failed' %}
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 mt-1">Failed</span>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">🔧 Plumbing</dt>
-                            <dd class="mt-1 text-sm {% if property.co_plumbing_date %}{% if property.co_plumbing_date < today %}text-green-600{% elif (property.co_plumbing_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
-                                {{ property.co_plumbing_date.strftime('%b %d, %Y') if property.co_plumbing_date else 'Not set' }}
-                            </dd>
-                            {% if property.co_plumbing_status == 'passed' %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 mt-1">Passed</span>
-                            {% elif property.co_plumbing_status == 'failed' %}
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 mt-1">Failed</span>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">📐 Zoning</dt>
-                            <dd class="mt-1 text-sm {% if property.co_zoning_date %}{% if property.co_zoning_date < today %}text-green-600{% elif (property.co_zoning_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
-                                {{ property.co_zoning_date.strftime('%b %d, %Y') if property.co_zoning_date else 'Not set' }}
-                            </dd>
-                            {% if property.co_zoning_status == 'passed' %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 mt-1">Passed</span>
-                            {% elif property.co_zoning_status == 'failed' %}
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 mt-1">Failed</span>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">🏢 Building</dt>
-                            <dd class="mt-1 text-sm {% if property.co_building_date %}{% if property.co_building_date < today %}text-green-600{% elif (property.co_building_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}{% else %}text-gray-400{% endif %}">
-                                {{ property.co_building_date.strftime('%b %d, %Y') if property.co_building_date else 'Not set' }}
-                            </dd>
-                            {% if property.co_building_status == 'passed' %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 mt-1">Passed</span>
-                            {% elif property.co_building_status == 'failed' %}
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 mt-1">Failed</span>
-                            {% endif %}
-                        </div>
-                    </dl>
-                    {% else %}
-                    <p class="text-sm text-gray-500">No CO inspections scheduled. <a href="/properties/{{ property.id }}/edit" class="text-blue-600 hover:text-blue-500">Schedule inspections →</a></p>
-                    {% endif %}
+                    <div class="space-y-4">
+                        {% set co_types = [
+                            ('mechanical', '⚙️ Mechanical', property.co_mechanical_date, property.co_mechanical_time, property.co_mechanical_status),
+                            ('electrical', '⚡ Electrical', property.co_electrical_date, property.co_electrical_time, property.co_electrical_status),
+                            ('plumbing', '🔧 Plumbing', property.co_plumbing_date, property.co_plumbing_time, property.co_plumbing_status),
+                            ('zoning', '📐 Zoning', property.co_zoning_date, property.co_zoning_time, property.co_zoning_status),
+                            ('building', '🏢 Building', property.co_building_date, property.co_building_time, property.co_building_status),
+                        ] %}
+                        {% for type_key, label, co_date, co_time, co_status in co_types %}
+                        <form method="POST" action="/inspections/co/update" class="border border-gray-100 rounded-lg p-3">
+                            <input type="hidden" name="property_id" value="{{ property.id }}">
+                            <input type="hidden" name="inspection_type" value="{{ type_key }}">
+                            <input type="hidden" name="redirect" value="/properties/{{ property.id }}#compliance">
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div class="font-medium text-sm text-gray-700 w-full sm:w-auto sm:min-w-[120px]">{{ label }}</div>
+                                <div class="flex-1 min-w-[130px]">
+                                    <label class="block text-[10px] text-gray-400 mb-0.5">Date</label>
+                                    <input type="date" name="date" value="{{ co_date.strftime('%Y-%m-%d') if co_date else '' }}"
+                                        class="w-full rounded-md border-gray-300 text-sm py-1.5 px-2 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div class="min-w-[100px]">
+                                    <label class="block text-[10px] text-gray-400 mb-0.5">Time</label>
+                                    <input type="time" name="time" value="{{ co_time or '' }}"
+                                        class="w-full rounded-md border-gray-300 text-sm py-1.5 px-2 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div class="min-w-[110px]">
+                                    <label class="block text-[10px] text-gray-400 mb-0.5">Status</label>
+                                    <select name="status" class="w-full rounded-md border-gray-300 text-sm py-1.5 px-2 shadow-sm focus:border-blue-500 focus:ring-blue-500
+                                        {% if co_status == 'passed' %}bg-green-50 text-green-700{% elif co_status == 'failed' %}bg-red-50 text-red-700{% endif %}">
+                                        <option value="">— Not set —</option>
+                                        <option value="passed" {% if co_status == 'passed' %}selected{% endif %}>Passed</option>
+                                        <option value="failed" {% if co_status == 'failed' %}selected{% endif %}>Failed</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 

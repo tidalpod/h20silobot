@@ -145,26 +145,28 @@ async def update_co_inspection(
     property_id: int = Form(...),
     inspection_type: str = Form(...),
     date: str = Form(""),
-    time: str = Form("")
+    time: str = Form(""),
+    status: str = Form(""),
+    redirect: str = Form(""),
 ):
-    """Update a CO inspection date/time"""
+    """Update a CO inspection date/time/status"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
     # Map inspection type to field names
     field_map = {
-        "mechanical": ("co_mechanical_date", "co_mechanical_time"),
-        "electrical": ("co_electrical_date", "co_electrical_time"),
-        "plumbing": ("co_plumbing_date", "co_plumbing_time"),
-        "zoning": ("co_zoning_date", "co_zoning_time"),
-        "building": ("co_building_date", "co_building_time"),
+        "mechanical": ("co_mechanical_date", "co_mechanical_time", "co_mechanical_status"),
+        "electrical": ("co_electrical_date", "co_electrical_time", "co_electrical_status"),
+        "plumbing": ("co_plumbing_date", "co_plumbing_time", "co_plumbing_status"),
+        "zoning": ("co_zoning_date", "co_zoning_time", "co_zoning_status"),
+        "building": ("co_building_date", "co_building_time", "co_building_status"),
     }
 
     if inspection_type.lower() not in field_map:
         return RedirectResponse(url="/inspections", status_code=303)
 
-    date_field, time_field = field_map[inspection_type.lower()]
+    date_field, time_field, status_field = field_map[inspection_type.lower()]
 
     async with get_session() as session:
         result = await session.execute(
@@ -174,8 +176,11 @@ async def update_co_inspection(
         if prop:
             setattr(prop, date_field, parse_date(date))
             setattr(prop, time_field, time if time else None)
+            setattr(prop, status_field, status if status in ("passed", "failed") else None)
             await session.commit()
 
+    if redirect:
+        return RedirectResponse(url=redirect, status_code=303)
     return RedirectResponse(url="/inspections", status_code=303)
 
 
