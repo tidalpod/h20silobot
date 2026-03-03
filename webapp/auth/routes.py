@@ -71,6 +71,75 @@ async def login(
     return RedirectResponse(url=next, status_code=303)
 
 
+@router.get("/login/phone", response_class=HTMLResponse)
+async def phone_login_page(request: Request, next: str = "/"):
+    """Phone login page for admin users"""
+    user = await get_current_user(request)
+    if user:
+        return RedirectResponse(url="/", status_code=303)
+
+    return templates.TemplateResponse(
+        "auth/phone_login.html",
+        {"request": request, "next": next, "error": None}
+    )
+
+
+@router.post("/login/phone", response_class=HTMLResponse)
+async def phone_login_send_code(request: Request, phone: str = Form(...), next: str = Form("/")):
+    """Send SMS verification code for admin login"""
+    from webapp.services.admin_verification_service import send_admin_verification_code
+
+    result = await send_admin_verification_code(phone)
+    if not result["success"]:
+        return templates.TemplateResponse(
+            "auth/phone_login.html",
+            {"request": request, "next": next, "error": result["error"], "phone": phone},
+            status_code=400
+        )
+
+    request.session["admin_phone"] = phone
+    request.session["admin_next"] = next
+    return RedirectResponse(url="/login/verify", status_code=303)
+
+
+@router.get("/login/verify", response_class=HTMLResponse)
+async def phone_verify_page(request: Request):
+    """Code verification page for admin login"""
+    phone = request.session.get("admin_phone")
+    if not phone:
+        return RedirectResponse(url="/login/phone", status_code=303)
+
+    return templates.TemplateResponse(
+        "auth/phone_verify.html",
+        {"request": request, "phone": phone, "error": None}
+    )
+
+
+@router.post("/login/verify", response_class=HTMLResponse)
+async def phone_verify_code(request: Request, code: str = Form(...)):
+    """Verify SMS code and log in admin user"""
+    from webapp.services.admin_verification_service import verify_admin_code
+
+    phone = request.session.get("admin_phone")
+    if not phone:
+        return RedirectResponse(url="/login/phone", status_code=303)
+
+    result = await verify_admin_code(phone, code)
+    if not result["success"]:
+        return templates.TemplateResponse(
+            "auth/phone_verify.html",
+            {"request": request, "phone": phone, "error": result["error"]},
+            status_code=400
+        )
+
+    # Log in the user
+    login_user(request, result["user"])
+    next_url = request.session.pop("admin_next", "/")
+    request.session.pop("admin_phone", None)
+
+    return RedirectResponse(url=next_url, status_code=303)
+
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     """Registration is disabled - redirect to login"""
@@ -128,6 +197,8 @@ async def admin_create_user(
     password: str = Form(...),
     password_confirm: str = Form(...),
     name: str = Form(""),
+    phone: str = Form(""),
+    telegram_id: str = Form(""),
     is_admin: str = Form("")
 ):
     """Admin creates a new user"""
@@ -172,10 +243,99 @@ async def admin_create_user(
             email=email.lower(),
             password_hash=hash_password(password),
             name=name or None,
+            phone=phone.strip() or None,
+            telegram_id=int(telegram_id.strip()) if telegram_id.strip() else None,
             is_admin=is_admin.lower() == "true" if is_admin else False,
             is_active=True
         )
         session.add(new_user)
+        await session.commit()
+
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@router.get("/admin/users/{user_id}/edit", response_class=HTMLResponse)
+async def admin_edit_user_page(request: Request, user_id: int):
+    """Admin page to edit a user"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.get("is_admin"):
+        return RedirectResponse(url="/", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WebUser).where(WebUser.id == user_id)
+        )
+        edit_user = result.scalar_one_or_none()
+        if not edit_user:
+            return RedirectResponse(url="/admin/users", status_code=303)
+
+    return templates.TemplateResponse(
+        "auth/admin_edit_user.html",
+        {"request": request, "user": user, "edit_user": edit_user, "error": None, "success": None}
+    )
+
+
+@router.post("/admin/users/{user_id}/edit", response_class=HTMLResponse)
+async def admin_update_user(
+    request: Request,
+    user_id: int,
+    name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    telegram_id: str = Form(""),
+    is_admin: str = Form(""),
+    is_active: str = Form(""),
+    new_password: str = Form(""),
+    new_password_confirm: str = Form("")
+):
+    """Admin updates a user"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.get("is_admin"):
+        return RedirectResponse(url="/", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WebUser).where(WebUser.id == user_id)
+        )
+        edit_user = result.scalar_one_or_none()
+        if not edit_user:
+            return RedirectResponse(url="/admin/users", status_code=303)
+
+        def render_error(error):
+            return templates.TemplateResponse(
+                "auth/admin_edit_user.html",
+                {"request": request, "user": user, "edit_user": edit_user, "error": error, "success": None},
+                status_code=400
+            )
+
+        # Check email uniqueness if changed
+        if email.lower() != edit_user.email:
+            existing = await session.execute(
+                select(WebUser).where(WebUser.email == email.lower(), WebUser.id != user_id)
+            )
+            if existing.scalar_one_or_none():
+                return render_error("Email already in use by another user")
+
+        # Update fields
+        edit_user.name = name.strip() or None
+        edit_user.email = email.lower().strip()
+        edit_user.phone = phone.strip() or None
+        edit_user.telegram_id = int(telegram_id.strip()) if telegram_id.strip() else None
+        edit_user.is_admin = is_admin == "true"
+        edit_user.is_active = is_active == "true"
+
+        # Reset password if provided
+        if new_password:
+            if new_password != new_password_confirm:
+                return render_error("Passwords do not match")
+            if len(new_password) < 8:
+                return render_error("Password must be at least 8 characters")
+            edit_user.password_hash = hash_password(new_password)
+
         await session.commit()
 
     return RedirectResponse(url="/admin/users", status_code=303)

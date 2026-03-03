@@ -55,6 +55,20 @@ async def run_migration():
             else:
                 logger.info("web_users.phone already exists")
 
+            # Add telegram_id column to web_users
+            result = await conn.execute(text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'web_users' AND column_name = 'telegram_id'
+            """))
+            if not result.fetchone():
+                await conn.execute(text("""
+                    ALTER TABLE web_users
+                    ADD COLUMN telegram_id INTEGER NULL
+                """))
+                logger.info("Added telegram_id to web_users")
+            else:
+                logger.info("web_users.telegram_id already exists")
+
         logger.info("Migration completed successfully")
         return True
 

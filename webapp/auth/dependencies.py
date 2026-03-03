@@ -57,6 +57,7 @@ def login_user(request: Request, user: "WebUser"):
         "email": user.email,
         "name": user.name,
         "phone": user.phone,
+        "telegram_id": user.telegram_id,
         "is_admin": user.is_admin
     }
 
