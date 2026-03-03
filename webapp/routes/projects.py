@@ -1,5 +1,6 @@
 """PM-side Project (Rehab) tracking routes"""
 
+import logging
 import os
 import uuid
 from datetime import datetime, date
@@ -14,11 +15,14 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Project, ProjectStatus, Property, Vendor, WorkOrder, Invoice, InvoiceStatus,
-    ProjectDocument,
+    ProjectDocument, SMSMessage, MessageDirection,
 )
 from webapp.auth.dependencies import get_current_user
+from webapp.services.twilio_service import twilio_service
 
 router = APIRouter(tags=["projects"])
+
+logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -38,6 +42,89 @@ ALLOWED_TYPES = {
     "image/webp": ".webp",
 }
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
+def _normalize_phone(phone):
+    """Normalize phone number to E.164 format"""
+    if not phone:
+        return None
+    digits = ''.join(c for c in phone if c.isdigit() or c == '+')
+    if not digits:
+        return None
+    if digits.startswith('+'):
+        return digits
+    elif digits.startswith('1') and len(digits) == 11:
+        return f"+{digits}"
+    elif len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}"
+
+
+async def _notify_vendor_project_sms(vendor_id: int, project, session):
+    """Send SMS to vendor about a project assignment"""
+    try:
+        result = await session.execute(
+            select(Vendor).where(Vendor.id == vendor_id)
+        )
+        vendor = result.scalar_one_or_none()
+        if not vendor or not vendor.phone:
+            return False
+
+        # Query property for address
+        prop_addr = ""
+        if project.property_id:
+            prop_result = await session.execute(
+                select(Property).where(Property.id == project.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            prop_addr = prop.address if prop else ""
+
+        status_label = project.status.replace('_', ' ').title() if project.status else "Planning"
+        budget_str = f"${project.budget:,.2f}" if project.budget else "TBD"
+        start = project.start_date.strftime('%b %d, %Y') if project.start_date else "TBD"
+        end = project.end_date.strftime('%b %d, %Y') if project.end_date else "TBD"
+
+        msg = (
+            f"Blue Deer - Project Assignment\n\n"
+            f"Project: {project.name}\n"
+            f"Property: {prop_addr}\n"
+            f"Status: {status_label}\n"
+            f"Budget: {budget_str}\n"
+            f"Dates: {start} - {end}\n"
+        )
+        if project.description:
+            desc_short = project.description[:100] + ("..." if len(project.description) > 100 else "")
+            msg += f"Details: {desc_short}\n"
+
+        sms_result = await twilio_service.send_sms(vendor.phone, msg)
+        if sms_result.success:
+            logger.info(f"Vendor SMS sent to {vendor.name} for project #{project.id}")
+        else:
+            logger.error(f"Failed to SMS vendor {vendor.name}: {sms_result.error_message}")
+
+        # Store outbound message in DB for conversation tracking
+        try:
+            from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+            to_number = _normalize_phone(vendor.phone)
+            sms_message = SMSMessage(
+                vendor_id=vendor_id,
+                from_number=from_number,
+                to_number=to_number,
+                body=msg,
+                direction=MessageDirection.OUTBOUND,
+                twilio_sid=sms_result.message_sid if sms_result.success else None,
+                status="sent" if sms_result.success else "failed",
+                created_at=datetime.utcnow()
+            )
+            session.add(sms_message)
+            await session.flush()
+        except Exception as db_err:
+            logger.error(f"Failed to store vendor SMS in DB: {db_err}")
+
+        return sms_result.success
+    except Exception as e:
+        logger.error(f"Error sending vendor project SMS: {e}")
+        return False
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -125,6 +212,10 @@ async def project_create(request: Request):
         session.add(project)
         await session.flush()
         project_id = project.id
+
+        # Send SMS to vendor if assigned and checkbox checked
+        if project.vendor_id and form.get("notify_vendor"):
+            await _notify_vendor_project_sms(project.vendor_id, project, session)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
@@ -254,6 +345,10 @@ async def project_update(request: Request, project_id: int):
 
         if project.status == ProjectStatus.COMPLETED.value and not project.completed_date:
             project.completed_date = date.today()
+
+        # Send SMS to vendor if assigned and checkbox checked
+        if project.vendor_id and form.get("notify_vendor"):
+            await _notify_vendor_project_sms(project.vendor_id, project, session)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
