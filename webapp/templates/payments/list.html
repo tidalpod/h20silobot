@@ -63,7 +63,7 @@
     <a href="/payments?status=failed" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'failed' %}bg-red-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Failed</a>
 
     {% if properties %}
-    <select onchange="if(this.value) window.location='/payments?property_id='+this.value; else window.location='/payments';" class="px-3 py-2 rounded-lg text-sm bg-white text-gray-700 ring-1 ring-gray-300">
+    <select onchange="if(this.value) window.location='/payments?property_id='+this.value; else window.location='/payments';" class="px-3 py-2 rounded-lg text-sm bg-white text-gray-700 ring-1 ring-gray-300 searchable-select" data-placeholder="Type to search...">
         <option value="">All Properties</option>
         {% for prop in properties %}
         <option value="{{ prop.id }}" {% if filter_property_id == prop.id %}selected{% endif %}>{{ prop.address }}</option>

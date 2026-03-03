@@ -45,7 +45,7 @@
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-500 mb-1">Vendor</label>
-                <select name="vendor_id" class="rounded-lg border-gray-300 text-sm py-1.5">
+                <select name="vendor_id" class="rounded-lg border-gray-300 text-sm py-1.5 searchable-select" data-placeholder="Type to search...">
                     <option value="">All Vendors</option>
                     {% for v in vendors %}
                     <option value="{{ v.id }}" {{ 'selected' if vendor_filter == v.id|string }}>{{ v.name }}</option>
@@ -54,7 +54,7 @@
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-500 mb-1">Property</label>
-                <select name="property_id" class="rounded-lg border-gray-300 text-sm py-1.5">
+                <select name="property_id" class="rounded-lg border-gray-300 text-sm py-1.5 searchable-select" data-placeholder="Type to search...">
                     <option value="">All Properties</option>
                     {% for p in properties %}
                     <option value="{{ p.id }}" {{ 'selected' if property_filter == p.id|string }}>{{ p.address }}</option>

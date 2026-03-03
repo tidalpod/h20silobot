@@ -47,7 +47,7 @@
                         <label for="property_id" class="block text-sm font-medium leading-6 text-gray-900">Property *</label>
                         <div class="mt-2">
                             <select name="property_id" id="property_id" required
-                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3">
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3 searchable-select" data-placeholder="Type to search properties...">
                                 <option value="">Select a property</option>
                                 {% for prop in properties %}
                                 <option value="{{ prop.id }}" {% if selected_property_id == prop.id %}selected{% endif %}>

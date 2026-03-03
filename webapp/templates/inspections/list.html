@@ -366,12 +366,9 @@
     {% endif %}
 </div>
 
-<!-- Tom Select CSS -->
-<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+<!-- Tom Select styles (loaded globally from base.html) -->
 <style>
     .ts-wrapper { width: 100%; }
-    .ts-control { border-radius: 0.5rem !important; border-color: #d1d5db !important; padding: 0.5rem 0.75rem !important; }
-    .ts-control:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6 !important; }
     .ts-dropdown { border-radius: 0.5rem !important; }
     .ts-dropdown-content { max-height: 250px; }
 </style>
@@ -397,7 +394,7 @@
                 <!-- Property (Searchable) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                    <select id="schedule-property" name="property_id" required class="property-search">
+                    <select id="schedule-property" name="property_id" required class="property-search searchable-select" data-placeholder="Type to search properties...">
                         <option value="">Type to search...</option>
                         {% for prop in properties %}
                         <option value="{{ prop.id }}">{{ prop.address }}{% if prop.city %}, {{ prop.city }}{% endif %}</option>
@@ -587,21 +584,12 @@
     </div>
 </div>
 
-<!-- Tom Select JS -->
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-// Initialize Tom Select for property dropdowns
+// Property select is now auto-initialized via searchable-select class in base.html
 let propertySelect = null;
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize searchable property dropdown
-    propertySelect = new TomSelect('#schedule-property', {
-        placeholder: 'Type to search for a property...',
-        allowEmptyOption: true,
-        create: false,
-        maxOptions: null,
-        sortField: { field: 'text', direction: 'asc' }
-    });
+    const el = document.getElementById('schedule-property');
+    if (el && el.tomselect) propertySelect = el.tomselect;
 });
 
 // Time format helpers

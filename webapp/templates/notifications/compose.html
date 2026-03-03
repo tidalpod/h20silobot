@@ -29,7 +29,7 @@
                         <label for="property_id" class="block text-sm font-medium leading-6 text-gray-900">Property *</label>
                         <div class="mt-2">
                             <select name="property_id" id="property_id" required
-                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3"
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3 searchable-select" data-placeholder="Type to search properties..."
                                     onchange="updateTenants(this.value)">
                                 <option value="">Select a property</option>
                                 {% for prop in properties %}
@@ -46,7 +46,7 @@
                         <label for="tenant_id" class="block text-sm font-medium leading-6 text-gray-900">Tenant</label>
                         <div class="mt-2">
                             <select name="tenant_id" id="tenant_id"
-                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3"
+                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3 searchable-select" data-placeholder="Type to search tenants..."
                                     onchange="updateRecipient()">
                                 <option value="">Select a tenant (optional)</option>
                                 {% for tenant in tenants %}

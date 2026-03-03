@@ -64,6 +64,66 @@ async def run_migrations(engine):
             except Exception:
                 pass  # Column may already be nullable or table may not exist yet
 
+async def _seed_lease_default_terms(engine):
+    """Seed the default Tenant Responsibilities Addendum if the table is empty."""
+    default_content = """TENANT RESPONSIBILITIES ADDENDUM
+
+This Tenant Responsibilities Addendum is incorporated into and made part of the lease agreement between Landlord and Tenant for the premises identified in the lease.
+
+Tenant agrees to the following conditions:
+
+TENANT-CAUSED MAINTENANCE & REPAIRS
+
+1. Plumbing & Drain Issues
+Tenant shall be responsible for maintaining clear and functional drains, toilets, and garbage disposals. Any clogs or damage caused by tenant negligence, including but not limited to flushing wipes, grease, food, hair buildup, or other non-flushable items, shall be repaired at the tenant's expense. Landlord shall be responsible for major plumbing issues not caused by tenant misuse, such as broken pipes due to age or structural failure.
+
+2. HVAC & Air Filters
+Tenant shall replace HVAC filters every one to three months to ensure proper system function. If failure to replace filters results in HVAC system damage (e.g., burnt-out motor, excessive wear), the tenant shall be liable for all repair or replacement costs.
+
+3. Pest Control
+Tenant shall maintain a clean living environment free from food waste, trash buildup, and standing water to prevent pest infestations. Landlord shall be responsible for structural pest issues, including pre-existing infestations or those caused by defects in the property (e.g., termites). If an infestation occurs due to tenant negligence, the tenant shall be responsible for all necessary extermination and remediation costs.
+
+4. Mold & Moisture Prevention
+Tenant shall report any water leaks, plumbing issues, or excessive moisture to the landlord immediately. Tenant shall use exhaust fans in bathrooms and kitchens, wipe down wet surfaces, and keep the premises adequately ventilated to prevent mold growth. If mold develops due to tenant neglect, such as failure to report leaks or properly ventilate areas, the tenant shall be responsible for all cleaning and remediation costs.
+
+5. Appliance Use & Damage
+Tenant shall operate all appliances properly and in accordance with manufacturer guidelines. Any damage resulting from improper use, such as overloading washing machines, inserting metal into microwaves, or misuse of the garbage disposal, shall be repaired at the tenant's expense. Landlord is responsible for appliance malfunctions due to normal wear and tear.
+
+PROPERTY CARE & DAMAGE RESPONSIBILITY
+
+6. Window, Screen, and Door Damage
+Tenant shall be responsible for replacing or repairing any broken windows, damaged screens, or door hardware, including locks and knobs, unless the damage is due to a documented break-in with a police report.
+
+7. Flooring and Carpet Maintenance
+Tenant shall keep all flooring clean and free from stains, burns, and excessive wear. Any damage beyond normal wear and tear, including pet-related damage such as scratches, chewing, or urine stains, shall be repaired at the tenant's expense.
+
+8. Light Bulbs and Batteries
+Tenant shall replace all light bulbs and smoke detector batteries as needed. Landlord shall be responsible for replacing bulbs or batteries that require special equipment or professional installation.
+
+9. Lawn Care
+The tenant is responsible for lawn maintenance, including mowing, trimming bushes, and keeping weeds under control. Failure to maintain the lawn may result in the landlord hiring a service at the tenant's expense.
+
+10. Unauthorized Alterations and Repairs
+Tenant shall not make any modifications, repairs, or alterations to the property including but not limited to painting, installing fixtures, or replacing hardware, without prior written consent from the landlord. Any unauthorized changes must be removed or restored to the original condition at the tenant's expense.
+
+11. Smoking and Fire Hazard Prevention
+The lease designates the property as non-smoking, the tenant shall not smoke inside the unit. Any costs associated with odor removal, burn marks, or deep cleaning due to smoking shall be charged to the tenant.
+
+12. Utilities - Water Bill Payment Requirement
+Tenant acknowledges that payment of the monthly water bill is a material condition of this lease and addendum, regardless of whether the bill is issued directly to the Tenant or reimbursed to the Landlord. Tenant agrees to pay the full water bill balance each month by the due date stated on the bill or as otherwise directed by the Landlord. Failure to pay the water bill in full shall constitute a material breach of the lease and this Addendum. In the event of nonpayment, the Landlord may issue a written notice of default and, if the balance remains unpaid after any applicable cure period required by law, the Landlord may pursue all remedies allowed under the lease and applicable state and local law, including but not limited to termination of tenancy and eviction proceedings. Any unpaid water charges may also be deemed additional rent to the extent permitted by law. This provision shall be enforced in compliance with all applicable HUD, Housing Choice Voucher (HCV), and state landlord-tenant regulations."""
+
+    async with engine.begin() as conn:
+        result = await conn.execute(text(
+            "SELECT id FROM lease_default_terms LIMIT 1"
+        ))
+        if not result.fetchone():
+            await conn.execute(text(
+                "INSERT INTO lease_default_terms (title, content, is_active) "
+                "VALUES (:title, :content, true)"
+            ), {"title": "Tenant Responsibilities Addendum", "content": default_content})
+            print("[DB] Seeded default lease terms (Tenant Responsibilities Addendum)")
+
+
 async def _seed_telegram_admins(engine):
     """Ensure default Telegram admin users exist for Blue Deer alerts"""
     admin_users = [
@@ -140,6 +200,9 @@ async def init_db():
 
         # Seed default Telegram admin user for Blue Deer alerts
         await _seed_telegram_admins(engine)
+
+        # Seed default lease addendum terms
+        await _seed_lease_default_terms(engine)
 
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")

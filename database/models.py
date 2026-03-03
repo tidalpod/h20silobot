@@ -109,6 +109,15 @@ class ShowingStatus(PyEnum):
     CANCELLED = "cancelled"
 
 
+class ESignStatus(PyEnum):
+    CREATED = "created"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    COMPLETED = "completed"
+    DECLINED = "declined"
+    VOIDED = "voided"
+
+
 class Property(Base):
     """Property/Account being tracked"""
     __tablename__ = "properties"
@@ -1254,6 +1263,57 @@ class EntityBankAccount(Base):
 
     def __repr__(self):
         return f"<EntityBankAccount {self.institution_name} ...{self.account_mask}>"
+
+
+class LeaseDefaultTerms(Base):
+    """Default addendum terms that pre-fill every new lease builder."""
+    __tablename__ = "lease_default_terms"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False, default="Tenant Responsibilities Addendum")
+    content = Column(Text, nullable=False, default="")
+    is_active = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<LeaseDefaultTerms {self.id}: {self.title}>"
+
+
+class ESignEnvelope(Base):
+    """DocuSign e-signature envelope tracking."""
+    __tablename__ = "esign_envelopes"
+
+    id = Column(Integer, primary_key=True)
+    lease_document_id = Column(Integer, ForeignKey("lease_documents.id", ondelete="CASCADE"), nullable=False)
+
+    # DocuSign envelope info
+    envelope_id = Column(String(100), nullable=True, unique=True)
+    status = Column(Enum(ESignStatus), default=ESignStatus.CREATED)
+
+    # Signers (JSON list: [{"name": ..., "email": ..., "role": "tenant|landlord"}])
+    signers = Column(Text, nullable=True)
+
+    # Timestamps
+    sent_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    # Signed document
+    signed_file_url = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    lease_document_ref = relationship("LeaseDocument", backref="esign_envelopes")
+
+    __table_args__ = (
+        Index("ix_esign_envelopes_lease", "lease_document_id"),
+        Index("ix_esign_envelopes_status", "status"),
+    )
+
+    def __repr__(self):
+        return f"<ESignEnvelope {self.id}: {self.envelope_id} ({self.status})>"
 
 
 class Showing(Base):

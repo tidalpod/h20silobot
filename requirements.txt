@@ -55,3 +55,6 @@ aiofiles==23.2.1
 
 # PDF Generation (Lease Builder)
 weasyprint==68.0
+
+# DocuSign E-Sign (JWT auth)
+PyJWT==2.8.0

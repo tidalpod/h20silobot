@@ -27,6 +27,14 @@ class Config:
     scrape_interval_hours: int = int(os.getenv("SCRAPE_INTERVAL_HOURS", "24"))
     headless_browser: bool = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
 
+    # DocuSign E-Sign
+    docusign_integration_key: str = os.getenv("DOCUSIGN_INTEGRATION_KEY", "")
+    docusign_user_id: str = os.getenv("DOCUSIGN_USER_ID", "")
+    docusign_account_id: str = os.getenv("DOCUSIGN_ACCOUNT_ID", "")
+    docusign_private_key_path: str = os.getenv("DOCUSIGN_PRIVATE_KEY_PATH", "")
+    docusign_base_url: str = os.getenv("DOCUSIGN_BASE_URL", "https://demo.docusign.net/restapi")
+    docusign_oauth_url: str = os.getenv("DOCUSIGN_OAUTH_URL", "https://account-d.docusign.com")
+
     # BSA URLs
     @property
     def bsa_base_url(self) -> str:

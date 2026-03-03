@@ -42,7 +42,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Property *</label>
-                    <select name="property_id" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    <select name="property_id" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm searchable-select" data-placeholder="Type to search properties...">
                         <option value="">Select property...</option>
                         {% for p in properties %}
                         <option value="{{ p.id }}" {% if lease and lease.property_id == p.id %}selected{% endif %}>{{ p.address }}</option>
@@ -51,7 +51,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tenant</label>
-                    <select name="tenant_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    <select name="tenant_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm searchable-select" data-placeholder="Type to search tenants...">
                         <option value="">No tenant</option>
                         {% for t in tenants %}
                         <option value="{{ t.id }}" {% if lease and lease.tenant_id == t.id %}selected{% endif %}>{{ t.name }}</option>

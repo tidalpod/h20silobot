@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     LeaseBuilder, LeaseBuilderStatus, LeaseDocument, LeaseStatus,
-    Property, Tenant, EntityConfig,
+    Property, Tenant, EntityConfig, LeaseDefaultTerms,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.lease_pdf_service import generate_lease_pdf
@@ -165,6 +165,14 @@ async def builder_create(request: Request):
             "maintenance_communication": ["bluedeer_portal", "email", "text"],
             "lead_paint_disclosure": bool(prop and prop.year_built and prop.year_built < 1978),
         }
+
+        # Pre-fill additional_terms from active default terms
+        terms_result = await session.execute(
+            select(LeaseDefaultTerms).where(LeaseDefaultTerms.is_active == True)
+        )
+        default_terms = terms_result.scalars().all()
+        if default_terms:
+            initial_data["additional_terms"] = "\n\n".join(t.content for t in default_terms)
 
         builder = LeaseBuilder(
             property_id=property_id,
@@ -508,3 +516,105 @@ async def builder_delete(request: Request, builder_id: int):
             await session.delete(builder)
 
     return RedirectResponse(url="/leases/builder", status_code=303)
+
+
+# =============================================================================
+# Default Terms Settings
+# =============================================================================
+
+@router.get("/terms", response_class=HTMLResponse)
+async def builder_terms(request: Request):
+    """Admin page to view/edit default addendum terms."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(LeaseDefaultTerms).order_by(LeaseDefaultTerms.id)
+        )
+        terms = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "leases/builder_terms.html",
+        {"request": request, "user": user, "terms": terms},
+    )
+
+
+@router.post("/terms")
+async def save_terms(request: Request):
+    """Save updated default terms."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        term_ids = form.getlist("term_id")
+        term_titles = form.getlist("term_title")
+        term_contents = form.getlist("term_content")
+        term_active = form.getlist("term_active")
+
+        for tid, title, content in zip(term_ids, term_titles, term_contents):
+            if not tid:
+                continue
+            result = await session.execute(
+                select(LeaseDefaultTerms).where(LeaseDefaultTerms.id == int(tid))
+            )
+            term = result.scalar_one_or_none()
+            if term:
+                term.title = title
+                term.content = content
+                term.is_active = tid in term_active
+                term.updated_at = datetime.utcnow()
+
+        # Handle new term
+        new_title = form.get("new_title", "").strip()
+        new_content = form.get("new_content", "").strip()
+        if new_title and new_content:
+            new_term = LeaseDefaultTerms(
+                title=new_title,
+                content=new_content,
+                is_active=True,
+            )
+            session.add(new_term)
+
+    return RedirectResponse(url="/leases/builder/terms?saved=1", status_code=303)
+
+
+@router.post("/terms/{term_id}/delete")
+async def delete_term(request: Request, term_id: int):
+    """Delete a default term."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(LeaseDefaultTerms).where(LeaseDefaultTerms.id == term_id)
+        )
+        term = result.scalar_one_or_none()
+        if term:
+            await session.delete(term)
+
+    return RedirectResponse(url="/leases/builder/terms", status_code=303)
+
+
+@router.get("/terms/api/defaults")
+async def get_default_terms_api(request: Request):
+    """API endpoint: return current active default terms as JSON (for reset-to-defaults)."""
+    from fastapi.responses import JSONResponse
+
+    user = await get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(LeaseDefaultTerms).where(LeaseDefaultTerms.is_active == True)
+        )
+        terms = result.scalars().all()
+        combined = "\n\n".join(t.content for t in terms)
+
+    return JSONResponse({"content": combined})

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Default Lease Terms{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div>
+            <div class="flex items-center gap-2 mb-2">
+                <a href="/leases/builder" class="text-sm text-blue-600 hover:text-blue-500">&larr; Lease Builder</a>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900">Default Addendum Terms</h1>
+            <p class="mt-1 text-sm text-gray-500">These terms auto-populate Step 6 for every new lease</p>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+{% if request.query_params.get('saved') %}
+<div class="mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
+    <p class="text-sm font-medium text-green-800">Default terms saved successfully.</p>
+</div>
+{% endif %}
+
+<form method="POST" action="/leases/builder/terms">
+    <div class="max-w-4xl space-y-6">
+        {% for term in terms %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <input type="hidden" name="term_id" value="{{ term.id }}">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 mr-4">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                    <input type="text" name="term_title" value="{{ term.title }}" class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">
+                </div>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="term_active" value="{{ term.id }}" {% if term.is_active %}checked{% endif %} class="text-blue-600 rounded">
+                        <span class="text-sm text-gray-600">Active</span>
+                    </label>
+                    <button type="button" onclick="deleteTerm({{ term.id }})" class="text-sm text-red-500 hover:text-red-700">Delete</button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Content</label>
+                <textarea name="term_content" rows="20" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono leading-relaxed">{{ term.content }}</textarea>
+            </div>
+            <p class="text-xs text-gray-400">Last updated: {{ term.updated_at.strftime('%b %d, %Y %I:%M %p') if term.updated_at else 'Never' }}</p>
+        </div>
+        {% endfor %}
+
+        {% if not terms %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <h3 class="text-lg font-semibold text-gray-900">No default terms configured</h3>
+            <p class="mt-1 text-sm text-gray-500">Add default addendum terms that will pre-fill every new lease.</p>
+        </div>
+        {% endif %}
+
+        <!-- Add New Term -->
+        <details class="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-6">
+            <summary class="text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-500">+ Add Another Term Set</summary>
+            <div class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                    <input type="text" name="new_title" placeholder="e.g., Pet Policy Addendum" class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Content</label>
+                    <textarea name="new_content" rows="10" placeholder="Enter the addendum terms..." class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono"></textarea>
+                </div>
+            </div>
+        </details>
+
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <button type="submit" class="px-8 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-colors">
+                Save Default Terms
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Hidden delete forms -->
+{% for term in terms %}
+<form id="delete-form-{{ term.id }}" method="POST" action="/leases/builder/terms/{{ term.id }}/delete" class="hidden"></form>
+{% endfor %}
+
+<script>
+function deleteTerm(termId) {
+    if (confirm('Delete this default term? This cannot be undone.')) {
+        document.getElementById('delete-form-' + termId).submit();
+    }
+}
+</script>
+{% endblock %}

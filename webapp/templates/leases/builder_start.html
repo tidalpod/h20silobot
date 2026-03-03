@@ -21,7 +21,7 @@
             <!-- Property -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Property *</label>
-                <select name="property_id" required class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select name="property_id" required class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 searchable-select" data-placeholder="Type to search properties...">
                     <option value="">Select a property...</option>
                     {% for prop in properties %}
                     <option value="{{ prop.id }}">{{ prop.address }}{% if prop.city %}, {{ prop.city }}{% endif %}</option>
@@ -32,7 +32,7 @@
             <!-- Tenant -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Primary Tenant</label>
-                <select name="tenant_id" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select name="tenant_id" class="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 searchable-select" data-placeholder="Type to search tenants...">
                     <option value="">Select a tenant (optional)...</option>
                     {% for tenant in tenants %}
                     <option value="{{ tenant.id }}">{{ tenant.name }}{% if tenant.property_ref %} — {{ tenant.property_ref.address }}{% endif %}</option>

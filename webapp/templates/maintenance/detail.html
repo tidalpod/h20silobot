@@ -200,7 +200,7 @@
                     <dt class="text-xs text-gray-500 mb-1">Vendor</dt>
                     <dd>
                         <form method="POST" action="/maintenance/{{ wo.id }}/assign-vendor" class="space-y-2">
-                            <select name="vendor_id" class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5">
+                            <select name="vendor_id" class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 searchable-select" data-placeholder="Type to search vendors...">
                                 <option value="">— Not assigned —</option>
                                 {% for v in vendors %}
                                 <option value="{{ v.id }}" {% if wo.vendor_id == v.id %}selected{% endif %}>

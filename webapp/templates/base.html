@@ -115,6 +115,15 @@
         }
     </style>
 
+    <!-- Tom Select (searchable dropdowns) -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+    <style>
+        .ts-wrapper .ts-control { border-radius: 0.5rem; border-color: #d1d5db; padding: 0.375rem 0.75rem; font-size: 0.875rem; min-height: 38px; }
+        .ts-wrapper.focus .ts-control { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+        .ts-dropdown { border-radius: 0.5rem; font-size: 0.875rem; }
+        .ts-dropdown .active { background-color: #eff6ff; color: #1d4ed8; }
+    </style>
+
     {% block head %}{% endblock %}
 </head>
 <body class="h-full bg-gray-50">
@@ -870,6 +879,21 @@
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             // Handle flash messages or toast triggers
         });
+    </script>
+
+    <!-- Tom Select (searchable dropdowns) -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('select.searchable-select').forEach(function(el) {
+            if (el.tomselect) return; // already initialized
+            new TomSelect(el, {
+                create: false,
+                sortField: { field: 'text', direction: 'asc' },
+                placeholder: el.dataset.placeholder || 'Type to search...',
+            });
+        });
+    });
     </script>
 
     {% block scripts %}{% endblock %}

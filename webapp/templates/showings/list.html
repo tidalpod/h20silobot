@@ -51,7 +51,7 @@
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Property</label>
-            <select name="property_id" class="rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50">
+            <select name="property_id" class="rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 searchable-select" data-placeholder="Type to search...">
                 <option value="">All Properties</option>
                 {% for p in properties %}
                 <option value="{{ p.id }}" {% if filter_property_id == p.id %}selected{% endif %}>{{ p.address }}</option>
@@ -60,7 +60,7 @@
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Vendor</label>
-            <select name="vendor_id" class="rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50">
+            <select name="vendor_id" class="rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 searchable-select" data-placeholder="Type to search...">
                 <option value="">All Vendors</option>
                 {% for v in vendors %}
                 <option value="{{ v.id }}" {% if filter_vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
