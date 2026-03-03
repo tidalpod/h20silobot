@@ -1,9 +1,11 @@
 """PM-side Project (Rehab) tracking routes"""
 
+import os
+import uuid
 from datetime import datetime, date
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, desc
@@ -12,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Project, ProjectStatus, Property, Vendor, WorkOrder, Invoice, InvoiceStatus,
+    ProjectDocument,
 )
 from webapp.auth.dependencies import get_current_user
 
@@ -19,6 +22,22 @@ router = APIRouter(tags=["projects"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Upload directory for project documents
+UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
+    "/app/uploads" if Path("/app/uploads").exists()
+    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
+)
+UPLOAD_DIR = Path(UPLOAD_BASE) / "projects"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_TYPES = {
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -126,6 +145,7 @@ async def project_detail(request: Request, project_id: int):
                 selectinload(Project.vendor_ref),
                 selectinload(Project.invoices).selectinload(Invoice.vendor_ref),
                 selectinload(Project.work_orders).selectinload(WorkOrder.vendor_ref),
+                selectinload(Project.documents),
             )
         )
         project = result.scalar_one_or_none()
@@ -256,5 +276,75 @@ async def project_add_work_order(request: Request, project_id: int):
             wo = result.scalar_one_or_none()
             if wo:
                 wo.project_id = project_id
+
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@router.post("/{project_id}/documents/upload")
+async def project_document_upload(request: Request, project_id: int):
+    """Upload a document to a project"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    file: UploadFile = form.get("file")
+    title = form.get("title", "").strip() or None
+
+    if not file or not file.filename:
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    if file.content_type not in ALLOWED_TYPES:
+        return RedirectResponse(url=f"/projects/{project_id}?error=invalid_type", status_code=303)
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        return RedirectResponse(url=f"/projects/{project_id}?error=too_large", status_code=303)
+
+    ext = ALLOWED_TYPES.get(file.content_type, ".pdf")
+    filename = f"proj_{project_id}_{uuid.uuid4().hex[:12]}{ext}"
+    filepath = UPLOAD_DIR / filename
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    file_url = f"/uploads/projects/{filename}"
+
+    async with get_session() as session:
+        doc = ProjectDocument(
+            project_id=project_id,
+            file_url=file_url,
+            original_filename=file.filename or filename,
+            file_type=ext.lstrip("."),
+            file_size=len(contents),
+            title=title,
+        )
+        session.add(doc)
+
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@router.post("/{project_id}/documents/{doc_id}/delete")
+async def project_document_delete(request: Request, project_id: int, doc_id: int):
+    """Delete a project document"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(ProjectDocument).where(
+                ProjectDocument.id == doc_id,
+                ProjectDocument.project_id == project_id,
+            )
+        )
+        doc = result.scalar_one_or_none()
+        if doc:
+            # Delete file from disk
+            relative_path = doc.file_url.lstrip("/uploads/")
+            filepath = Path(UPLOAD_BASE) / relative_path
+            if filepath.exists():
+                filepath.unlink()
+            await session.delete(doc)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

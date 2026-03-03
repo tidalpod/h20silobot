@@ -149,5 +149,62 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Documents -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-gray-700">Documents</h2>
+        </div>
+
+        {% if request.query_params.get('error') == 'invalid_type' %}
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm mb-4">
+            Invalid file type. Please upload a PDF, JPG, PNG, or WebP file.
+        </div>
+        {% elif request.query_params.get('error') == 'too_large' %}
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm mb-4">
+            File too large. Maximum size is 20MB.
+        </div>
+        {% endif %}
+
+        <!-- Upload form -->
+        <form method="POST" action="/projects/{{ project.id }}/documents/upload" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2 mb-4">
+            <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="flex-1 text-sm text-gray-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <input type="text" name="title" placeholder="Label (optional)" class="rounded-lg border-gray-300 text-sm px-3 py-1.5 w-full sm:w-48">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-500 whitespace-nowrap">Upload</button>
+        </form>
+
+        {% if project.documents %}
+        <div class="space-y-2">
+            {% for doc in project.documents %}
+            <div class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    {% if doc.file_type == 'pdf' %}
+                    <svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/><path d="M8 12h2v2H8zm0 3h2v2H8zm3-3h2v2h-2zm0 3h2v2h-2z"/></svg>
+                    {% else %}
+                    <svg class="w-8 h-8 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    {% endif %}
+                    <div class="min-w-0">
+                        <a href="{{ doc.file_url }}" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800 truncate block">
+                            {{ doc.title or doc.original_filename }}
+                        </a>
+                        <div class="text-xs text-gray-400">
+                            {% if doc.title %}{{ doc.original_filename }} &middot; {% endif %}
+                            {{ "%.1f"|format(doc.file_size / 1024) }} KB
+                            &middot; {{ doc.created_at.strftime('%b %d, %Y') }}
+                        </div>
+                    </div>
+                </div>
+                <form method="POST" action="/projects/{{ project.id }}/documents/{{ doc.id }}/delete" onsubmit="return confirm('Delete this document?')">
+                    <button type="submit" class="text-gray-400 hover:text-red-500 p-1" title="Delete">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">No documents uploaded yet</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

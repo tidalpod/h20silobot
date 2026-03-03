@@ -1022,6 +1022,7 @@ class Project(Base):
     vendor_ref = relationship("Vendor", back_populates="projects")
     work_orders = relationship("WorkOrder", back_populates="project")
     invoices = relationship("Invoice", back_populates="project_ref")
+    documents = relationship("ProjectDocument", back_populates="project", cascade="all, delete-orphan", order_by="ProjectDocument.created_at.desc()")
 
     # Indexes
     __table_args__ = (
@@ -1053,6 +1054,32 @@ class Project(Base):
         if self.budget and float(self.budget) > 0:
             return min(100, (self.total_spent / float(self.budget)) * 100)
         return 0
+
+
+class ProjectDocument(Base):
+    """Documents attached to rehab projects (city deficiency PDFs, punchlists, etc.)"""
+    __tablename__ = "project_documents"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+
+    file_url = Column(String(500), nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    file_type = Column(String(20), nullable=False)  # pdf, jpg, png, etc.
+    file_size = Column(Integer, nullable=False)  # bytes
+    title = Column(String(255), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="documents")
+
+    __table_args__ = (
+        Index("ix_project_documents_project", "project_id"),
+    )
+
+    def __repr__(self):
+        return f"<ProjectDocument {self.id}: {self.original_filename}>"
 
 
 # =============================================================================
