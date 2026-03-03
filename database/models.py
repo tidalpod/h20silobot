@@ -1426,6 +1426,9 @@ class Showing(Base):
 
     notes = Column(Text, nullable=True)
 
+    # Reminders
+    reminder_sent_at = Column(DateTime, nullable=True)
+
     # Tracking
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

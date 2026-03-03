@@ -120,23 +120,38 @@
 {% if wo.status.value in ['assigned', 'in_progress'] %}
 <div class="portal-card p-4 mb-4">
     <h2 class="text-sm font-semibold text-gray-700 mb-3">Update Status</h2>
-    <div class="flex gap-2">
-        {% if wo.status.value == 'assigned' %}
-        <form method="POST" action="/vendor/work-orders/{{ wo.id }}/status" class="flex-1">
-            <input type="hidden" name="status" value="in_progress">
-            <button type="submit" class="w-full bg-purple-600 text-white rounded-xl py-3 font-medium hover:bg-purple-500 transition-colors text-sm">
-                Start Work
-            </button>
-        </form>
-        {% endif %}
-        <form method="POST" action="/vendor/work-orders/{{ wo.id }}/status" class="flex-1">
-            <input type="hidden" name="status" value="completed">
-            <button type="submit" class="w-full bg-green-600 text-white rounded-xl py-3 font-medium hover:bg-green-500 transition-colors text-sm flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                Mark Completed
-            </button>
-        </form>
+
+    {% if wo.status.value == 'assigned' %}
+    <form method="POST" action="/vendor/work-orders/{{ wo.id }}/status" class="mb-3">
+        <input type="hidden" name="status" value="in_progress">
+        <button type="submit" class="w-full bg-purple-600 text-white rounded-xl py-3 font-medium hover:bg-purple-500 transition-colors text-sm">
+            Start Work
+        </button>
+    </form>
+    {% endif %}
+
+    <!-- Completion form with notes -->
+    <form method="POST" action="/vendor/work-orders/{{ wo.id }}/status">
+        <input type="hidden" name="status" value="completed">
+        <div class="mb-3">
+            <label class="block text-xs text-gray-500 mb-1">Completion Notes (optional)</label>
+            <textarea name="resolution_notes" rows="3" placeholder="Describe what was done, materials used, etc."
+                class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500"></textarea>
+        </div>
+        <button type="submit" class="w-full bg-green-600 text-white rounded-xl py-3 font-medium hover:bg-green-500 transition-colors text-sm flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            Submit as Completed
+        </button>
+        <p class="text-xs text-gray-400 text-center mt-2">Admin will be notified for review</p>
+    </form>
+</div>
+{% elif wo.status.value == 'completed' %}
+<div class="portal-card p-4 mb-4 bg-green-50 border border-green-200">
+    <div class="flex items-center gap-2 text-green-700">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+        <span class="text-sm font-semibold">Submitted as Completed</span>
     </div>
+    <p class="text-xs text-green-600 mt-1">Admin has been notified and will review and close this work order.</p>
 </div>
 {% endif %}
 

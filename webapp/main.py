@@ -1,5 +1,6 @@
 """FastAPI application entry point"""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -63,7 +64,29 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Database connected successfully")
 
+    # Run showing reminder migration
+    try:
+        from database.migrations.add_showing_reminder import run_migration
+        await run_migration()
+    except Exception as e:
+        logger.warning(f"Showing reminder migration skipped: {e}")
+
+    # Start background showing reminder service
+    reminder_task = None
+    if db_success and web_config.has_twilio:
+        from webapp.services.showing_reminders import reminder_loop
+        reminder_task = asyncio.create_task(reminder_loop())
+        logger.info("Showing reminder service started")
+
     yield
+
+    # Cancel reminder task on shutdown
+    if reminder_task:
+        reminder_task.cancel()
+        try:
+            await reminder_task
+        except asyncio.CancelledError:
+            pass
 
     logger.info("Shutting down Blue Deer Web App...")
 

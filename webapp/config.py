@@ -40,6 +40,9 @@ class WebConfig:
     # Database (shared with bot)
     database_url: str = os.getenv("DATABASE_URL", "")
 
+    # Admin notifications
+    admin_phone: str = os.getenv("ADMIN_PHONE", "")
+
     # Plaid ACH Payments
     plaid_client_id: str = os.getenv("PLAID_CLIENT_ID", "")
     plaid_secret: str = os.getenv("PLAID_SECRET", "")

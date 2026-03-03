@@ -276,6 +276,7 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
 
     form = await request.form()
     new_status = form.get("status", "")
+    resolution_notes = form.get("resolution_notes", "").strip()
 
     # Vendors can only set these statuses
     allowed = {WorkOrderStatus.IN_PROGRESS.value, WorkOrderStatus.COMPLETED.value}
@@ -284,7 +285,9 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
 
     async with get_session() as session:
         result = await session.execute(
-            select(WorkOrder).where(
+            select(WorkOrder)
+            .options(selectinload(WorkOrder.property_ref))
+            .where(
                 WorkOrder.id == wo_id,
                 WorkOrder.vendor_id == vendor["id"],
             )
@@ -295,6 +298,27 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
             if new_status == WorkOrderStatus.COMPLETED.value:
                 from datetime import date
                 wo.completed_date = date.today()
+                if resolution_notes:
+                    wo.resolution_notes = resolution_notes
+                await session.flush()
+
+                # Notify admin via SMS
+                from webapp.config import web_config
+                if web_config.admin_phone and web_config.has_twilio:
+                    from webapp.services.twilio_service import twilio_service
+                    prop_addr = wo.property_ref.address if wo.property_ref else "Unknown"
+                    photo_count = len(wo.photos) if wo.photos else 0
+                    msg = (
+                        f"Work Order Completed\n\n"
+                        f"WO #{wo.id}: {wo.title}\n"
+                        f"Property: {prop_addr}\n"
+                        f"Vendor: {vendor['name']}\n"
+                        f"Photos: {photo_count}\n"
+                    )
+                    if resolution_notes:
+                        msg += f"Notes: {resolution_notes}\n"
+                    msg += f"\nPlease review and close this work order."
+                    await twilio_service.send_sms(web_config.admin_phone, msg)
 
     return RedirectResponse(url=f"/vendor/work-orders/{wo_id}", status_code=303)
 
