@@ -148,6 +148,59 @@
             <p class="text-sm text-gray-400">No invoices linked yet</p>
             {% endif %}
         </div>
+
+        <!-- Estimates -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold text-gray-700">Estimates</h2>
+                <a href="/estimates?property_id={{ project.property_id }}" class="text-xs text-blue-600 hover:text-blue-700">View All</a>
+            </div>
+
+            {% if project.estimates %}
+            <div class="space-y-2">
+                {% for est in project.estimates %}
+                <div class="p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                    <div class="flex items-center justify-between mb-1">
+                        <a href="/estimates/{{ est.id }}" class="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{{ est.title }}</a>
+                        <div class="text-right flex-shrink-0 ml-2">
+                            <div class="text-sm font-semibold text-gray-900">${{ "%.2f"|format(est.amount) }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs text-gray-500">{% if est.vendor_ref %}{{ est.vendor_ref.name }}{% endif %}</div>
+                        <span class="text-xs px-2 py-0.5 rounded-full
+                            {% if est.status == 'submitted' %}bg-amber-100 text-amber-700
+                            {% elif est.status == 'approved' %}bg-green-100 text-green-700
+                            {% elif est.status == 'rejected' %}bg-red-100 text-red-700
+                            {% endif %}">{{ est.status|capitalize }}</span>
+                    </div>
+
+                    <!-- Inline actions -->
+                    {% if est.status == 'submitted' %}
+                    <div class="flex gap-2 mt-2">
+                        <form method="POST" action="/estimates/{{ est.id }}/approve" class="flex-1">
+                            <input type="hidden" name="redirect" value="/projects/{{ project.id }}">
+                            <button type="submit" class="w-full bg-green-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-green-500">Approve</button>
+                        </form>
+                        <form method="POST" action="/estimates/{{ est.id }}/reject" class="flex-1">
+                            <input type="hidden" name="redirect" value="/projects/{{ project.id }}">
+                            <button type="submit" class="w-full bg-red-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-red-500">Reject</button>
+                        </form>
+                    </div>
+                    {% elif est.status == 'approved' and not est.invoice_id %}
+                    <form method="POST" action="/estimates/{{ est.id }}/convert" class="mt-2">
+                        <button type="submit" class="w-full bg-blue-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-blue-500">Convert to Invoice</button>
+                    </form>
+                    {% elif est.invoice_id %}
+                    <div class="mt-2 text-xs text-blue-600">Converted to invoice</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">No estimates linked yet</p>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Documents -->
@@ -206,5 +259,104 @@
         <p class="text-sm text-gray-400">No documents uploaded yet</p>
         {% endif %}
     </div>
+
+    <!-- Embedded SMS Chat Widget -->
+    {% if project.vendor_ref and project.vendor_ref.phone %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6" id="sms-chat-widget">
+        <!-- Chat Header -->
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-700">Messages with {{ project.vendor_ref.name }}</h2>
+                <p class="text-xs text-gray-400">{{ project.vendor_ref.phone }}</p>
+            </div>
+            <a href="/notifications/chat" class="text-xs text-blue-600 hover:text-blue-700">Open Full Chat</a>
+        </div>
+
+        <!-- Chat Messages Area -->
+        <div id="chat-messages" class="px-4 py-3 space-y-2 overflow-y-auto bg-gray-50" style="height: 350px;">
+            <p class="text-sm text-gray-400 text-center py-8">Loading messages...</p>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="px-4 py-3 border-t border-gray-200">
+            <form id="chat-form" class="flex gap-2">
+                <input type="text" id="chat-input" placeholder="Type a message..."
+                    class="flex-1 rounded-lg border-gray-300 text-sm px-3 py-2 focus:border-purple-500 focus:ring-purple-500">
+                <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-500 transition-colors">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        const vendorId = {{ project.vendor_ref.id }};
+        const messagesDiv = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        let lastMessageCount = 0;
+
+        function renderMessages(messages) {
+            if (!messages || messages.length === 0) {
+                messagesDiv.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">No messages yet. Send a message to start the conversation.</p>';
+                return;
+            }
+            let html = '';
+            messages.forEach(function(msg) {
+                const isOutbound = msg.direction === 'outbound';
+                const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                if (isOutbound) {
+                    html += '<div class="flex justify-end"><div class="max-w-[80%] bg-purple-600 text-white rounded-2xl rounded-br-md px-3 py-2"><p class="text-sm whitespace-pre-wrap">' + escapeHtml(msg.body) + '</p><p class="text-xs text-purple-200 mt-0.5 text-right">' + time + '</p></div></div>';
+                } else {
+                    html += '<div class="flex justify-start"><div class="max-w-[80%] bg-white border border-gray-200 rounded-2xl rounded-bl-md px-3 py-2"><p class="text-sm text-gray-800 whitespace-pre-wrap">' + escapeHtml(msg.body) + '</p><p class="text-xs text-gray-400 mt-0.5">' + time + '</p></div></div>';
+                }
+            });
+            messagesDiv.innerHTML = html;
+            if (messages.length !== lastMessageCount) {
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                lastMessageCount = messages.length;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadMessages() {
+            try {
+                const resp = await fetch('/sms/conversation/vendor/' + vendorId);
+                const data = await resp.json();
+                renderMessages(data.messages || []);
+            } catch (e) {
+                console.error('Failed to load messages:', e);
+            }
+        }
+
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const body = chatInput.value.trim();
+            if (!body) return;
+
+            chatInput.value = '';
+            const formData = new FormData();
+            formData.append('body', body);
+
+            try {
+                await fetch('/sms/send/vendor/' + vendorId, { method: 'POST', body: formData });
+                await loadMessages();
+            } catch (e) {
+                console.error('Failed to send message:', e);
+            }
+        });
+
+        // Initial load and polling
+        loadMessages();
+        setInterval(loadMessages, 5000);
+    })();
+    </script>
+    {% endif %}
 </div>
 {% endblock %}

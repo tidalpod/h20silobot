@@ -1,0 +1,129 @@
+{% extends "vendor/base.html" %}
+
+{% block title %}Submit Estimate{% endblock %}
+
+{% block content %}
+<a href="/vendor/estimates" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to Estimates
+</a>
+
+<h1 class="text-xl font-bold text-gray-900 mb-4">Submit Estimate</h1>
+
+{% set error = request.query_params.get('error', '') %}
+{% if error %}
+<div class="mb-4 bg-red-50 text-red-700 text-sm rounded-lg p-3">
+    {% if error == 'missing_fields' %}Please fill in all required fields.
+    {% elif error == 'invalid_amount' %}Please enter a valid amount.
+    {% elif error == 'invalid_file' %}Invalid file type. Please upload a PDF or image.
+    {% elif error == 'file_too_large' %}File too large. Maximum 20MB.
+    {% elif error == 'invalid_project' %}Invalid project selected.
+    {% else %}An error occurred. Please try again.
+    {% endif %}
+</div>
+{% endif %}
+
+<form method="POST" action="/vendor/estimates/new" enctype="multipart/form-data" class="space-y-4">
+    <!-- Title -->
+    <div class="portal-card p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Estimate Title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" required
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2"
+            placeholder="e.g., Kitchen renovation - materials and labor">
+    </div>
+
+    <!-- Amount -->
+    <div class="portal-card p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Estimated Amount <span class="text-red-500">*</span></label>
+        <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+            <input type="number" name="amount" step="0.01" min="0.01" required
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border pl-7 pr-3 py-2"
+                placeholder="0.00">
+        </div>
+    </div>
+
+    <!-- Project (optional) -->
+    {% if projects %}
+    <div class="portal-card p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Project <span class="text-gray-400 font-normal">(optional)</span></label>
+        <select name="project_id" id="project-select"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
+            <option value="">No project</option>
+            {% for proj in projects %}
+            <option value="{{ proj.id }}" data-property-id="{{ proj.property_id }}">{{ proj.name }}{% if proj.property_ref %} ({{ proj.property_ref.address }}){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <!-- Property -->
+    <div class="portal-card p-4" id="property-section">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Property <span class="text-red-500">*</span></label>
+        <select name="property_id" id="property-select" required
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
+            <option value="">Select property...</option>
+            {% for prop in properties %}
+            <option value="{{ prop.id }}">{{ prop.address }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Description -->
+    <div class="portal-card p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+        <textarea name="description" rows="3"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2"
+            placeholder="Describe the scope of work, materials needed, etc."></textarea>
+    </div>
+
+    <!-- File Upload -->
+    <div class="portal-card p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Attach File <span class="text-gray-400 font-normal">(optional)</span></label>
+        <div class="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center" id="file-drop">
+            <input type="file" name="file" accept=".pdf,image/*" id="file-input" class="hidden">
+            <button type="button" onclick="document.getElementById('file-input').click()" class="text-sm text-purple-700 font-medium hover:text-green-700">
+                <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                </svg>
+                Choose File
+            </button>
+            <p class="text-xs text-gray-400 mt-1">PDF or image, up to 20MB</p>
+            <p id="file-name" class="text-xs text-purple-700 mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" class="w-full bg-purple-700 text-white rounded-xl py-3 font-medium hover:bg-purple-600 transition-colors text-base">
+        Submit Estimate
+    </button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('file-input').addEventListener('change', function(e) {
+    const name = e.target.files[0]?.name;
+    const label = document.getElementById('file-name');
+    if (name) {
+        label.textContent = name;
+        label.classList.remove('hidden');
+    } else {
+        label.classList.add('hidden');
+    }
+});
+
+// Auto-select property when project is chosen
+const projectSelect = document.getElementById('project-select');
+if (projectSelect) {
+    projectSelect.addEventListener('change', function() {
+        const selected = this.options[this.selectedIndex];
+        const propertyId = selected.getAttribute('data-property-id');
+        const propertySelect = document.getElementById('property-select');
+        if (propertyId && propertySelect) {
+            propertySelect.value = propertyId;
+        }
+    });
+}
+</script>
+{% endblock %}

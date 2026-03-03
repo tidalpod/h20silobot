@@ -16,6 +16,7 @@ from database.models import (
     Vendor, WorkOrder, WorkOrderPhoto, WorkOrderStatus,
     Property, Invoice, InvoiceStatus, SMSMessage, MessageDirection,
     Showing, ShowingStatus,
+    Estimate, EstimateStatus, Project,
 )
 from webapp.auth.vendor_auth import get_current_vendor, login_vendor, logout_vendor
 from webapp.services.vendor_verification_service import (
@@ -36,6 +37,8 @@ WO_UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
 WO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 INVOICE_UPLOAD_DIR = Path(UPLOAD_BASE) / "invoices"
 INVOICE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+ESTIMATE_UPLOAD_DIR = Path(UPLOAD_BASE) / "estimates"
+ESTIMATE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # =============================================================================
@@ -494,6 +497,189 @@ async def vendor_invoice_detail(request: Request, inv_id: int):
         "request": request,
         "vendor": vendor,
         "invoice": invoice,
+    })
+
+
+# =============================================================================
+# Estimates
+# =============================================================================
+
+@router.get("/estimates", response_class=HTMLResponse)
+async def vendor_estimates(request: Request):
+    """List vendor's estimates"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Estimate)
+            .where(Estimate.vendor_id == vendor["id"])
+            .options(selectinload(Estimate.property_ref), selectinload(Estimate.project_ref))
+            .order_by(desc(Estimate.created_at))
+        )
+        estimates = result.scalars().all()
+
+    return templates.TemplateResponse("vendor/estimates.html", {
+        "request": request,
+        "vendor": vendor,
+        "estimates": estimates,
+    })
+
+
+@router.get("/estimates/new", response_class=HTMLResponse)
+async def vendor_estimate_form(request: Request):
+    """New estimate form"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        # Get projects assigned to this vendor
+        projects_result = await session.execute(
+            select(Project)
+            .where(Project.vendor_id == vendor["id"])
+            .options(selectinload(Project.property_ref))
+            .order_by(desc(Project.created_at))
+        )
+        projects = projects_result.scalars().all()
+
+        # Get properties where vendor has work orders
+        wo_result = await session.execute(
+            select(WorkOrder.property_id)
+            .where(WorkOrder.vendor_id == vendor["id"])
+            .distinct()
+        )
+        property_ids = [row[0] for row in wo_result.all()]
+
+        # Also include properties from projects
+        for p in projects:
+            if p.property_id and p.property_id not in property_ids:
+                property_ids.append(p.property_id)
+
+        properties = []
+        if property_ids:
+            prop_result = await session.execute(
+                select(Property).where(Property.id.in_(property_ids))
+            )
+            properties = prop_result.scalars().all()
+
+    return templates.TemplateResponse("vendor/estimate_form.html", {
+        "request": request,
+        "vendor": vendor,
+        "properties": properties,
+        "projects": projects,
+    })
+
+
+@router.post("/estimates/new")
+async def vendor_estimate_submit(request: Request):
+    """Submit a new estimate"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    form = await request.form()
+    title = form.get("title", "").strip()
+    amount = form.get("amount", "").strip()
+    description = form.get("description", "").strip()
+    property_id = form.get("property_id")
+    project_id = form.get("project_id") or None
+    file: UploadFile = form.get("file")
+
+    if not title or not amount or not property_id:
+        return RedirectResponse(url="/vendor/estimates/new?error=missing_fields", status_code=303)
+
+    try:
+        amount_val = float(amount)
+    except ValueError:
+        return RedirectResponse(url="/vendor/estimates/new?error=invalid_amount", status_code=303)
+
+    # Handle file upload
+    file_url = None
+    if file and file.filename:
+        allowed_types = {
+            "application/pdf": ".pdf",
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+        }
+        if file.content_type not in allowed_types:
+            return RedirectResponse(url="/vendor/estimates/new?error=invalid_file", status_code=303)
+
+        contents = await file.read()
+        if len(contents) > 20 * 1024 * 1024:  # 20MB
+            return RedirectResponse(url="/vendor/estimates/new?error=file_too_large", status_code=303)
+
+        ext = allowed_types.get(file.content_type, ".pdf")
+        filename = f"estimate_{uuid.uuid4().hex[:12]}{ext}"
+        filepath = ESTIMATE_UPLOAD_DIR / filename
+
+        with open(filepath, "wb") as f:
+            f.write(contents)
+
+        file_url = f"/uploads/estimates/{filename}"
+
+    async with get_session() as session:
+        # If project selected, use the project's property_id
+        if project_id:
+            proj_result = await session.execute(
+                select(Project).where(
+                    Project.id == int(project_id),
+                    Project.vendor_id == vendor["id"],
+                )
+            )
+            proj = proj_result.scalar_one_or_none()
+            if proj:
+                property_id = proj.property_id
+            else:
+                return RedirectResponse(url="/vendor/estimates/new?error=invalid_project", status_code=303)
+
+        estimate = Estimate(
+            vendor_id=vendor["id"],
+            property_id=int(property_id),
+            project_id=int(project_id) if project_id else None,
+            title=title,
+            description=description,
+            amount=amount_val,
+            file_url=file_url,
+            status=EstimateStatus.SUBMITTED.value,
+            submitted_at=datetime.utcnow(),
+        )
+        session.add(estimate)
+        await session.flush()
+        estimate_id = estimate.id
+
+    return RedirectResponse(url=f"/vendor/estimates/{estimate_id}", status_code=303)
+
+
+@router.get("/estimates/{est_id}", response_class=HTMLResponse)
+async def vendor_estimate_detail(request: Request, est_id: int):
+    """View estimate detail"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Estimate)
+            .where(
+                Estimate.id == est_id,
+                Estimate.vendor_id == vendor["id"],
+            )
+            .options(
+                selectinload(Estimate.property_ref),
+                selectinload(Estimate.project_ref),
+            )
+        )
+        estimate = result.scalar_one_or_none()
+        if not estimate:
+            return RedirectResponse(url="/vendor/estimates", status_code=303)
+
+    return templates.TemplateResponse("vendor/estimate_detail.html", {
+        "request": request,
+        "vendor": vendor,
+        "estimate": estimate,
     })
 
 
