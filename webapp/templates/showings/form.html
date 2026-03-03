@@ -65,15 +65,6 @@
                 <div></div>
             </div>
 
-            <!-- Notify Vendor -->
-            <div id="notify-vendor-row" class="hidden">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="notify_vendor" value="1" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span class="text-sm font-medium text-gray-700">📱 Send SMS notification to vendor</span>
-                    <span class="text-xs text-gray-400" id="notify-vendor-phone"></span>
-                </label>
-            </div>
-
             <!-- Date & Time -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -88,15 +79,15 @@
                 </div>
             </div>
 
-            <!-- Contact Info -->
+            <!-- Prospective Renter Info -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prospective Renter Name</label>
                     <input type="text" name="contact_name" value="{{ showing.contact_name if showing else '' }}"
                         class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" placeholder="e.g., John Smith">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prospective Renter Phone</label>
                     <input type="tel" name="contact_phone" value="{{ showing.contact_phone if showing else '' }}"
                         class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" placeholder="(555) 123-4567">
                 </div>
@@ -240,28 +231,5 @@
         items: properties,
     });
 
-    // --- Vendor notify ---
-    const vendorSelect = document.querySelector('select[name="vendor_id"]');
-    const notifyRow = document.getElementById('notify-vendor-row');
-    const notifyPhone = document.getElementById('notify-vendor-phone');
-
-    const vendorPhones = {
-        {% for v in vendors %}
-        {{ v.id }}: "{{ v.phone or '' }}",
-        {% endfor %}
-    };
-
-    function updateNotifyRow() {
-        const vid = vendorSelect.value;
-        if (vid && vendorPhones[vid]) {
-            notifyRow.classList.remove('hidden');
-            notifyPhone.textContent = '(' + vendorPhones[vid] + ')';
-        } else {
-            notifyRow.classList.add('hidden');
-        }
-    }
-
-    vendorSelect.addEventListener('change', updateNotifyRow);
-    updateNotifyRow();
 </script>
 {% endblock %}

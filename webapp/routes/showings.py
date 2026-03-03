@@ -71,7 +71,7 @@ async def _notify_vendor_showing_sms(vendor_id: int, showing, session):
             f"Time: {time_str}\n"
         )
         if showing.contact_name:
-            msg += f"Contact: {showing.contact_name}"
+            msg += f"Prospective Renter: {showing.contact_name}"
             if showing.contact_phone:
                 msg += f" ({showing.contact_phone})"
             msg += "\n"
@@ -105,6 +105,48 @@ async def _notify_vendor_showing_sms(vendor_id: int, showing, session):
         return sms_result.success
     except Exception as e:
         logger.error(f"Error sending vendor showing SMS: {e}")
+        return False
+
+
+async def _notify_renter_showing_sms(showing, session):
+    """Send SMS to prospective renter about a showing"""
+    try:
+        phone = _normalize_phone(showing.contact_phone)
+        if not phone:
+            return False
+
+        prop_addr = ""
+        if showing.property_id:
+            prop_result = await session.execute(
+                select(Property).where(Property.id == showing.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            prop_addr = prop.address if prop else ""
+
+        date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "TBD"
+        time_str = showing.scheduled_time or "TBD"
+
+        msg = (
+            f"Blue Deer Property Management\n\n"
+            f"Hi{' ' + showing.contact_name.split()[0] if showing.contact_name else ''}! "
+            f"Your showing has been scheduled:\n\n"
+            f"Property: {prop_addr}\n"
+            f"Date: {date_str}\n"
+            f"Time: {time_str}\n"
+        )
+        if showing.description:
+            msg += f"\nDetails: {showing.description}\n"
+        msg += "\nPlease reply to this message if you have any questions."
+
+        sms_result = await twilio_service.send_sms(phone, msg)
+        if sms_result.success:
+            logger.info(f"Renter SMS sent to {showing.contact_name} for Showing #{showing.id}")
+        else:
+            logger.error(f"Failed to SMS renter {showing.contact_name}: {sms_result.error_message}")
+
+        return sms_result.success
+    except Exception as e:
+        logger.error(f"Error sending renter showing SMS: {e}")
         return False
 
 
@@ -259,9 +301,13 @@ async def create_showing(request: Request):
         await session.flush()
         showing_id = showing.id
 
-        # Send SMS to vendor if assigned and checkbox checked
-        if showing.vendor_id and form.get("notify_vendor"):
+        # Auto-send SMS to vendor if assigned
+        if showing.vendor_id:
             await _notify_vendor_showing_sms(showing.vendor_id, showing, session)
+
+        # Auto-send SMS to prospective renter if phone provided
+        if showing.contact_phone:
+            await _notify_renter_showing_sms(showing, session)
 
     return RedirectResponse(url=f"/showings/{showing_id}", status_code=303)
 
