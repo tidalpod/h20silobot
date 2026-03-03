@@ -56,6 +56,7 @@ def login_user(request: Request, user: "WebUser"):
         "id": user.id,
         "email": user.email,
         "name": user.name,
+        "phone": user.phone,
         "is_admin": user.is_admin
     }
 

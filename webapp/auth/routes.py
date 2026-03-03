@@ -205,6 +205,7 @@ async def profile_page(request: Request):
 async def update_profile(
     request: Request,
     name: str = Form(""),
+    phone: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
     new_password_confirm: str = Form("")
@@ -223,8 +224,9 @@ async def update_profile(
         if not user:
             return RedirectResponse(url="/login", status_code=303)
 
-        # Update name
+        # Update name and phone
         user.name = name or None
+        user.phone = phone.strip() or None
 
         # Update password if provided
         if new_password:

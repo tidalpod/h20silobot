@@ -1,4 +1,4 @@
-"""Migration: Add reminder_sent_at column to showings table"""
+"""Migration: Add reminder_sent_at to showings + phone to web_users"""
 
 import asyncio
 import os
@@ -41,7 +41,21 @@ async def run_migration():
             else:
                 logger.info("showings.reminder_sent_at already exists")
 
-        logger.info("Showing reminder migration completed successfully")
+            # Add phone column to web_users
+            result = await conn.execute(text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'web_users' AND column_name = 'phone'
+            """))
+            if not result.fetchone():
+                await conn.execute(text("""
+                    ALTER TABLE web_users
+                    ADD COLUMN phone VARCHAR(20) NULL
+                """))
+                logger.info("Added phone to web_users")
+            else:
+                logger.info("web_users.phone already exists")
+
+        logger.info("Migration completed successfully")
         return True
 
     except Exception as e:

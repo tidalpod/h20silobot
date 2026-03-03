@@ -304,21 +304,31 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
 
                 # Notify admin via SMS
                 from webapp.config import web_config
-                if web_config.admin_phone and web_config.has_twilio:
-                    from webapp.services.twilio_service import twilio_service
-                    prop_addr = wo.property_ref.address if wo.property_ref else "Unknown"
-                    photo_count = len(wo.photos) if wo.photos else 0
-                    msg = (
-                        f"Work Order Completed\n\n"
-                        f"WO #{wo.id}: {wo.title}\n"
-                        f"Property: {prop_addr}\n"
-                        f"Vendor: {vendor['name']}\n"
-                        f"Photos: {photo_count}\n"
+                from database.models import WebUser
+                if web_config.has_twilio:
+                    admin_result = await session.execute(
+                        select(WebUser).where(
+                            WebUser.is_admin == True,
+                            WebUser.phone.isnot(None),
+                            WebUser.is_active == True,
+                        ).limit(1)
                     )
-                    if resolution_notes:
-                        msg += f"Notes: {resolution_notes}\n"
-                    msg += f"\nPlease review and close this work order."
-                    await twilio_service.send_sms(web_config.admin_phone, msg)
+                    admin_user = admin_result.scalar_one_or_none()
+                    if admin_user and admin_user.phone:
+                        from webapp.services.twilio_service import twilio_service
+                        prop_addr = wo.property_ref.address if wo.property_ref else "Unknown"
+                        photo_count = len(wo.photos) if wo.photos else 0
+                        msg = (
+                            f"Work Order Completed\n\n"
+                            f"WO #{wo.id}: {wo.title}\n"
+                            f"Property: {prop_addr}\n"
+                            f"Vendor: {vendor['name']}\n"
+                            f"Photos: {photo_count}\n"
+                        )
+                        if resolution_notes:
+                            msg += f"Notes: {resolution_notes}\n"
+                        msg += f"\nPlease review and close this work order."
+                        await twilio_service.send_sms(admin_user.phone, msg)
 
     return RedirectResponse(url=f"/vendor/work-orders/{wo_id}", status_code=303)
 
