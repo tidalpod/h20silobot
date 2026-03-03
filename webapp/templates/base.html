@@ -131,8 +131,8 @@
         <!-- Navigation -->
         {% if user %}
         {# Active state logic #}
-        {% set portfolio_active = '/properties' in request.url.path or '/tenants' in request.url.path or '/leases' in request.url.path or '/phas' in request.url.path %}
-        {% set operations_active = '/maintenance' in request.url.path or '/showings' in request.url.path or '/inspections' in request.url.path or '/bills' in request.url.path or '/invoices' in request.url.path or '/projects' in request.url.path or ('/notifications' in request.url.path and '/notifications/chat' not in request.url.path) %}
+        {% set portfolio_active = '/properties' in request.url.path or '/tenants' in request.url.path or '/leases' in request.url.path or '/phas' in request.url.path or '/maintenance/vendors' in request.url.path %}
+        {% set operations_active = ('/maintenance' in request.url.path and '/maintenance/vendors' not in request.url.path) or '/showings' in request.url.path or '/inspections' in request.url.path or '/bills' in request.url.path or '/invoices' in request.url.path or '/estimates' in request.url.path or '/projects' in request.url.path %}
         {% set messages_active = '/notifications/chat' in request.url.path %}
 
         <nav class="gradient-bg shadow-lg relative z-40">
@@ -210,6 +210,17 @@
                                             <div>
                                                 <div class="text-sm font-medium text-gray-900">PHAs</div>
                                                 <div class="text-xs text-gray-500">Housing authorities</div>
+                                            </div>
+                                        </a>
+                                        <a href="/maintenance/vendors" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/maintenance/vendors' in request.url.path else '' }}">
+                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900">Vendors</div>
+                                                <div class="text-xs text-gray-500">Vendor directory</div>
                                             </div>
                                         </a>
                                     </div>
@@ -293,18 +304,6 @@
                                                 <div class="text-xs text-gray-500">Bill tracking</div>
                                             </div>
                                         </a>
-                                        <div class="border-t border-gray-100 my-1.5"></div>
-                                        <a href="/maintenance/vendors" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/maintenance/vendors' in request.url.path else '' }}">
-                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
-                                                <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">Vendors</div>
-                                                <div class="text-xs text-gray-500">Vendor directory</div>
-                                            </div>
-                                        </a>
                                         <a href="/invoices" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/invoices' in request.url.path else '' }}">
                                             <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
                                                 <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -325,17 +324,6 @@
                                             <div>
                                                 <div class="text-sm font-medium text-gray-900">Projects</div>
                                                 <div class="text-xs text-gray-500">Rehab tracking</div>
-                                            </div>
-                                        </a>
-                                        <a href="/notifications" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/notifications' in request.url.path and '/notifications/chat' not in request.url.path else '' }}">
-                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">Notifications</div>
-                                                <div class="text-xs text-gray-500">SMS/email history</div>
                                             </div>
                                         </a>
                                     </div>
@@ -499,6 +487,10 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" /></svg>
                         PHAs
                     </a>
+                    <a href="/maintenance/vendors" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+                        Vendors
+                    </a>
 
                     <!-- Operations section -->
                     <div class="mt-3 mb-1 px-3">
@@ -528,10 +520,6 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         Water Bills
                     </a>
-                    <a href="/maintenance/vendors" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
-                        Vendors
-                    </a>
                     <a href="/invoices" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         Invoices
@@ -543,10 +531,6 @@
                     <a href="/projects" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
                         Projects
-                    </a>
-                    <a href="/notifications" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
-                        Notifications
                     </a>
 
                     <!-- Messages -->
