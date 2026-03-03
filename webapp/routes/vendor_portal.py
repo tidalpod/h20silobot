@@ -267,6 +267,38 @@ async def vendor_work_order_detail(request: Request, wo_id: int):
     })
 
 
+@router.post("/work-orders/{wo_id}/status")
+async def vendor_update_work_order_status(request: Request, wo_id: int):
+    """Update work order status (vendor can set in_progress or completed)"""
+    vendor = await get_current_vendor(request)
+    if not vendor:
+        return RedirectResponse(url="/vendor/login", status_code=303)
+
+    form = await request.form()
+    new_status = form.get("status", "")
+
+    # Vendors can only set these statuses
+    allowed = {WorkOrderStatus.IN_PROGRESS.value, WorkOrderStatus.COMPLETED.value}
+    if new_status not in allowed:
+        return RedirectResponse(url=f"/vendor/work-orders/{wo_id}", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkOrder).where(
+                WorkOrder.id == wo_id,
+                WorkOrder.vendor_id == vendor["id"],
+            )
+        )
+        wo = result.scalar_one_or_none()
+        if wo:
+            wo.status = WorkOrderStatus(new_status)
+            if new_status == WorkOrderStatus.COMPLETED.value:
+                from datetime import date
+                wo.completed_date = date.today()
+
+    return RedirectResponse(url=f"/vendor/work-orders/{wo_id}", status_code=303)
+
+
 @router.post("/work-orders/{wo_id}/photos/upload")
 async def vendor_photo_upload(request: Request, wo_id: int, photo: UploadFile = File(...)):
     """Upload photo for a work order (vendor)"""
