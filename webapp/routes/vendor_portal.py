@@ -330,6 +330,26 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
                         msg += f"\nPlease review and close this work order."
                         await twilio_service.send_sms(admin_user.phone, msg)
 
+                # Notify all approved Telegram users
+                try:
+                    from webapp.services.telegram_service import telegram_service
+                    prop_addr = wo.property_ref.address if wo.property_ref else "Unknown"
+                    photo_count = len(wo.photos) if wo.photos else 0
+                    tg_msg = (
+                        f"✅ *Work Order Completed*\n\n"
+                        f"*WO #{wo.id}:* {wo.title}\n"
+                        f"*Property:* {prop_addr}\n"
+                        f"*Vendor:* {vendor['name']}\n"
+                        f"*Photos:* {photo_count}\n"
+                    )
+                    if resolution_notes:
+                        tg_msg += f"*Notes:* {resolution_notes}\n"
+                    tg_msg += f"\nPlease review and close this work order."
+                    await telegram_service.send_message(tg_msg, all_users=True)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Telegram WO notification failed: {e}")
+
     return RedirectResponse(url=f"/vendor/work-orders/{wo_id}", status_code=303)
 
 

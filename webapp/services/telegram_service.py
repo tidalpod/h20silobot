@@ -22,8 +22,13 @@ class TelegramService:
     def is_configured(self) -> bool:
         return bool(self.token)
 
-    async def get_notification_chat_ids(self) -> List[int]:
-        """Get list of chat IDs to send notifications to (admins + group)"""
+    async def get_notification_chat_ids(self, all_users: bool = False) -> List[int]:
+        """Get list of chat IDs to send notifications to.
+
+        Args:
+            all_users: If True, send to ALL approved users with notifications enabled.
+                       If False (default), send to admins + group only.
+        """
         chat_ids = []
 
         if self.admin_chat_id:
@@ -38,30 +43,36 @@ class TelegramService:
             except ValueError:
                 pass
 
-        # Also get admins from TelegramUser table
+        # Get users from TelegramUser table
         try:
             from database.connection import get_session, is_connected
             from database.models import TelegramUser
 
             if is_connected():
                 async with get_session() as session:
-                    result = await session.execute(
-                        select(TelegramUser).where(
-                            TelegramUser.is_admin == True,
-                            TelegramUser.notifications_enabled == True
-                        )
+                    query = select(TelegramUser).where(
+                        TelegramUser.notifications_enabled == True
                     )
+                    if not all_users:
+                        query = query.where(TelegramUser.is_admin == True)
+                    result = await session.execute(query)
                     users = result.scalars().all()
                     for user in users:
                         if user.telegram_id not in chat_ids:
                             chat_ids.append(user.telegram_id)
         except Exception as e:
-            logger.error(f"Error getting admin chat IDs: {e}")
+            logger.error(f"Error getting notification chat IDs: {e}")
 
         return chat_ids
 
-    async def send_message(self, text: str, chat_id: int = None):
-        """Send a Telegram message to a specific chat or all authorized users"""
+    async def send_message(self, text: str, chat_id: int = None, all_users: bool = False):
+        """Send a Telegram message to a specific chat or authorized users.
+
+        Args:
+            text: Message text (Markdown supported)
+            chat_id: Send to a specific chat only
+            all_users: If True, send to ALL approved users (not just admins)
+        """
         if not self.is_configured:
             logger.warning("Telegram service not configured (no BLUEDEER_BOT_TOKEN)")
             return
@@ -69,7 +80,7 @@ class TelegramService:
         if chat_id:
             chat_ids = [chat_id]
         else:
-            chat_ids = await self.get_notification_chat_ids()
+            chat_ids = await self.get_notification_chat_ids(all_users=all_users)
 
         if not chat_ids:
             logger.warning("No chat IDs configured for Telegram notifications")
