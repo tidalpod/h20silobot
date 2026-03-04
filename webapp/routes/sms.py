@@ -370,12 +370,18 @@ async def get_recent_conversations(request: Request):
         )
         showings = showings_result.scalars().all()
 
-        showing_conversations = []
+        # Group showings by renter phone number (deduplicate)
+        phone_to_showing = {}
         for showing in showings:
             renter_phone = normalize_phone(showing.contact_phone)
             if not renter_phone:
                 continue
+            # Keep the most recent showing per phone number
+            if renter_phone not in phone_to_showing:
+                phone_to_showing[renter_phone] = showing
 
+        showing_conversations = []
+        for renter_phone, showing in phone_to_showing.items():
             # Get messages for this phone number (unmatched messages)
             msg_result = await session.execute(
                 select(SMSMessage)

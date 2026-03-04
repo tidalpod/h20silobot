@@ -146,7 +146,7 @@
         </div>
 
         <div class="flex gap-3">
-            <button type="submit" class="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+            <button type="submit" id="submit-btn" class="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
                 {% if work_order %}Save Changes{% else %}Create Work Order{% endif %}
             </button>
             <a href="{% if work_order %}/maintenance/{{ work_order.id }}{% else %}/maintenance{% endif %}" class="inline-flex items-center rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
@@ -159,6 +159,14 @@
 
 {% block scripts %}
 <script>
+    // --- Double-submit protection ---
+    document.querySelector('form').addEventListener('submit', function() {
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    });
+
     // --- Searchable dropdown helper ---
     function initSearchable(config) {
         const searchInput = document.getElementById(config.searchId);
