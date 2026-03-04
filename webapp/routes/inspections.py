@@ -1,5 +1,6 @@
 """Inspections routes"""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -11,8 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property
+from database.models import Property, Tenant, SMSMessage, MessageDirection
 from webapp.auth.dependencies import get_current_user
+from webapp.services.twilio_service import twilio_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
 
@@ -28,6 +32,94 @@ def parse_date(date_str: str) -> Optional[datetime]:
         return datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def _normalize_phone(phone):
+    """Normalize phone number to E.164 format"""
+    if not phone:
+        return None
+    digits = ''.join(c for c in phone if c.isdigit() or c == '+')
+    if not digits:
+        return None
+    if digits.startswith('+'):
+        return digits
+    elif digits.startswith('1') and len(digits) == 11:
+        return f"+{digits}"
+    elif len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}"
+
+
+async def _notify_tenants_inspection_sms(property_id: int, inspection_type: str, date: str, time: str, session):
+    """Send SMS to all active tenants at a property about an inspection."""
+    try:
+        result = await session.execute(
+            select(Property)
+            .where(Property.id == property_id)
+            .options(selectinload(Property.tenants))
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return
+
+        parsed_date = parse_date(date)
+        date_str = parsed_date.strftime('%b %d, %Y') if parsed_date else "TBD"
+        time_str = time if time else "TBD"
+
+        for tenant in prop.tenants:
+            if not tenant.is_active or not tenant.phone:
+                continue
+
+            phone = _normalize_phone(tenant.phone)
+            if not phone:
+                continue
+
+            if inspection_type == "section8":
+                msg = (
+                    f"Blue Deer Property Management\n\n"
+                    f"Your Section 8 inspection has been scheduled:\n\n"
+                    f"Property: {prop.address}\n"
+                    f"Date: {date_str}\n"
+                    f"Time: {time_str}\n\n"
+                    f"Please ensure the unit is accessible and all areas are reachable. Reply with any questions."
+                )
+            else:
+                msg = (
+                    f"Blue Deer Property Management\n\n"
+                    f"Your rental inspection has been scheduled:\n\n"
+                    f"Property: {prop.address}\n"
+                    f"Date: {date_str}\n"
+                    f"Time: {time_str}\n\n"
+                    f"Please ensure the unit is accessible. Reply with any questions."
+                )
+
+            sms_result = await twilio_service.send_sms(phone, msg)
+
+            try:
+                from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+                sms_message = SMSMessage(
+                    tenant_id=tenant.id,
+                    property_id=property_id,
+                    from_number=from_number,
+                    to_number=phone,
+                    body=msg,
+                    direction=MessageDirection.OUTBOUND,
+                    twilio_sid=sms_result.message_sid if sms_result.success else None,
+                    status="sent" if sms_result.success else "failed",
+                    created_at=datetime.utcnow()
+                )
+                session.add(sms_message)
+                await session.flush()
+            except Exception as db_err:
+                logger.error(f"Failed to store inspection SMS in DB: {db_err}")
+
+            if sms_result.success:
+                logger.info(f"Inspection SMS sent to tenant {tenant.name} at {phone}")
+            else:
+                logger.warning(f"Failed to send inspection SMS to tenant {tenant.name}: {sms_result.error}")
+
+    except Exception as e:
+        logger.error(f"Error sending inspection SMS notifications: {e}")
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -189,7 +281,8 @@ async def update_rental_inspection(
     request: Request,
     property_id: int = Form(...),
     date: str = Form(""),
-    time: str = Form("")
+    time: str = Form(""),
+    notify_tenant: str = Form("")
 ):
     """Update a rental inspection date/time"""
     user = await get_current_user(request)
@@ -206,6 +299,10 @@ async def update_rental_inspection(
             prop.rental_inspection_time = time if time else None
             await session.commit()
 
+            if notify_tenant and date:
+                await _notify_tenants_inspection_sms(property_id, "rental", date, time, session)
+                await session.commit()
+
     return RedirectResponse(url="/inspections", status_code=303)
 
 
@@ -216,7 +313,8 @@ async def update_section8_inspection(
     date: str = Form(""),
     time: str = Form(""),
     status: str = Form("scheduled"),
-    notes: str = Form("")
+    notes: str = Form(""),
+    notify_tenant: str = Form("")
 ):
     """Update a Section 8 inspection"""
     user = await get_current_user(request)
@@ -234,6 +332,10 @@ async def update_section8_inspection(
             prop.section8_inspection_status = status if status else None
             prop.section8_inspection_notes = notes if notes else None
             await session.commit()
+
+            if notify_tenant and date:
+                await _notify_tenants_inspection_sms(property_id, "section8", date, time, session)
+                await session.commit()
 
     return RedirectResponse(url="/inspections", status_code=303)
 
