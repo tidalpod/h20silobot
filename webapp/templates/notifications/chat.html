@@ -276,11 +276,11 @@
 <!-- Unmatched Messages Section -->
 <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
     <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <span>❓</span> Unmatched Messages
+        <span>❓</span> Unregistered Senders
         <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
     </h3>
     <div id="unmatched-list" class="space-y-3">
-        <p class="text-sm text-gray-500">Messages from unknown numbers will appear here.</p>
+        <p class="text-sm text-gray-500">Messages from unregistered numbers will appear here.</p>
     </div>
 </div>
 
@@ -803,7 +803,7 @@ async function loadUnmatched() {
 
         if (data.messages.length === 0) {
             countEl.textContent = '';
-            container.innerHTML = `<p class="text-sm text-gray-400">No unmatched messages</p>`;
+            container.innerHTML = `<p class="text-sm text-gray-400">No messages from unregistered numbers</p>`;
             return;
         }
 

@@ -94,6 +94,124 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Renter SMS Chat -->
+        {% if renter_phone %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    SMS with {{ showing.contact_name or renter_phone }}
+                </h2>
+                <span class="text-xs text-gray-400">{{ renter_phone }}</span>
+            </div>
+            <div id="showing-chat-messages" class="bg-gray-50 px-4 py-3 space-y-2 max-h-80 overflow-y-auto" style="min-height: 100px;">
+                <p class="text-sm text-gray-400 text-center py-4" id="chat-loading">Loading messages...</p>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 bg-white">
+                <form id="showing-chat-form" class="flex items-center gap-2">
+                    <input
+                        type="text"
+                        id="showing-chat-input"
+                        placeholder="Type a message..."
+                        autocomplete="off"
+                        class="flex-1 rounded-full border-gray-300 bg-gray-50 px-4 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                    >
+                    <button type="submit" class="flex-shrink-0 w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center transition-colors">
+                        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </form>
+                <p id="showing-chat-error" class="mt-1 text-xs text-red-500 hidden"></p>
+            </div>
+        </div>
+        <script>
+        const renterPhone = "{{ renter_phone }}";
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        async function loadShowingChat() {
+            try {
+                const resp = await fetch(`/sms/conversation/unmatched/${encodeURIComponent(renterPhone)}`);
+                const data = await resp.json();
+                const container = document.getElementById('showing-chat-messages');
+
+                if (!data.messages || data.messages.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No messages yet</p>';
+                    return;
+                }
+
+                let html = '';
+                for (const msg of data.messages) {
+                    const isOut = msg.direction === 'outbound';
+                    const align = isOut ? 'justify-end' : 'justify-start';
+                    const bgClass = isOut ? 'bg-blue-600 text-white' : 'bg-white text-gray-900 ring-1 ring-gray-200';
+                    const timeClass = isOut ? 'text-blue-200' : 'text-gray-400';
+
+                    html += `<div class="flex ${align}">
+                        <div class="max-w-[80%] rounded-xl px-3 py-2 ${bgClass} shadow-sm">
+                            <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.body)}</p>
+                            <p class="text-[10px] ${timeClass} mt-0.5 text-right">${formatTime(msg.created_at)}</p>
+                        </div>
+                    </div>`;
+                }
+                container.innerHTML = html;
+                container.scrollTop = container.scrollHeight;
+            } catch (err) {
+                console.error('Error loading showing chat:', err);
+            }
+        }
+
+        document.getElementById('showing-chat-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('showing-chat-input');
+            const errorEl = document.getElementById('showing-chat-error');
+            const message = input.value.trim();
+            if (!message) return;
+
+            errorEl.classList.add('hidden');
+            input.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('message', message);
+                const resp = await fetch(`/sms/send/unmatched/${encodeURIComponent(renterPhone)}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    input.value = '';
+                    await loadShowingChat();
+                } else {
+                    errorEl.textContent = data.error || 'Failed to send';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Network error';
+                errorEl.classList.remove('hidden');
+            } finally {
+                input.disabled = false;
+                input.focus();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShowingChat();
+            setInterval(loadShowingChat, 10000);
+        });
+        </script>
+        {% endif %}
     </div>
 
     <!-- Sidebar -->

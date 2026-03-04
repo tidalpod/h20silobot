@@ -349,6 +349,8 @@ async def showing_detail(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/showings", status_code=303)
 
+        renter_phone = _normalize_phone(showing.contact_phone) if showing.contact_phone else None
+
     return templates.TemplateResponse(
         "showings/detail.html",
         {
@@ -356,6 +358,7 @@ async def showing_detail(request: Request, showing_id: int):
             "user": user,
             "showing": showing,
             "statuses": ShowingStatus,
+            "renter_phone": renter_phone,
         }
     )
 
