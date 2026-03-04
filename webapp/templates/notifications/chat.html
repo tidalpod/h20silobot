@@ -191,7 +191,7 @@
     <!-- Conversations List (Telegram sidebar) -->
     <div class="panel-list" id="panel-list">
         <div class="p-3 sm:p-4 border-b border-white/5">
-            <!-- Tenant/Vendor tabs -->
+            <!-- Tenant/Vendor/Showings tabs -->
             <div class="flex gap-1 bg-white/5 rounded-lg p-0.5">
                 <button id="tab-tenants" onclick="switchTab('tenants')"
                     class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm">
@@ -200,6 +200,10 @@
                 <button id="tab-vendors" onclick="switchTab('vendors')"
                     class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200">
                     Vendors
+                </button>
+                <button id="tab-showings" onclick="switchTab('showings')"
+                    class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200">
+                    Showings
                 </button>
             </div>
         </div>
@@ -381,13 +385,12 @@ function switchTab(tab) {
     activeListTab = tab;
     const tenantBtn = document.getElementById('tab-tenants');
     const vendorBtn = document.getElementById('tab-vendors');
-    if (tab === 'tenants') {
-        tenantBtn.className = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm';
-        vendorBtn.className = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200';
-    } else {
-        vendorBtn.className = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm';
-        tenantBtn.className = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200';
-    }
+    const showingsBtn = document.getElementById('tab-showings');
+    const activeClass = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm';
+    const inactiveClass = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200';
+    tenantBtn.className = tab === 'tenants' ? activeClass : inactiveClass;
+    vendorBtn.className = tab === 'vendors' ? activeClass : inactiveClass;
+    showingsBtn.className = tab === 'showings' ? activeClass : inactiveClass;
     renderConversationsList();
 }
 
@@ -411,8 +414,10 @@ function renderConversationsList() {
 
     if (activeListTab === 'tenants') {
         renderTenantConversations(container, cachedData.conversations || []);
-    } else {
+    } else if (activeListTab === 'vendors') {
         renderVendorConversations(container, cachedData.vendor_conversations || []);
+    } else {
+        renderShowingConversations(container, cachedData.showing_conversations || []);
     }
 }
 
@@ -510,6 +515,59 @@ function renderVendorConversations(container, conversations) {
     container.innerHTML = html;
 }
 
+function renderShowingConversations(container, conversations) {
+    if (conversations.length === 0) {
+        container.innerHTML = `
+            <div class="p-6 text-center text-gray-500 text-sm">
+                <p>No showing conversations yet.</p>
+                <p class="mt-1 text-gray-600">SMS sent to renters will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    for (const conv of conversations) {
+        const isActive = currentConvType === 'unmatched' && currentConvId === conv.contact_phone;
+        const activeClass = isActive ? 'active-tenant' : '';
+        const timeStr = formatSidebarTime(conv.last_message_time);
+        const dirIcon = conv.last_direction === 'inbound' ? '' : '<span class="text-gray-500 mr-0.5">You:</span> ';
+        const initial = conv.contact_name ? conv.contact_name.charAt(0).toUpperCase() : '?';
+
+        const statusBadge = conv.status === 'scheduled' ? '📅'
+            : conv.status === 'confirmed' ? '✅'
+            : conv.status === 'completed' ? '☑️'
+            : conv.status === 'cancelled' ? '❌' : '';
+
+        html += `
+            <div class="conv-item ${activeClass} flex items-center gap-3"
+                 onclick="selectUnmatchedConversation('${conv.contact_phone}')" data-type="showing" data-phone="${conv.contact_phone}">
+                <div class="w-11 h-11 rounded-full bg-amber-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    ${initial}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-baseline mb-0.5">
+                        <h4 class="font-medium text-white text-sm truncate">${escapeHtml(conv.contact_name)}</h4>
+                        <span class="text-[11px] flex-shrink-0 ml-2 ${conv.unread_count > 0 ? 'text-amber-400' : 'text-gray-500'}">${timeStr}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <p class="text-[13px] text-gray-400 truncate">
+                            ${conv.last_message ? dirIcon + escapeHtml(conv.last_message) : '<span class="text-gray-500 italic">No messages</span>'}
+                        </p>
+                        ${conv.unread_count > 0 ? `
+                            <span class="ml-2 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-medium flex items-center justify-center">
+                                ${conv.unread_count}
+                            </span>
+                        ` : ''}
+                    </div>
+                    <p class="text-[11px] text-gray-500 truncate mt-0.5">${statusBadge} ${escapeHtml(conv.showing_title)}${conv.property_address ? ' &middot; ' + escapeHtml(conv.property_address) : ''}</p>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
 // Select a conversation
 async function selectConversation(type, id) {
     currentConvType = type;
@@ -571,13 +629,24 @@ function selectUnmatchedConversation(phone) {
     const emptyEl = document.getElementById('messages-empty');
     if (emptyEl) emptyEl.classList.add('hidden');
 
-    // Set header for unmatched
-    document.getElementById('chat-tenant-name').textContent = phone;
+    // Try to find contact name from showing conversations
+    let contactName = null;
+    let showingInfo = 'Unknown contact';
+    if (cachedData && cachedData.showing_conversations) {
+        const match = cachedData.showing_conversations.find(c => c.contact_phone === phone);
+        if (match) {
+            contactName = match.contact_name;
+            showingInfo = match.showing_title + (match.property_address ? ' \u00b7 ' + match.property_address : '');
+        }
+    }
+
+    document.getElementById('chat-tenant-name').textContent = contactName || phone;
     document.getElementById('chat-avatar').className = 'w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 bg-amber-600 text-white';
-    document.getElementById('chat-avatar').textContent = '?';
-    document.getElementById('chat-tenant-info').textContent = 'Unknown contact';
+    document.getElementById('chat-avatar').textContent = contactName ? contactName.charAt(0).toUpperCase() : '?';
+    document.getElementById('chat-tenant-info').textContent = showingInfo;
 
     showChatPanel();
+    renderConversationsList();
     loadUnmatchedConversation(phone);
 
     if (refreshInterval) clearInterval(refreshInterval);

@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from pathlib import Path
 
 from database.connection import get_session
-from database.models import SMSMessage, Tenant, Vendor, Property, MessageDirection
+from database.models import SMSMessage, Tenant, Vendor, Property, MessageDirection, Showing, ShowingStatus
 from webapp.services.twilio_service import twilio_service
 from webapp.auth.dependencies import get_current_user
 
@@ -360,9 +360,67 @@ async def get_recent_conversations(request: Request):
             reverse=True
         )
 
+        # Get showings with renter phone numbers that have SMS activity
+        showings_result = await session.execute(
+            select(Showing)
+            .where(Showing.contact_phone != None)
+            .where(Showing.contact_phone != "")
+            .options(selectinload(Showing.property_ref))
+            .order_by(Showing.scheduled_date.desc())
+        )
+        showings = showings_result.scalars().all()
+
+        showing_conversations = []
+        for showing in showings:
+            renter_phone = normalize_phone(showing.contact_phone)
+            if not renter_phone:
+                continue
+
+            # Get messages for this phone number (unmatched messages)
+            msg_result = await session.execute(
+                select(SMSMessage)
+                .where(
+                    or_(
+                        SMSMessage.from_number == renter_phone,
+                        SMSMessage.to_number == renter_phone
+                    )
+                )
+                .where(SMSMessage.tenant_id == None)
+                .where(SMSMessage.vendor_id == None)
+                .order_by(SMSMessage.created_at.desc())
+            )
+            msgs = msg_result.scalars().all()
+
+            latest_msg = msgs[0] if msgs else None
+            unread_count = sum(
+                1 for m in msgs
+                if m.direction == MessageDirection.INBOUND and m.status == "received"
+            )
+
+            showing_conversations.append({
+                "showing_id": showing.id,
+                "showing_title": showing.title,
+                "contact_name": showing.contact_name or renter_phone,
+                "contact_phone": renter_phone,
+                "property_address": showing.property_ref.address if showing.property_ref else "",
+                "status": showing.status.value,
+                "last_message": (latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body) if latest_msg else "",
+                "last_message_time": latest_msg.created_at.isoformat() if latest_msg and latest_msg.created_at else None,
+                "last_direction": latest_msg.direction.value if latest_msg else None,
+                "message_count": len(msgs),
+                "unread_count": unread_count,
+            })
+
+        # Sort by most recent message, then by showing date
+        showing_conversations.sort(
+            key=lambda c: c["last_message_time"] or "",
+            reverse=True
+        )
+
         return JSONResponse({
             "conversations": conversations,
-            "vendor_conversations": vendor_conversations
+            "vendor_conversations": vendor_conversations,
+            "showing_conversations": showing_conversations,
         })
 
 
