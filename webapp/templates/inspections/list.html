@@ -199,6 +199,8 @@
                             {% endif %}
                         </td>
                         <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <button onclick="notifyInspection({{ item.property.id }}, 'rental', '{{ item.property.address }}')"
+                                    class="text-green-600 hover:text-green-800 text-sm font-medium mr-2">Notify</button>
                             <button onclick="openEditRentalModal({{ item.property.id }}, '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.property.address }}')"
                                     class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
                             <button onclick="confirmDeleteInspection({{ item.property.id }}, 'rental', '', '{{ item.property.address }}')"
@@ -306,6 +308,8 @@
                             {{ item.notes or '—' }}
                         </td>
                         <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <button onclick="notifyInspection({{ item.property.id }}, 'section8', '{{ item.property.address }}')"
+                                    class="text-green-600 hover:text-green-800 text-sm font-medium mr-2">Notify</button>
                             <button onclick="openEditSection8Modal({{ item.property.id }}, '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.status }}', '{{ item.notes|default('', true)|replace('\n', ' ')|replace('\'', '\\\'') }}', '{{ item.property.address }}')"
                                     class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
                             <button onclick="confirmDeleteInspection({{ item.property.id }}, 'section8', '', '{{ item.property.address }}')"
@@ -777,6 +781,18 @@ function confirmDeleteInspection(propertyId, category, type, address) {
 
 function closeDeleteModal() {
     document.getElementById('delete-modal').classList.add('hidden');
+}
+
+// Notify tenants about an inspection
+function notifyInspection(propertyId, inspectionType, address) {
+    if (!confirm('Send SMS notification to all tenants at ' + address + '?')) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/inspections/notify';
+    form.innerHTML = '<input type="hidden" name="property_id" value="' + propertyId + '">' +
+                     '<input type="hidden" name="inspection_type" value="' + inspectionType + '">';
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // Close modals on escape key

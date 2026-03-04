@@ -340,6 +340,37 @@ async def update_section8_inspection(
     return RedirectResponse(url="/inspections", status_code=303)
 
 
+@router.post("/notify")
+async def notify_inspection(
+    request: Request,
+    property_id: int = Form(...),
+    inspection_type: str = Form(...),
+):
+    """Send SMS notification to tenants about an existing inspection"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if prop:
+            if inspection_type == "rental" and prop.rental_inspection_date:
+                date_str = prop.rental_inspection_date.strftime("%Y-%m-%d")
+                time_str = prop.rental_inspection_time or ""
+                await _notify_tenants_inspection_sms(property_id, "rental", date_str, time_str, session)
+                await session.commit()
+            elif inspection_type == "section8" and prop.section8_inspection_date:
+                date_str = prop.section8_inspection_date.strftime("%Y-%m-%d")
+                time_str = prop.section8_inspection_time or ""
+                await _notify_tenants_inspection_sms(property_id, "section8", date_str, time_str, session)
+                await session.commit()
+
+    return RedirectResponse(url="/inspections", status_code=303)
+
+
 @router.post("/delete")
 async def delete_inspection(
     request: Request,
