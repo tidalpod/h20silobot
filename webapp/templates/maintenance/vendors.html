@@ -27,7 +27,7 @@
 <!-- Mobile Cards -->
 <div class="md:hidden space-y-3">
     {% for v in vendors %}
-    <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-4">
+    <a href="/maintenance/vendors/{{ v.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:border-blue-200 transition-colors">
         <div class="flex items-start justify-between gap-2 mb-1">
             <div>
                 <div class="text-sm font-medium text-gray-900">{{ v.name }}</div>
@@ -39,15 +39,14 @@
                 {% else %}
                 <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
                 {% endif %}
-                <a href="/maintenance/vendors/{{ v.id }}/edit" class="text-blue-600 hover:text-blue-500 text-xs font-medium">Edit</a>
             </div>
         </div>
         <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500 mt-1.5">
             {% if v.specialty %}<span>{{ v.specialty }}</span>{% endif %}
-            {% if v.phone %}<a href="tel:{{ v.phone }}" class="text-blue-600">{{ v.phone }}</a>{% endif %}
+            {% if v.phone %}<span>{{ v.phone }}</span>{% endif %}
             {% if v.email %}<span class="truncate">{{ v.email }}</span>{% endif %}
         </div>
-    </div>
+    </a>
     {% endfor %}
 </div>
 
@@ -67,7 +66,7 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for v in vendors %}
-            <tr class="hover:bg-gray-50 transition-colors">
+            <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/maintenance/vendors/{{ v.id }}'">
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ v.name }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ v.company or '—' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ v.specialty or '—' }}</td>
@@ -81,7 +80,8 @@
                     {% endif %}
                 </td>
                 <td class="px-6 py-4 text-right">
-                    <a href="/maintenance/vendors/{{ v.id }}/edit" class="text-blue-600 hover:text-blue-500 text-sm">Edit</a>
+                    <a href="/maintenance/vendors/{{ v.id }}" class="text-blue-600 hover:text-blue-500 text-sm mr-2" onclick="event.stopPropagation()">View</a>
+                    <a href="/maintenance/vendors/{{ v.id }}/edit" class="text-gray-500 hover:text-gray-700 text-sm" onclick="event.stopPropagation()">Edit</a>
                 </td>
             </tr>
             {% endfor %}

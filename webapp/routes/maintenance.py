@@ -15,7 +15,8 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     WorkOrder, WorkOrderPhoto, WorkOrderStatus, WorkOrderPriority,
-    WorkOrderCategory, Vendor, Property, Tenant, SMSMessage, MessageDirection
+    WorkOrderCategory, Vendor, Property, Tenant, SMSMessage, MessageDirection,
+    Invoice, InvoiceStatus, Project, ProjectStatus,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -292,6 +293,58 @@ async def update_vendor(request: Request, vendor_id: int):
         vendor.updated_at = datetime.utcnow()
 
     return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+
+@router.get("/vendors/{vendor_id}", response_class=HTMLResponse)
+async def vendor_detail(request: Request, vendor_id: int):
+    """Vendor detail page with work orders, projects, and financials"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Vendor)
+            .where(Vendor.id == vendor_id)
+            .options(
+                selectinload(Vendor.work_orders).selectinload(WorkOrder.property_ref),
+                selectinload(Vendor.projects).selectinload(Project.property_ref),
+                selectinload(Vendor.invoices).selectinload(Invoice.property_ref),
+            )
+        )
+        vendor = result.scalar_one_or_none()
+        if not vendor:
+            return RedirectResponse(url="/maintenance/vendors", status_code=303)
+
+        # Compute stats
+        open_wo = sum(1 for wo in vendor.work_orders if wo.status in (
+            WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS
+        ))
+        completed_wo = sum(1 for wo in vendor.work_orders if wo.status in (
+            WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED
+        ))
+        active_projects = sum(1 for p in vendor.projects if p.status in (
+            ProjectStatus.PLANNING.value, ProjectStatus.IN_PROGRESS.value
+        ))
+        total_invoiced = sum(float(inv.amount) for inv in vendor.invoices)
+        total_paid = sum(
+            float(inv.amount) for inv in vendor.invoices
+            if inv.status == InvoiceStatus.PAID.value
+        )
+
+    return templates.TemplateResponse(
+        "maintenance/vendor_detail.html",
+        {
+            "request": request,
+            "user": user,
+            "vendor": vendor,
+            "open_wo": open_wo,
+            "completed_wo": completed_wo,
+            "active_projects": active_projects,
+            "total_invoiced": total_invoiced,
+            "total_paid": total_paid,
+        }
+    )
 
 
 # =============================================================================

@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}{{ vendor.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-gray-500 mb-4">
+        <a href="/maintenance" class="hover:text-gray-700">Maintenance</a>
+        <span>/</span>
+        <a href="/maintenance/vendors" class="hover:text-gray-700">Vendors</a>
+        <span>/</span>
+        <span class="text-gray-900">{{ vendor.name }}</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                {{ vendor.name }}
+                {% if vendor.is_active %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
+                {% endif %}
+            </h1>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
+                {% if vendor.company %}<span>{{ vendor.company }}</span>{% endif %}
+                {% if vendor.specialty %}<span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{{ vendor.specialty }}</span>{% endif %}
+                {% if vendor.phone %}<a href="tel:{{ vendor.phone }}" class="text-blue-600 hover:text-blue-500">{{ vendor.phone }}</a>{% endif %}
+                {% if vendor.email %}<span class="truncate">{{ vendor.email }}</span>{% endif %}
+            </div>
+        </div>
+        <a href="/maintenance/vendors/{{ vendor.id }}/edit" class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors flex-shrink-0">
+            Edit Vendor
+        </a>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500">Work Orders</div>
+            <div class="text-xl font-bold text-gray-900">{{ vendor.work_orders|length }}</div>
+            <div class="text-xs text-gray-400 mt-0.5">{{ open_wo }} open</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500">Projects</div>
+            <div class="text-xl font-bold text-gray-900">{{ vendor.projects|length }}</div>
+            <div class="text-xs text-gray-400 mt-0.5">{{ active_projects }} active</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500">Total Invoiced</div>
+            <div class="text-xl font-bold text-gray-900">${{ "%.2f"|format(total_invoiced) }}</div>
+            <div class="text-xs text-green-600 mt-0.5">${{ "%.2f"|format(total_paid) }} paid</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500">Completed WOs</div>
+            <div class="text-xl font-bold text-gray-900">{{ completed_wo }}</div>
+            <div class="text-xs text-gray-400 mt-0.5">of {{ vendor.work_orders|length }} total</div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <button onclick="showTab('work-orders')" id="tab-work-orders" class="tab-btn border-b-2 border-blue-500 py-3 px-1 text-sm font-medium text-blue-600">
+                Work Orders ({{ vendor.work_orders|length }})
+            </button>
+            <button onclick="showTab('projects')" id="tab-projects" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                Projects ({{ vendor.projects|length }})
+            </button>
+            <button onclick="showTab('financials')" id="tab-financials" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                Financials ({{ vendor.invoices|length }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- Work Orders Panel -->
+    <div id="panel-work-orders" class="tab-panel">
+        {% if vendor.work_orders %}
+        <!-- Mobile Cards -->
+        <div class="md:hidden space-y-3">
+            {% for wo in vendor.work_orders|sort(attribute='created_at', reverse=true) %}
+            <a href="/maintenance/{{ wo.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:border-blue-200 transition-colors">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <div class="text-sm font-medium text-gray-900">{{ wo.title }}</div>
+                    <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0
+                        {% if wo.status.value == 'completed' or wo.status.value == 'closed' %}bg-green-100 text-green-700
+                        {% elif wo.status.value == 'in_progress' %}bg-purple-100 text-purple-700
+                        {% elif wo.status.value == 'assigned' %}bg-blue-100 text-blue-700
+                        {% else %}bg-gray-100 text-gray-600
+                        {% endif %}">{{ wo.status.value|replace('_', ' ')|title }}</span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    {{ wo.property_ref.address if wo.property_ref else '' }}
+                    {% if wo.priority %} &middot;
+                    <span class="{% if wo.priority.value == 'emergency' %}text-red-600{% elif wo.priority.value == 'high' %}text-orange-600{% endif %}">{{ wo.priority.value|title }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for wo in vendor.work_orders|sort(attribute='created_at', reverse=true) %}
+                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/maintenance/{{ wo.id }}'">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ wo.title }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ wo.property_ref.address if wo.property_ref else '—' }}</td>
+                        <td class="px-6 py-4">
+                            {% if wo.priority %}
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if wo.priority.value == 'emergency' %}bg-red-100 text-red-700
+                                {% elif wo.priority.value == 'high' %}bg-orange-100 text-orange-700
+                                {% elif wo.priority.value == 'normal' %}bg-gray-100 text-gray-600
+                                {% else %}bg-blue-100 text-blue-600
+                                {% endif %}">{{ wo.priority.value|title }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if wo.status.value == 'completed' or wo.status.value == 'closed' %}bg-green-100 text-green-700
+                                {% elif wo.status.value == 'in_progress' %}bg-purple-100 text-purple-700
+                                {% elif wo.status.value == 'assigned' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-600
+                                {% endif %}">{{ wo.status.value|replace('_', ' ')|title }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ wo.created_at.strftime('%b %d, %Y') if wo.created_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <p class="text-sm text-gray-400">No work orders assigned to this vendor yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Projects Panel -->
+    <div id="panel-projects" class="tab-panel hidden">
+        {% if vendor.projects %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {% for project in vendor.projects|sort(attribute='created_at', reverse=true) %}
+            <a href="/projects/{{ project.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-5 hover:border-blue-200 transition-colors">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <h3 class="text-sm font-semibold text-gray-900">{{ project.name }}</h3>
+                    <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0
+                        {% if project.status == 'planning' %}bg-gray-100 text-gray-600
+                        {% elif project.status == 'in_progress' %}bg-blue-100 text-blue-700
+                        {% elif project.status == 'completed' %}bg-green-100 text-green-700
+                        {% elif project.status == 'on_hold' %}bg-amber-100 text-amber-700
+                        {% endif %}">{{ project.status|replace('_', ' ')|title }}</span>
+                </div>
+                <div class="text-xs text-gray-500 mb-2">{{ project.property_ref.address if project.property_ref else '' }}</div>
+                {% if project.budget %}
+                <div class="text-xs text-gray-500">Budget: <span class="font-medium text-gray-700">${{ "%.2f"|format(project.budget) }}</span></div>
+                {% endif %}
+                {% if project.start_date %}
+                <div class="text-xs text-gray-400 mt-1">{{ project.start_date.strftime('%b %d, %Y') }}{% if project.end_date %} — {{ project.end_date.strftime('%b %d, %Y') }}{% endif %}</div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <p class="text-sm text-gray-400">No projects assigned to this vendor yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Financials Panel -->
+    <div id="panel-financials" class="tab-panel hidden">
+        {% if vendor.invoices %}
+        <!-- Mobile Cards -->
+        <div class="md:hidden space-y-3">
+            {% for inv in vendor.invoices|sort(attribute='created_at', reverse=true) %}
+            <a href="/invoices/{{ inv.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:border-blue-200 transition-colors">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <div class="text-sm font-medium text-gray-900">{{ inv.title }}</div>
+                    <div class="text-sm font-semibold text-gray-900 flex-shrink-0">${{ "%.2f"|format(inv.amount) }}</div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="text-xs text-gray-500">{{ inv.property_ref.address if inv.property_ref else '' }}</div>
+                    <span class="text-xs px-2 py-0.5 rounded-full
+                        {% if inv.status == 'submitted' %}bg-amber-100 text-amber-700
+                        {% elif inv.status == 'approved' %}bg-blue-100 text-blue-700
+                        {% elif inv.status == 'paid' %}bg-green-100 text-green-700
+                        {% elif inv.status == 'rejected' %}bg-red-100 text-red-700
+                        {% endif %}">{{ inv.status|capitalize }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for inv in vendor.invoices|sort(attribute='created_at', reverse=true) %}
+                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/invoices/{{ inv.id }}'">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ inv.title }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ inv.property_ref.address if inv.property_ref else '—' }}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">${{ "%.2f"|format(inv.amount) }}</td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if inv.status == 'submitted' %}bg-amber-100 text-amber-700
+                                {% elif inv.status == 'approved' %}bg-blue-100 text-blue-700
+                                {% elif inv.status == 'paid' %}bg-green-100 text-green-700
+                                {% elif inv.status == 'rejected' %}bg-red-100 text-red-700
+                                {% endif %}">{{ inv.status|capitalize }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ inv.created_at.strftime('%b %d, %Y') if inv.created_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <p class="text-sm text-gray-400">No invoices from this vendor yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function showTab(tabName) {
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.add('hidden');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    document.getElementById('panel-' + tabName).classList.remove('hidden');
+    const activeTab = document.getElementById('tab-' + tabName);
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+    activeTab.classList.add('border-blue-500', 'text-blue-600');
+}
+</script>
+{% endblock %}

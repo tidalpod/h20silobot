@@ -16,7 +16,6 @@ from database.connection import get_session
 from database.models import (
     Project, ProjectStatus, Property, Vendor, WorkOrder, Invoice, InvoiceStatus,
     ProjectDocument, SMSMessage, MessageDirection,
-    Estimate, EstimateStatus,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -237,7 +236,6 @@ async def project_detail(request: Request, project_id: int):
                 selectinload(Project.vendor_ref),
                 selectinload(Project.invoices).selectinload(Invoice.vendor_ref),
                 selectinload(Project.work_orders).selectinload(WorkOrder.vendor_ref),
-                selectinload(Project.estimates).selectinload(Estimate.vendor_ref),
                 selectinload(Project.documents),
             )
         )
@@ -273,7 +271,6 @@ async def project_detail(request: Request, project_id: int):
         "total_spent": total_spent,
         "total_paid": total_paid,
         "unlinked_work_orders": unlinked_work_orders,
-        "EstimateStatus": EstimateStatus,
     })
 
 

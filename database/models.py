@@ -65,12 +65,6 @@ class InvoiceStatus(PyEnum):
     PAID = "paid"
 
 
-class EstimateStatus(PyEnum):
-    SUBMITTED = "submitted"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-
-
 class ProjectStatus(PyEnum):
     PLANNING = "planning"
     IN_PROGRESS = "in_progress"
@@ -777,7 +771,6 @@ class Vendor(Base):
     # Relationships
     work_orders = relationship("WorkOrder", back_populates="vendor_ref")
     invoices = relationship("Invoice", back_populates="vendor_ref")
-    estimates = relationship("Estimate", back_populates="vendor_ref")
     projects = relationship("Project", back_populates="vendor_ref")
     sms_messages = relationship("SMSMessage", back_populates="vendor", lazy="selectin")
 
@@ -1003,57 +996,6 @@ class Invoice(Base):
         return f"<Invoice {self.id}: {self.title} - ${self.amount}>"
 
 
-class Estimate(Base):
-    """Vendor cost estimates before work begins"""
-    __tablename__ = "estimates"
-
-    id = Column(Integer, primary_key=True)
-    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False)
-    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
-
-    # Estimate details
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    amount = Column(Numeric(10, 2), nullable=False)
-    file_url = Column(String(500), nullable=True)
-
-    # Status
-    status = Column(String(20), default=EstimateStatus.SUBMITTED.value)
-
-    # Timestamps
-    submitted_at = Column(DateTime, default=datetime.utcnow)
-    approved_at = Column(DateTime, nullable=True)
-    rejected_at = Column(DateTime, nullable=True)
-
-    # PM notes
-    notes = Column(Text, nullable=True)
-
-    # Link to invoice when converted
-    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True)
-
-    # Tracking
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    vendor_ref = relationship("Vendor", back_populates="estimates")
-    property_ref = relationship("Property")
-    project_ref = relationship("Project", back_populates="estimates")
-    invoice_ref = relationship("Invoice")
-
-    # Indexes
-    __table_args__ = (
-        Index("ix_estimates_vendor", "vendor_id"),
-        Index("ix_estimates_status", "status"),
-        Index("ix_estimates_property", "property_id"),
-        Index("ix_estimates_project", "project_id"),
-    )
-
-    def __repr__(self):
-        return f"<Estimate {self.id}: {self.title} - ${self.amount}>"
-
-
 class Project(Base):
     """Rehab/renovation projects grouping work orders and invoices"""
     __tablename__ = "projects"
@@ -1082,7 +1024,6 @@ class Project(Base):
     vendor_ref = relationship("Vendor", back_populates="projects")
     work_orders = relationship("WorkOrder", back_populates="project")
     invoices = relationship("Invoice", back_populates="project_ref")
-    estimates = relationship("Estimate", back_populates="project_ref", order_by="Estimate.created_at.desc()")
     documents = relationship("ProjectDocument", back_populates="project", cascade="all, delete-orphan", order_by="ProjectDocument.created_at.desc()")
 
     # Indexes

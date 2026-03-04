@@ -149,58 +149,6 @@
             {% endif %}
         </div>
 
-        <!-- Estimates -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-gray-700">Estimates</h2>
-                <a href="/estimates?property_id={{ project.property_id }}" class="text-xs text-blue-600 hover:text-blue-700">View All</a>
-            </div>
-
-            {% if project.estimates %}
-            <div class="space-y-2">
-                {% for est in project.estimates %}
-                <div class="p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
-                    <div class="flex items-center justify-between mb-1">
-                        <a href="/estimates/{{ est.id }}" class="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{{ est.title }}</a>
-                        <div class="text-right flex-shrink-0 ml-2">
-                            <div class="text-sm font-semibold text-gray-900">${{ "%.2f"|format(est.amount) }}</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <div class="text-xs text-gray-500">{% if est.vendor_ref %}{{ est.vendor_ref.name }}{% endif %}</div>
-                        <span class="text-xs px-2 py-0.5 rounded-full
-                            {% if est.status == 'submitted' %}bg-amber-100 text-amber-700
-                            {% elif est.status == 'approved' %}bg-green-100 text-green-700
-                            {% elif est.status == 'rejected' %}bg-red-100 text-red-700
-                            {% endif %}">{{ est.status|capitalize }}</span>
-                    </div>
-
-                    <!-- Inline actions -->
-                    {% if est.status == 'submitted' %}
-                    <div class="flex gap-2 mt-2">
-                        <form method="POST" action="/estimates/{{ est.id }}/approve" class="flex-1">
-                            <input type="hidden" name="redirect" value="/projects/{{ project.id }}">
-                            <button type="submit" class="w-full bg-green-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-green-500">Approve</button>
-                        </form>
-                        <form method="POST" action="/estimates/{{ est.id }}/reject" class="flex-1">
-                            <input type="hidden" name="redirect" value="/projects/{{ project.id }}">
-                            <button type="submit" class="w-full bg-red-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-red-500">Reject</button>
-                        </form>
-                    </div>
-                    {% elif est.status == 'approved' and not est.invoice_id %}
-                    <form method="POST" action="/estimates/{{ est.id }}/convert" class="mt-2">
-                        <button type="submit" class="w-full bg-blue-600 text-white rounded-lg py-1 text-xs font-medium hover:bg-blue-500">Convert to Invoice</button>
-                    </form>
-                    {% elif est.invoice_id %}
-                    <div class="mt-2 text-xs text-blue-600">Converted to invoice</div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-sm text-gray-400">No estimates linked yet</p>
-            {% endif %}
-        </div>
     </div>
 
     <!-- Documents -->
