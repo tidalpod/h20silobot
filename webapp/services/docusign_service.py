@@ -37,14 +37,22 @@ _access_token = None
 _token_expires_at = 0
 
 
+def _get_private_key() -> str | None:
+    """Get DocuSign private key from env var content or file path."""
+    if config.docusign_private_key:
+        return config.docusign_private_key
+    if config.docusign_private_key_path and Path(config.docusign_private_key_path).exists():
+        return Path(config.docusign_private_key_path).read_text()
+    return None
+
+
 def is_configured() -> bool:
     """Check if DocuSign credentials are set."""
     return bool(
         config.docusign_integration_key
         and config.docusign_user_id
         and config.docusign_account_id
-        and config.docusign_private_key_path
-        and Path(config.docusign_private_key_path).exists()
+        and _get_private_key()
     )
 
 
@@ -55,11 +63,9 @@ async def _get_access_token() -> str:
     if _access_token and time.time() < _token_expires_at - 60:
         return _access_token
 
-    private_key_path = Path(config.docusign_private_key_path)
-    if not private_key_path.exists():
-        raise RuntimeError(f"DocuSign private key not found: {private_key_path}")
-
-    private_key = private_key_path.read_text()
+    private_key = _get_private_key()
+    if not private_key:
+        raise RuntimeError("DocuSign private key not found. Set DOCUSIGN_PRIVATE_KEY or DOCUSIGN_PRIVATE_KEY_PATH.")
 
     now = int(time.time())
     payload = {
