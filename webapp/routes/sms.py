@@ -401,6 +401,110 @@ async def get_unmatched_messages(request: Request):
         })
 
 
+@router.get("/conversation/unmatched/{phone}")
+async def get_unmatched_conversation(phone: str, request: Request):
+    """Get SMS conversation history for an unmatched phone number"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    normalized = normalize_phone(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(SMSMessage)
+            .where(
+                or_(
+                    SMSMessage.from_number == normalized,
+                    SMSMessage.to_number == normalized
+                )
+            )
+            .where(SMSMessage.tenant_id == None)
+            .where(SMSMessage.vendor_id == None)
+            .order_by(SMSMessage.created_at.asc())
+        )
+        messages = result.scalars().all()
+
+        # Mark inbound as read
+        inbound_ids = [m.id for m in messages if m.direction == MessageDirection.INBOUND and m.status == "received"]
+        if inbound_ids:
+            await session.execute(
+                update(SMSMessage)
+                .where(SMSMessage.id.in_(inbound_ids))
+                .values(status="read")
+            )
+            await session.commit()
+
+        return JSONResponse({
+            "phone": normalized,
+            "messages": [
+                {
+                    "id": msg.id,
+                    "body": msg.body,
+                    "direction": msg.direction.value,
+                    "status": msg.status,
+                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "from_number": msg.from_number,
+                    "to_number": msg.to_number
+                }
+                for msg in messages
+            ]
+        })
+
+
+@router.post("/send/unmatched/{phone}")
+async def send_sms_to_unmatched(
+    phone: str,
+    request: Request,
+    message: str = Form(...)
+):
+    """Send an SMS reply to an unmatched phone number"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    normalized = normalize_phone(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+
+    # Send SMS via Twilio
+    result = await twilio_service.send_sms(normalized, message)
+
+    async with get_session() as session:
+        from_number = normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+
+        sms_message = SMSMessage(
+            tenant_id=None,
+            vendor_id=None,
+            from_number=from_number,
+            to_number=normalized,
+            body=message,
+            direction=MessageDirection.OUTBOUND,
+            twilio_sid=result.message_sid if result.success else None,
+            status="sent" if result.success else "failed",
+            created_at=datetime.utcnow()
+        )
+        session.add(sms_message)
+        await session.commit()
+
+        if result.success:
+            return JSONResponse({
+                "success": True,
+                "message_id": sms_message.id,
+                "twilio_sid": result.message_sid
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "error": result.error_message
+            }, status_code=400)
+
+
 # =============================================================================
 # Tenants with Phone Numbers (for new conversation)
 # =============================================================================

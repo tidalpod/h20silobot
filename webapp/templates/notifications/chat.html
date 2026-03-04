@@ -521,6 +521,8 @@ async function selectConversation(type, id) {
     const sendBtn = document.getElementById('send-btn');
     if (type === 'vendor') {
         sendBtn.className = 'flex-shrink-0 w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center transition-colors';
+    } else if (type === 'unmatched') {
+        sendBtn.className = 'flex-shrink-0 w-10 h-10 rounded-full bg-amber-600 hover:bg-amber-500 flex items-center justify-center transition-colors';
     } else {
         sendBtn.className = 'flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center transition-colors';
     }
@@ -548,6 +550,90 @@ async function selectConversation(type, id) {
     // Start auto-refresh
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(() => loadMessages(type, id), 5000);
+}
+
+// Select an unmatched conversation by phone number
+function selectUnmatchedConversation(phone) {
+    currentConvType = 'unmatched';
+    currentConvId = phone;
+    document.getElementById('current-conv-type').value = 'unmatched';
+    document.getElementById('current-conv-id').value = phone;
+
+    const sendBtn = document.getElementById('send-btn');
+    sendBtn.className = 'flex-shrink-0 w-10 h-10 rounded-full bg-amber-600 hover:bg-amber-500 flex items-center justify-center transition-colors';
+
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.classList.remove('vendor-bg');
+
+    document.getElementById('chat-header-content').classList.remove('hidden');
+    document.getElementById('chat-header-empty').classList.add('hidden');
+    document.getElementById('chat-input-area').classList.remove('hidden');
+    const emptyEl = document.getElementById('messages-empty');
+    if (emptyEl) emptyEl.classList.add('hidden');
+
+    // Set header for unmatched
+    document.getElementById('chat-tenant-name').textContent = phone;
+    document.getElementById('chat-avatar').className = 'w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 bg-amber-600 text-white';
+    document.getElementById('chat-avatar').textContent = '?';
+    document.getElementById('chat-tenant-info').textContent = 'Unknown contact';
+
+    showChatPanel();
+    loadUnmatchedConversation(phone);
+
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => loadUnmatchedConversation(phone), 5000);
+}
+
+async function loadUnmatchedConversation(phone) {
+    try {
+        const response = await fetch(`/sms/conversation/unmatched/${encodeURIComponent(phone)}`);
+        const data = await response.json();
+
+        const container = document.getElementById('chat-messages');
+
+        if (data.messages.length === 0) {
+            container.innerHTML = `
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-center">
+                        <p class="font-medium text-gray-400">No messages</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        let lastDate = '';
+
+        for (const msg of data.messages) {
+            if (msg.created_at) {
+                const msgDate = new Date(msg.created_at).toLocaleDateString();
+                if (msgDate !== lastDate) {
+                    lastDate = msgDate;
+                    html += `<div class="text-center my-4"><span class="date-pill">${formatDatePill(msg.created_at)}</span></div>`;
+                }
+            }
+
+            const isOutbound = msg.direction === 'outbound';
+            const align = isOutbound ? 'justify-end' : 'justify-start';
+            const bubbleClass = isOutbound ? 'msg-out-blue' : 'msg-in';
+            const timeColor = isOutbound ? 'text-blue-200' : 'text-gray-500';
+            const sender = !isOutbound ? `<span class="text-xs font-medium text-amber-400 block mb-0.5">${escapeHtml(phone)}</span>` : '';
+
+            html += `<div class="flex ${align} mb-1.5">
+                <div class="msg-bubble ${bubbleClass} px-3 py-1.5">
+                    ${sender}
+                    <span class="text-[15px] leading-relaxed whitespace-pre-wrap">${escapeHtml(msg.body)}<span class="msg-meta"><span class="text-[11px] ${timeColor}">${formatTime(msg.created_at)}</span></span></span>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = html;
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+        console.error('Error loading unmatched conversation:', error);
+    }
 }
 
 // Load messages for a tenant or vendor
@@ -666,9 +752,14 @@ document.getElementById('send-message-form').addEventListener('submit', async (e
         const formData = new FormData();
         formData.append('message', message);
 
-        const url = type === 'vendor'
-            ? `/sms/send/vendor/${id}`
-            : `/sms/send/${id}`;
+        let url;
+        if (type === 'vendor') {
+            url = `/sms/send/vendor/${id}`;
+        } else if (type === 'unmatched') {
+            url = `/sms/send/unmatched/${encodeURIComponent(id)}`;
+        } else {
+            url = `/sms/send/${id}`;
+        }
 
         const response = await fetch(url, {
             method: 'POST',
@@ -679,7 +770,12 @@ document.getElementById('send-message-form').addEventListener('submit', async (e
 
         if (data.success) {
             messageInput.value = '';
-            await loadMessages(type, id);
+            if (type === 'unmatched') {
+                await loadUnmatchedConversation(id);
+                loadUnmatched();
+            } else {
+                await loadMessages(type, id);
+            }
             loadConversations();
         } else {
             errorEl.textContent = data.error || 'Failed to send message';
@@ -720,12 +816,14 @@ async function loadUnmatched() {
             }) : '';
 
             html += `
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer hover:bg-amber-100 transition-colors"
+                     onclick="selectUnmatchedConversation('${msg.from_number}')">
                     <div class="flex justify-between items-start mb-1">
                         <span class="text-sm font-medium text-amber-800">${msg.from_number}</span>
                         <span class="text-xs text-amber-600">${time}</span>
                     </div>
                     <p class="text-sm text-amber-900">${escapeHtml(msg.body)}</p>
+                    <p class="text-xs text-amber-600 mt-1">Click to reply &rarr;</p>
                 </div>
             `;
         }
