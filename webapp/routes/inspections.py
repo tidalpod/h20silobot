@@ -53,21 +53,32 @@ def _normalize_phone(phone):
 async def _notify_tenants_inspection_sms(property_id: int, inspection_type: str, date: str, time: str, session):
     """Send SMS to all active tenants at a property about an inspection."""
     try:
-        result = await session.execute(
-            select(Property)
-            .where(Property.id == property_id)
-            .options(selectinload(Property.tenants))
+        # Load tenants separately to avoid identity map caching issues
+        tenant_result = await session.execute(
+            select(Tenant).where(
+                Tenant.property_id == property_id,
+                Tenant.is_active == True
+            )
         )
-        prop = result.scalar_one_or_none()
+        tenants = tenant_result.scalars().all()
+
+        prop_result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = prop_result.scalar_one_or_none()
         if not prop:
+            logger.warning(f"Inspection notify: property {property_id} not found")
             return
+
+        logger.info(f"Inspection notify: property={prop.address}, type={inspection_type}, tenants found={len(tenants)}")
 
         parsed_date = parse_date(date)
         date_str = parsed_date.strftime('%b %d, %Y') if parsed_date else "TBD"
         time_str = time if time else "TBD"
 
-        for tenant in prop.tenants:
-            if not tenant.is_active or not tenant.phone:
+        for tenant in tenants:
+            if not tenant.phone:
+                logger.info(f"Skipping tenant {tenant.name} - no phone number")
                 continue
 
             phone = _normalize_phone(tenant.phone)
