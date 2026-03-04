@@ -38,33 +38,7 @@
         </div>
     </a>
 
-    <!-- 2. Compliance -->
-    <a href="/properties?filter=missing_license" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-amber-200 transition-all cursor-pointer block">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 {% if missing_license_count > 0 %}bg-amber-50{% else %}bg-green-50{% endif %} rounded-xl">
-                    <span class="text-2xl">📜</span>
-                </div>
-                <div class="ml-4 flex-1">
-                    <p class="text-sm font-medium text-gray-500">Compliance</p>
-                    <p class="text-2xl font-bold {% if missing_license_count > 0 %}text-amber-600{% else %}text-green-600{% endif %}">
-                        {{ licensed_count }}/{{ total_properties }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
-            <p class="text-xs {% if missing_license_count > 0 %}text-amber-600{% else %}text-gray-500{% endif %}">
-                {% if missing_license_count > 0 %}
-                <span class="font-medium">{{ missing_license_count }} missing license{{ 's' if missing_license_count > 1 else '' }}</span>
-                {% else %}
-                All licenses current
-                {% endif %}
-            </p>
-        </div>
-    </a>
-
-    <!-- 3. Tenants -->
+    <!-- Tenants -->
     <a href="/tenants" class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all cursor-pointer block">
         <div class="p-5">
             <div class="flex items-center">
