@@ -144,6 +144,23 @@ async def _notify_renter_showing_sms(showing, session):
         else:
             logger.error(f"Failed to SMS renter {showing.contact_name}: {sms_result.error_message}")
 
+        # Store outbound message in DB so it appears in conversations
+        try:
+            from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+            sms_message = SMSMessage(
+                from_number=from_number,
+                to_number=phone,
+                body=msg,
+                direction=MessageDirection.OUTBOUND,
+                twilio_sid=sms_result.message_sid if sms_result.success else None,
+                status="sent" if sms_result.success else "failed",
+                created_at=datetime.utcnow()
+            )
+            session.add(sms_message)
+            await session.flush()
+        except Exception as db_err:
+            logger.error(f"Failed to store renter SMS in DB: {db_err}")
+
         return sms_result.success
     except Exception as e:
         logger.error(f"Error sending renter showing SMS: {e}")
