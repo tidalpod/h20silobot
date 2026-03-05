@@ -152,6 +152,7 @@ from .routes.portal_payments import router as portal_payments_router
 from .routes.payments_admin import router as payments_admin_router
 from .routes.entity_accounts import router as entity_accounts_router
 from .routes.lease_builder import router as lease_builder_router
+from .routes.assets import router as assets_router
 from .routes.pwa import router as pwa_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
@@ -160,6 +161,7 @@ from .routes.pwa import router as pwa_router
 app.include_router(pwa_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(assets_router, prefix="/assets")
 app.include_router(properties_router, prefix="/properties")
 app.include_router(tenants_router, prefix="/tenants")
 app.include_router(notifications_router, prefix="/notifications")

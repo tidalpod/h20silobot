@@ -31,6 +31,21 @@ async def run_migrations(engine):
         ("entity_bank_accounts", "is_manual", "BOOLEAN DEFAULT false"),
         # Entity bank account on rent payments
         ("rent_payments", "entity_bank_account_id", "INTEGER REFERENCES entity_bank_accounts(id) ON DELETE SET NULL"),
+        # Investment / Financial columns on properties
+        ("properties", "purchase_price", "NUMERIC(12,2)"),
+        ("properties", "purchase_date", "DATE"),
+        ("properties", "appraised_value", "NUMERIC(12,2)"),
+        ("properties", "appraisal_date", "DATE"),
+        ("properties", "loan_amount", "NUMERIC(12,2)"),
+        ("properties", "loan_balance", "NUMERIC(12,2)"),
+        ("properties", "interest_rate", "NUMERIC(5,3)"),
+        ("properties", "loan_term_years", "INTEGER"),
+        ("properties", "loan_start_date", "DATE"),
+        ("properties", "monthly_pi", "NUMERIC(10,2)"),
+        ("properties", "monthly_tax", "NUMERIC(10,2)"),
+        ("properties", "monthly_insurance", "NUMERIC(10,2)"),
+        ("properties", "monthly_piti", "NUMERIC(10,2)"),
+        ("properties", "hoa_monthly", "NUMERIC(10,2)"),
     ]
 
     async with engine.begin() as conn:

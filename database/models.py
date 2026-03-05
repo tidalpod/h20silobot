@@ -200,6 +200,22 @@ class Property(Base):
     # Web user ownership (optional - for web app property management)
     web_user_id = Column(Integer, ForeignKey("web_users.id", ondelete="SET NULL"), nullable=True)
 
+    # Investment / Financial
+    purchase_price = Column(Numeric(12, 2), nullable=True)
+    purchase_date = Column(Date, nullable=True)
+    appraised_value = Column(Numeric(12, 2), nullable=True)
+    appraisal_date = Column(Date, nullable=True)
+    loan_amount = Column(Numeric(12, 2), nullable=True)       # Original mortgage amount
+    loan_balance = Column(Numeric(12, 2), nullable=True)       # Current outstanding balance
+    interest_rate = Column(Numeric(5, 3), nullable=True)       # Mortgage rate %
+    loan_term_years = Column(Integer, nullable=True)            # 15, 30, etc.
+    loan_start_date = Column(Date, nullable=True)
+    monthly_pi = Column(Numeric(10, 2), nullable=True)         # Principal + interest payment
+    monthly_tax = Column(Numeric(10, 2), nullable=True)        # Property tax escrow
+    monthly_insurance = Column(Numeric(10, 2), nullable=True)  # Insurance escrow
+    monthly_piti = Column(Numeric(10, 2), nullable=True)       # Total PITI
+    hoa_monthly = Column(Numeric(10, 2), nullable=True)        # HOA/condo fees
+
     # Tracking
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

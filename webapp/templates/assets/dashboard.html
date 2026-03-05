@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Assets — Blue Deer{% endblock %}
+
+{% macro fmt(val) %}{% if val is not none %}${{ "{:,.0f}".format(val|float) }}{% else %}—{% endif %}{% endmacro %}
+{% macro fmt2(val) %}{% if val is not none %}${{ "{:,.2f}".format(val|float) }}{% else %}—{% endif %}{% endmacro %}
+{% macro fmtpct(val) %}{% if val is not none %}{{ "{:.2f}".format(val|float) }}%{% else %}—{% endif %}{% endmacro %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Assets</h1>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Portfolio Value -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-blue-50">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5M3.75 3v18m16.5-18v18M5.25 3h13.5M5.25 21h13.5M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Portfolio Value</p>
+                    <p class="text-xl font-bold text-gray-900">{{ fmt(total_value) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Total Equity -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-green-50">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total Equity</p>
+                    <p class="text-xl font-bold text-gray-900">{{ fmt(total_equity) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Monthly Cash Flow -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 rounded-lg {% if total_cash_flow >= 0 %}bg-green-50{% else %}bg-red-50{% endif %}">
+                    <svg class="w-5 h-5 {% if total_cash_flow >= 0 %}text-green-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Monthly Cash Flow</p>
+                    <p class="text-xl font-bold {% if total_cash_flow >= 0 %}text-green-700{% else %}text-red-700{% endif %}">{{ fmt2(total_cash_flow) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Total Debt -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-orange-50">
+                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total Debt</p>
+                    <p class="text-xl font-bold text-gray-900">{{ fmt(total_debt) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Property Table -->
+    {% if grouped|length == 0 %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+        No active properties found. Add financial data to your properties to see the portfolio view.
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Appraised</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Equity</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Bal</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">PITI</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rent</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cash Flow</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cap Rate</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">LTV</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Edit</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for entity, rows in grouped.items() %}
+                    {# Entity header #}
+                    <tr class="bg-gray-100 cursor-pointer hover:bg-gray-200" onclick="toggleEntity('{{ entity|replace(' ', '_')|replace('.', '') }}')">
+                        <td colspan="12" class="px-4 py-2">
+                            <div class="flex items-center gap-2 font-semibold text-sm text-gray-800">
+                                <svg id="chevron-{{ entity|replace(' ', '_')|replace('.', '') }}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                                {{ entity }}
+                                <span class="text-gray-400 font-normal">({{ rows|length }} {{ 'property' if rows|length == 1 else 'properties' }})</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    {# Property rows #}
+                    {% for row in rows %}
+                    {% set p = row.property %}
+                    <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
+                            <div>{{ p.address }}</div>
+                            <div class="text-xs text-gray-400">{{ p.city }}, {{ p.state }} {{ p.zip_code }}</div>
+                        </td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.purchase_price) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.appraised_value) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.loan_balance) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(p.interest_rate) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(p.monthly_piti) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(p.monthly_rent) }}</td>
+                        <td class="px-4 py-2 text-sm text-right font-medium {% if row.cash_flow is not none and row.cash_flow >= 0 %}text-green-600{% elif row.cash_flow is not none %}text-red-600{% else %}text-gray-400{% endif %}">
+                            {{ fmt2(row.cash_flow) }}
+                        </td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(row.cap_rate) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(row.ltv) }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <button onclick="openEditModal({{ p.id }})" class="text-blue-600 hover:text-blue-800 p-1 cursor-pointer" title="Edit financial data">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {# Subtotals row #}
+                    {% set ns = namespace(val=0, eq=0, debt=0, cf=0, rent=0, piti=0) %}
+                    {% for row in rows %}
+                        {% set ns.val = ns.val + (row.property.appraised_value|float if row.property.appraised_value else 0) %}
+                        {% set ns.eq = ns.eq + (row.equity|float if row.equity else 0) %}
+                        {% set ns.debt = ns.debt + (row.property.loan_balance|float if row.property.loan_balance else 0) %}
+                        {% set ns.cf = ns.cf + (row.cash_flow|float if row.cash_flow else 0) %}
+                        {% set ns.rent = ns.rent + (row.property.monthly_rent|float if row.property.monthly_rent else 0) %}
+                        {% set ns.piti = ns.piti + (row.property.monthly_piti|float if row.property.monthly_piti else 0) %}
+                    {% endfor %}
+                    <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} bg-gray-50 font-medium text-sm">
+                        <td class="px-4 py-2 text-gray-600 italic">Subtotal</td>
+                        <td class="px-4 py-2"></td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.val) }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.eq) }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.debt) }}</td>
+                        <td class="px-4 py-2"></td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt2(ns.piti) }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt2(ns.rent) }}</td>
+                        <td class="px-4 py-2 text-right font-semibold {% if ns.cf >= 0 %}text-green-600{% else %}text-red-600{% endif %}">{{ fmt2(ns.cf) }}</td>
+                        <td class="px-4 py-2"></td>
+                        <td class="px-4 py-2"></td>
+                        <td class="px-4 py-2"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Modal (hidden by default) -->
+{% for entity, rows in grouped.items() %}
+{% for row in rows %}
+{% set p = row.property %}
+<div id="modal-{{ p.id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
+        <form action="/assets/{{ p.id }}/edit" method="post">
+            <div class="flex items-center justify-between px-6 py-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-900">Edit Financial Data — {{ p.address }}</h2>
+                <button type="button" onclick="closeEditModal({{ p.id }})" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% set fields = [
+                    ("purchase_price", "Purchase Price", "number", p.purchase_price, "$", "0.01"),
+                    ("purchase_date", "Purchase Date", "date", p.purchase_date, "", ""),
+                    ("appraised_value", "Appraised Value", "number", p.appraised_value, "$", "0.01"),
+                    ("appraisal_date", "Appraisal Date", "date", p.appraisal_date, "", ""),
+                    ("loan_amount", "Original Loan Amount", "number", p.loan_amount, "$", "0.01"),
+                    ("loan_balance", "Current Loan Balance", "number", p.loan_balance, "$", "0.01"),
+                    ("interest_rate", "Interest Rate (%)", "number", p.interest_rate, "", "0.001"),
+                    ("loan_term_years", "Loan Term (years)", "number", p.loan_term_years, "", "1"),
+                    ("loan_start_date", "Loan Start Date", "date", p.loan_start_date, "", ""),
+                    ("monthly_pi", "Monthly P&I", "number", p.monthly_pi, "$", "0.01"),
+                    ("monthly_tax", "Monthly Tax", "number", p.monthly_tax, "$", "0.01"),
+                    ("monthly_insurance", "Monthly Insurance", "number", p.monthly_insurance, "$", "0.01"),
+                    ("monthly_piti", "Monthly PITI", "number", p.monthly_piti, "$", "0.01"),
+                    ("hoa_monthly", "HOA / Month", "number", p.hoa_monthly, "$", "0.01"),
+                ] %}
+                {% for name, label, type, value, prefix, step in fields %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ label }}</label>
+                    <div class="relative">
+                        {% if prefix %}
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ prefix }}</span>
+                        {% endif %}
+                        <input
+                            type="{{ type }}"
+                            name="{{ name }}"
+                            {% if step %}step="{{ step }}"{% endif %}
+                            {% if type == "date" and value %}value="{{ value }}"{% elif type == "number" and value is not none %}value="{{ value }}"{% endif %}
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {% if prefix %}pl-7{% endif %}"
+                        />
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+                <button type="button" onclick="closeEditModal({{ p.id }})" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+<script>
+function openEditModal(id) {
+    document.getElementById('modal-' + id).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeEditModal(id) {
+    document.getElementById('modal-' + id).classList.add('hidden');
+    document.body.style.overflow = '';
+}
+function toggleEntity(key) {
+    const rows = document.querySelectorAll('.entity-row-' + key);
+    const chevron = document.getElementById('chevron-' + key);
+    rows.forEach(r => r.classList.toggle('hidden'));
+    chevron.classList.toggle('-rotate-90');
+}
+// Close modal on backdrop click
+document.querySelectorAll('[id^="modal-"]').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    });
+});
+</script>
+{% endblock %}
