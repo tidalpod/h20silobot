@@ -76,109 +76,199 @@
     </form>
 </div>
 
-<!-- Work Orders — Mobile Cards -->
-{% if work_orders %}
-<div class="md:hidden space-y-3">
-    {% for wo in work_orders %}
-    <a href="/maintenance/{{ wo.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:bg-gray-50 transition-colors">
-        <div class="flex items-start justify-between gap-2 mb-2">
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-900">{{ wo.title }}</div>
-                {% if wo.tenant_ref %}<div class="text-xs text-gray-500">{{ wo.tenant_ref.name }}</div>{% endif %}
-            </div>
-            <span class="text-xs text-gray-400 flex-shrink-0">#{{ wo.id }}</span>
-        </div>
-        <div class="flex items-center justify-between">
-            <div class="text-xs text-gray-500 truncate">
-                {% if wo.property_ref %}{{ wo.property_ref.address }}{% endif %}
-            </div>
-            <div class="flex gap-1.5 flex-shrink-0">
-                {% if wo.priority.value == 'emergency' %}
-                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Emergency</span>
-                {% elif wo.priority.value == 'high' %}
-                <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">High</span>
-                {% elif wo.priority.value == 'normal' %}
-                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Normal</span>
-                {% else %}
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">Low</span>
-                {% endif %}
-                {% if wo.status.value == 'new' %}
-                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">New</span>
-                {% elif wo.status.value == 'assigned' %}
-                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Assigned</span>
-                {% elif wo.status.value == 'in_progress' %}
-                <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">In Progress</span>
-                {% elif wo.status.value == 'completed' %}
-                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Completed</span>
-                {% elif wo.status.value == 'closed' %}
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Closed</span>
-                {% endif %}
-            </div>
-        </div>
-        <div class="text-xs text-gray-400 mt-1.5">{{ wo.created_at.strftime('%b %d, %Y') }}{% if wo.category %} · {{ wo.category.value.replace('_', ' ').title() }}{% endif %}</div>
-    </a>
-    {% endfor %}
-</div>
+<!-- Separate work orders into active and closed -->
+{% set active_orders = [] %}
+{% set closed_orders = [] %}
+{% for wo in work_orders %}
+    {% if wo.status.value == 'closed' %}
+        {% set _ = closed_orders.append(wo) %}
+    {% else %}
+        {% set _ = active_orders.append(wo) %}
+    {% endif %}
+{% endfor %}
 
-<!-- Work Orders — Desktop Table -->
-<div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-            {% for wo in work_orders %}
-            <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/maintenance/{{ wo.id }}'">
-                <td class="px-6 py-4 text-sm text-gray-500">#{{ wo.id }}</td>
-                <td class="px-6 py-4">
+<!-- Active Work Orders — Mobile Cards -->
+{% if active_orders %}
+<div class="mb-4">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Active Work Orders</h2>
+    <div class="md:hidden space-y-3">
+        {% for wo in active_orders %}
+        <a href="/maintenance/{{ wo.id }}" class="block bg-white shadow-sm rounded-xl border border-gray-100 p-4 hover:bg-gray-50 transition-colors">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="min-w-0">
                     <div class="text-sm font-medium text-gray-900">{{ wo.title }}</div>
                     {% if wo.tenant_ref %}<div class="text-xs text-gray-500">{{ wo.tenant_ref.name }}</div>{% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                    {% if wo.property_ref %}{{ wo.property_ref.address }}{% else %}—{% endif %}
-                </td>
-                <td class="px-6 py-4">
+                </div>
+                <span class="text-xs text-gray-400 flex-shrink-0">#{{ wo.id }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="text-xs text-gray-500 truncate">
+                    {% if wo.property_ref %}{{ wo.property_ref.address }}{% endif %}
+                </div>
+                <div class="flex gap-1.5 flex-shrink-0">
                     {% if wo.priority.value == 'emergency' %}
-                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Emergency</span>
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Emergency</span>
                     {% elif wo.priority.value == 'high' %}
-                    <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">High</span>
+                    <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">High</span>
                     {% elif wo.priority.value == 'normal' %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Normal</span>
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Normal</span>
                     {% else %}
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Low</span>
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">Low</span>
                     {% endif %}
-                </td>
-                <td class="px-6 py-4">
                     {% if wo.status.value == 'new' %}
-                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">New</span>
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">New</span>
                     {% elif wo.status.value == 'assigned' %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Assigned</span>
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Assigned</span>
                     {% elif wo.status.value == 'in_progress' %}
-                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">In Progress</span>
+                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">In Progress</span>
                     {% elif wo.status.value == 'completed' %}
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
-                    {% elif wo.status.value == 'closed' %}
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Completed</span>
                     {% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                    {% if wo.category %}{{ wo.category.value.replace('_', ' ').title() }}{% else %}—{% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ wo.created_at.strftime('%b %d, %Y') }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </div>
+            <div class="text-xs text-gray-400 mt-1.5">{{ wo.created_at.strftime('%b %d, %Y') }}{% if wo.category %} · {{ wo.category.value.replace('_', ' ').title() }}{% endif %}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Active Work Orders — Desktop Table -->
+    <div class="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for wo in active_orders %}
+                <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/maintenance/{{ wo.id }}'">
+                    <td class="px-6 py-4 text-sm text-gray-500">#{{ wo.id }}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">{{ wo.title }}</div>
+                        {% if wo.tenant_ref %}<div class="text-xs text-gray-500">{{ wo.tenant_ref.name }}</div>{% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        {% if wo.property_ref %}{{ wo.property_ref.address }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if wo.priority.value == 'emergency' %}
+                        <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Emergency</span>
+                        {% elif wo.priority.value == 'high' %}
+                        <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">High</span>
+                        {% elif wo.priority.value == 'normal' %}
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Normal</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Low</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if wo.status.value == 'new' %}
+                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">New</span>
+                        {% elif wo.status.value == 'assigned' %}
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Assigned</span>
+                        {% elif wo.status.value == 'in_progress' %}
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">In Progress</span>
+                        {% elif wo.status.value == 'completed' %}
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        {% if wo.category %}{{ wo.category.value.replace('_', ' ').title() }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ wo.created_at.strftime('%b %d, %Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
-{% else %}
+{% endif %}
+
+<!-- Closed Work Orders — Mobile Cards -->
+{% if closed_orders %}
+<div class="mt-8">
+    <h2 class="text-lg font-semibold text-gray-600 mb-3">Closed Work Orders</h2>
+    <div class="md:hidden space-y-3">
+        {% for wo in closed_orders %}
+        <a href="/maintenance/{{ wo.id }}" class="block bg-gray-50 shadow-sm rounded-xl border border-gray-200 p-4 hover:bg-gray-100 transition-colors opacity-75">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-600">{{ wo.title }}</div>
+                    {% if wo.tenant_ref %}<div class="text-xs text-gray-400">{{ wo.tenant_ref.name }}</div>{% endif %}
+                </div>
+                <span class="text-xs text-gray-400 flex-shrink-0">#{{ wo.id }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="text-xs text-gray-500 truncate">
+                    {% if wo.property_ref %}{{ wo.property_ref.address }}{% endif %}
+                </div>
+                <div class="flex gap-1.5 flex-shrink-0">
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                </div>
+            </div>
+            <div class="text-xs text-gray-400 mt-1.5">{{ wo.created_at.strftime('%b %d, %Y') }}{% if wo.category %} · {{ wo.category.value.replace('_', ' ').title() }}{% endif %}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Closed Work Orders — Desktop Table -->
+    <div class="hidden md:block bg-gray-50 shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for wo in closed_orders %}
+                <tr class="hover:bg-gray-100 transition-colors cursor-pointer opacity-60" onclick="window.location='/maintenance/{{ wo.id }}'">
+                    <td class="px-6 py-4 text-sm text-gray-400">#{{ wo.id }}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-600">{{ wo.title }}</div>
+                        {% if wo.tenant_ref %}<div class="text-xs text-gray-400">{{ wo.tenant_ref.name }}</div>{% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {% if wo.property_ref %}{{ wo.property_ref.address }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if wo.priority.value == 'emergency' %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Emergency</span>
+                        {% elif wo.priority.value == 'high' %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">High</span>
+                        {% elif wo.priority.value == 'normal' %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Normal</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Low</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {% if wo.category %}{{ wo.category.value.replace('_', ' ').title() }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-400">{{ wo.created_at.strftime('%b %d, %Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if not active_orders and not closed_orders %}
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
     <span class="text-4xl">🔧</span>
     <h3 class="mt-3 text-lg font-semibold text-gray-900">No work orders</h3>
