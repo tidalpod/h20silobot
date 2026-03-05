@@ -283,7 +283,10 @@ async def vendor_update_work_order_status(request: Request, wo_id: int):
     async with get_session() as session:
         result = await session.execute(
             select(WorkOrder)
-            .options(selectinload(WorkOrder.property_ref))
+            .options(
+                selectinload(WorkOrder.property_ref),
+                selectinload(WorkOrder.photos),
+            )
             .where(
                 WorkOrder.id == wo_id,
                 WorkOrder.vendor_id == vendor["id"],
