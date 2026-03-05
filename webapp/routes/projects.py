@@ -269,15 +269,21 @@ async def project_detail(request: Request, project_id: int):
         )
         unlinked_work_orders = unlinked_result.scalars().all()
 
-    # Calculate budget stats
-    total_spent = sum(
+    # Calculate budget stats from invoices + paid work orders
+    invoice_spent = sum(
         float(inv.amount) for inv in project.invoices
         if inv.status in (InvoiceStatus.APPROVED.value, InvoiceStatus.PAID.value)
     )
-    total_paid = sum(
+    invoice_paid = sum(
         float(inv.amount) for inv in project.invoices
         if inv.status == InvoiceStatus.PAID.value
     )
+    wo_paid = sum(
+        float(wo.actual_cost) for wo in project.work_orders
+        if wo.is_paid and wo.actual_cost
+    )
+    total_spent = invoice_spent + wo_paid
+    total_paid = invoice_paid + wo_paid
 
     return templates.TemplateResponse("projects/detail.html", {
         "request": request,

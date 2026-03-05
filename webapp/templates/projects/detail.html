@@ -95,11 +95,17 @@
                         <div class="text-sm font-medium text-gray-900 truncate">{{ wo.title }}</div>
                         <div class="text-xs text-gray-500">WO #{{ wo.id }}{% if wo.vendor_ref %} &middot; {{ wo.vendor_ref.name }}{% endif %}</div>
                     </div>
-                    <span class="text-xs px-2 py-0.5 rounded-full
-                        {% if wo.status.value == 'completed' %}bg-green-100 text-green-700
-                        {% elif wo.status.value == 'in_progress' %}bg-purple-100 text-purple-700
-                        {% else %}bg-gray-100 text-gray-600
-                        {% endif %}">{{ wo.status.value|replace('_', ' ')|title }}</span>
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                        {% if wo.is_paid %}
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Paid{{ " $%.2f"|format(wo.actual_cost|float) if wo.actual_cost else '' }}</span>
+                        {% else %}
+                        <span class="text-xs px-2 py-0.5 rounded-full
+                            {% if wo.status.value == 'completed' %}bg-green-100 text-green-700
+                            {% elif wo.status.value == 'in_progress' %}bg-purple-100 text-purple-700
+                            {% else %}bg-gray-100 text-gray-600
+                            {% endif %}">{{ wo.status.value|replace('_', ' ')|title }}</span>
+                        {% endif %}
+                    </div>
                 </a>
                 {% endfor %}
             </div>
