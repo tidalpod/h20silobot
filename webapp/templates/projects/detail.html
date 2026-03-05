@@ -23,6 +23,9 @@
                 {% elif project.status == 'on_hold' %}bg-amber-100 text-amber-700
                 {% endif %}">{{ project.status|replace('_', ' ')|title }}</span>
             <a href="/projects/{{ project.id }}/edit" class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-sm font-medium">Edit</a>
+            <form method="POST" action="/projects/{{ project.id }}/delete" onsubmit="return confirm('Delete this project? This cannot be undone.');" class="inline">
+                <button type="submit" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 text-sm font-medium">Delete</button>
+            </form>
         </div>
     </div>
 

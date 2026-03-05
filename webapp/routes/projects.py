@@ -416,6 +416,24 @@ async def project_add_work_order(request: Request, project_id: int):
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
 
+@router.post("/{project_id}/delete")
+async def project_delete(request: Request, project_id: int):
+    """Delete a project"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
+        if project:
+            await session.delete(project)
+
+    return RedirectResponse(url="/projects", status_code=303)
+
+
 @router.post("/{project_id}/create-work-order")
 async def project_create_work_order(request: Request, project_id: int):
     """Create a work order from this project and assign to vendor"""
