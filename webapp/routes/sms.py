@@ -203,7 +203,7 @@ async def get_conversation(tenant_id: int, request: Request):
                     "body": msg.body,
                     "direction": msg.direction.value,
                     "status": msg.status,
-                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None,
                     "from_number": msg.from_number,
                     "to_number": msg.to_number
                 }
@@ -314,7 +314,7 @@ async def get_recent_conversations(request: Request):
                     "tenant_phone": tenant.phone,
                     "property_address": tenant.property_ref.address if tenant.property_ref else "Unknown",
                     "last_message": latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body,
-                    "last_message_time": latest_msg.created_at.isoformat() if latest_msg.created_at else None,
+                    "last_message_time": (latest_msg.created_at.isoformat() + "Z") if latest_msg.created_at else None,
                     "last_direction": latest_msg.direction.value,
                     "message_count": len(tenant.sms_messages),
                     "unread_count": unread_count
@@ -349,7 +349,7 @@ async def get_recent_conversations(request: Request):
                     "vendor_phone": vendor.phone,
                     "specialty": vendor.specialty or "",
                     "last_message": latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body,
-                    "last_message_time": latest_msg.created_at.isoformat() if latest_msg.created_at else None,
+                    "last_message_time": (latest_msg.created_at.isoformat() + "Z") if latest_msg.created_at else None,
                     "last_direction": latest_msg.direction.value,
                     "message_count": len(vendor.sms_messages),
                     "unread_count": unread_count
@@ -411,7 +411,7 @@ async def get_recent_conversations(request: Request):
                 "property_address": showing.property_ref.address if showing.property_ref else "",
                 "status": showing.status.value,
                 "last_message": (latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body) if latest_msg else "",
-                "last_message_time": latest_msg.created_at.isoformat() if latest_msg and latest_msg.created_at else None,
+                "last_message_time": (latest_msg.created_at.isoformat() + "Z") if latest_msg and latest_msg.created_at else None,
                 "last_direction": latest_msg.direction.value if latest_msg else None,
                 "message_count": len(msgs),
                 "unread_count": unread_count,
@@ -458,7 +458,7 @@ async def get_unmatched_messages(request: Request):
                     "id": msg.id,
                     "from_number": msg.from_number,
                     "body": msg.body,
-                    "created_at": msg.created_at.isoformat() if msg.created_at else None
+                    "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None
                 }
                 for msg in messages
             ]
@@ -509,7 +509,7 @@ async def get_unmatched_conversation(phone: str, request: Request):
                     "body": msg.body,
                     "direction": msg.direction.value,
                     "status": msg.status,
-                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None,
                     "from_number": msg.from_number,
                     "to_number": msg.to_number
                 }
@@ -685,7 +685,7 @@ async def get_vendor_conversation(vendor_id: int, request: Request):
                     "body": msg.body,
                     "direction": msg.direction.value,
                     "status": msg.status,
-                    "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None,
                     "from_number": msg.from_number,
                     "to_number": msg.to_number
                 }
