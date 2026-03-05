@@ -48,7 +48,7 @@
     <div class="portal-card p-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Property <span class="text-red-500">*</span></label>
         <select name="property_id" required
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2 searchable-select" data-placeholder="Type to search properties...">
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm border px-3 py-2">
             <option value="">Select property...</option>
             {% for prop in properties %}
             <option value="{{ prop.id }}" {% if prefill_property_id and prefill_property_id|string == prop.id|string %}selected{% endif %}>{{ prop.address }}</option>
