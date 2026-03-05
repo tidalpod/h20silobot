@@ -710,6 +710,7 @@ async def mark_work_order_paid(request: Request, wo_id: int):
         return RedirectResponse(url="/login", status_code=303)
 
     form = await request.form()
+    payment_amount = form.get("payment_amount", "")
     payment_method = form.get("payment_method", "")
     payment_notes = form.get("payment_notes", "")
     receipt_file = form.get("receipt")
@@ -738,6 +739,12 @@ async def mark_work_order_paid(request: Request, wo_id: int):
         wo.paid_date = date.today()
         wo.payment_method = payment_method or None
         wo.payment_notes = payment_notes or None
+        if payment_amount:
+            try:
+                from decimal import Decimal
+                wo.actual_cost = Decimal(payment_amount.strip().replace(",", ""))
+            except Exception:
+                pass
         if receipt_url:
             wo.payment_receipt_url = receipt_url
         wo.updated_at = datetime.utcnow()
@@ -758,7 +765,7 @@ async def mark_work_order_paid(request: Request, wo_id: int):
                         prop = prop_result.scalar_one_or_none()
                         prop_addr = prop.address if prop else ""
 
-                    amount_str = f"${float(wo.actual_cost):,.2f}" if wo.actual_cost else "your invoice"
+                    amount_str = f"${float(wo.actual_cost):,.2f}" if wo.actual_cost else "your invoice amount"
                     method_str = f" via {payment_method}" if payment_method else ""
 
                     msg = (
