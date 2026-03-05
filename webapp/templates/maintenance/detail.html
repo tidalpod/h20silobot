@@ -72,6 +72,13 @@
 {% block content %}
 {% set sms_status = request.query_params.get('sms', '') %}
 {% set assigned = request.query_params.get('assigned', '') %}
+{% set paid_status = request.query_params.get('paid', '') %}
+{% if paid_status == '1' %}
+<div class="mb-4 bg-green-50 text-green-700 text-sm rounded-lg p-3 flex items-center gap-2">
+    <span>💰</span> Work order marked as paid.
+    {% if sms_status == 'sent' %} Vendor notified via SMS.{% elif sms_status == 'failed' %} (SMS notification failed){% endif %}
+</div>
+{% endif %}
 {% if assigned == '1' %}
 <div class="mb-4 bg-blue-50 text-blue-700 text-sm rounded-lg p-3 flex items-center gap-2">
     <span>📋</span> Vendor assignment updated.
@@ -265,6 +272,72 @@
                     <dd class="text-sm text-gray-900">{{ "$%.2f"|format(wo.actual_cost|float) if wo.actual_cost else '—' }}</dd>
                 </div>
             </dl>
+        </div>
+
+        <!-- Payment -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">Payment</h2>
+            {% if wo.is_paid %}
+            <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Paid</span>
+                    {% if wo.paid_date %}
+                    <span class="text-xs text-gray-500">{{ wo.paid_date.strftime('%b %d, %Y') }}</span>
+                    {% endif %}
+                </div>
+                {% if wo.payment_method %}
+                <div>
+                    <dt class="text-xs text-gray-500">Method</dt>
+                    <dd class="text-sm text-gray-900">{{ wo.payment_method }}</dd>
+                </div>
+                {% endif %}
+                {% if wo.payment_notes %}
+                <div>
+                    <dt class="text-xs text-gray-500">Notes</dt>
+                    <dd class="text-sm text-gray-600">{{ wo.payment_notes }}</dd>
+                </div>
+                {% endif %}
+                {% if wo.payment_receipt_url %}
+                <div>
+                    <dt class="text-xs text-gray-500 mb-1">Receipt</dt>
+                    <a href="{{ wo.payment_receipt_url }}" target="_blank" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
+                        View receipt
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <form method="POST" action="/maintenance/{{ wo.id }}/mark-paid" enctype="multipart/form-data" class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-500">Method</label>
+                    <select name="payment_method" class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 mt-0.5">
+                        <option value="">— Select —</option>
+                        <option value="Check">Check</option>
+                        <option value="Zelle">Zelle</option>
+                        <option value="Venmo">Venmo</option>
+                        <option value="Cash">Cash</option>
+                        <option value="ACH">ACH</option>
+                        <option value="Wire">Wire</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Notes (optional)</label>
+                    <input type="text" name="payment_notes" class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 mt-0.5" placeholder="e.g. Check #1234">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Proof of payment (optional)</label>
+                    <input type="file" name="receipt" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 mt-0.5 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <button type="submit" class="w-full inline-flex items-center justify-center rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors cursor-pointer">
+                    💰 Mark Paid
+                </button>
+                {% if wo.vendor_ref and wo.vendor_ref.phone %}
+                <p class="text-xs text-gray-400 text-center">Vendor will be notified via SMS</p>
+                {% endif %}
+            </form>
+            {% endif %}
         </div>
     </div>
 </div>

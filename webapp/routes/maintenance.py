@@ -702,6 +702,105 @@ async def update_work_order_status(request: Request, wo_id: int):
     return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
 
 
+@router.post("/{wo_id}/mark-paid")
+async def mark_work_order_paid(request: Request, wo_id: int):
+    """Mark a work order as paid, optionally upload receipt and notify vendor."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    payment_method = form.get("payment_method", "")
+    payment_notes = form.get("payment_notes", "")
+    receipt_file = form.get("receipt")
+
+    receipt_url = None
+    if receipt_file and hasattr(receipt_file, "read") and receipt_file.filename:
+        allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]
+        if receipt_file.content_type in allowed:
+            ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
+            filename = f"receipt_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
+            receipt_path = UPLOAD_DIR / filename
+            content = await receipt_file.read()
+            with open(receipt_path, "wb") as f:
+                f.write(content)
+            receipt_url = f"/uploads/work_orders/{filename}"
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkOrder).where(WorkOrder.id == wo_id)
+        )
+        wo = result.scalar_one_or_none()
+        if not wo:
+            return RedirectResponse(url="/maintenance", status_code=303)
+
+        wo.is_paid = True
+        wo.paid_date = date.today()
+        wo.payment_method = payment_method or None
+        wo.payment_notes = payment_notes or None
+        if receipt_url:
+            wo.payment_receipt_url = receipt_url
+        wo.updated_at = datetime.utcnow()
+
+        # SMS notify vendor they got paid
+        if wo.vendor_id:
+            try:
+                vendor_result = await session.execute(
+                    select(Vendor).where(Vendor.id == wo.vendor_id)
+                )
+                vendor = vendor_result.scalar_one_or_none()
+                if vendor and vendor.phone:
+                    prop_addr = ""
+                    if wo.property_id:
+                        prop_result = await session.execute(
+                            select(Property).where(Property.id == wo.property_id)
+                        )
+                        prop = prop_result.scalar_one_or_none()
+                        prop_addr = prop.address if prop else ""
+
+                    amount_str = f"${float(wo.actual_cost):,.2f}" if wo.actual_cost else "your invoice"
+                    method_str = f" via {payment_method}" if payment_method else ""
+
+                    msg = (
+                        f"Blue Deer - Payment Sent\n\n"
+                        f"Work Order: {wo.title}\n"
+                        f"Property: {prop_addr}\n"
+                        f"Amount: {amount_str}{method_str}\n"
+                        f"Date: {date.today().strftime('%b %d, %Y')}\n\n"
+                        f"Thank you!"
+                    )
+
+                    sms_result = await twilio_service.send_sms(vendor.phone, msg)
+
+                    # Store outbound SMS
+                    try:
+                        from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+                        to_number = _normalize_phone(vendor.phone)
+                        sms_message = SMSMessage(
+                            vendor_id=wo.vendor_id,
+                            from_number=from_number,
+                            to_number=to_number,
+                            body=msg,
+                            direction=MessageDirection.OUTBOUND,
+                            twilio_sid=sms_result.message_sid if sms_result.success else None,
+                            status="sent" if sms_result.success else "failed",
+                            created_at=datetime.utcnow()
+                        )
+                        session.add(sms_message)
+                        await session.flush()
+                    except Exception as db_err:
+                        logger.error(f"Failed to store payment SMS in DB: {db_err}")
+
+                    if sms_result.success:
+                        return RedirectResponse(url=f"/maintenance/{wo_id}?paid=1&sms=sent", status_code=303)
+                    else:
+                        return RedirectResponse(url=f"/maintenance/{wo_id}?paid=1&sms=failed", status_code=303)
+            except Exception as e:
+                logger.error(f"Error notifying vendor of payment for WO #{wo_id}: {e}")
+
+    return RedirectResponse(url=f"/maintenance/{wo_id}?paid=1", status_code=303)
+
+
 @router.post("/{wo_id}/photos/upload")
 async def upload_work_order_photo(
     request: Request,

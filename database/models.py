@@ -823,6 +823,13 @@ class WorkOrder(Base):
     # Resolution
     resolution_notes = Column(Text, nullable=True)
 
+    # Payment tracking
+    is_paid = Column(Boolean, default=False)
+    paid_date = Column(Date, nullable=True)
+    payment_method = Column(String(50), nullable=True)  # check, cash, zelle, venmo, etc.
+    payment_notes = Column(Text, nullable=True)
+    payment_receipt_url = Column(String(500), nullable=True)  # proof of payment image
+
     # Tenant submission flag
     submitted_by_tenant = Column(Boolean, default=False)
 

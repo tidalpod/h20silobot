@@ -46,6 +46,12 @@ async def run_migrations(engine):
         ("properties", "monthly_insurance", "NUMERIC(10,2)"),
         ("properties", "monthly_piti", "NUMERIC(10,2)"),
         ("properties", "hoa_monthly", "NUMERIC(10,2)"),
+        # Work order payment tracking
+        ("work_orders", "is_paid", "BOOLEAN DEFAULT false"),
+        ("work_orders", "paid_date", "DATE"),
+        ("work_orders", "payment_method", "VARCHAR(50)"),
+        ("work_orders", "payment_notes", "TEXT"),
+        ("work_orders", "payment_receipt_url", "VARCHAR(500)"),
     ]
 
     async with engine.begin() as conn:
