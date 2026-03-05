@@ -14,8 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
 from database.models import (
-    Project, ProjectStatus, Property, Vendor, WorkOrder, Invoice, InvoiceStatus,
-    ProjectDocument, SMSMessage, MessageDirection,
+    Project, ProjectStatus, Property, Vendor, WorkOrder, WorkOrderStatus,
+    Invoice, InvoiceStatus, ProjectDocument, SMSMessage, MessageDirection,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -213,6 +213,21 @@ async def project_create(request: Request):
         await session.flush()
         project_id = project.id
 
+        # Auto-create a work order for the vendor if assigned
+        if project.vendor_id:
+            wo = WorkOrder(
+                property_id=project.property_id,
+                vendor_id=project.vendor_id,
+                project_id=project.id,
+                title=project.name,
+                description=project.description or "",
+                status=WorkOrderStatus.ASSIGNED,
+                scheduled_date=project.start_date,
+                estimated_cost=project.budget,
+            )
+            session.add(wo)
+            await session.flush()
+
         # Send SMS to vendor if assigned and checkbox checked
         if project.vendor_id and form.get("notify_vendor"):
             await _notify_vendor_project_sms(project.vendor_id, project, session)
@@ -326,9 +341,12 @@ async def project_update(request: Request, project_id: int):
         if not project:
             return RedirectResponse(url="/projects", status_code=303)
 
+        old_vendor_id = project.vendor_id
+        new_vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
+
         project.name = form["name"]
         project.property_id = int(form["property_id"])
-        project.vendor_id = int(form["vendor_id"]) if form.get("vendor_id") else None
+        project.vendor_id = new_vendor_id
         project.description = form.get("description", "")
         project.status = form.get("status", "planning")
         project.budget = float(form["budget"]) if form.get("budget") else None
@@ -345,6 +363,29 @@ async def project_update(request: Request, project_id: int):
 
         if project.status == ProjectStatus.COMPLETED.value and not project.completed_date:
             project.completed_date = date.today()
+
+        # Auto-create a work order if vendor was just assigned (new or changed)
+        if new_vendor_id and new_vendor_id != old_vendor_id:
+            # Check if project already has a work order for this vendor
+            existing_wo = await session.execute(
+                select(WorkOrder).where(
+                    WorkOrder.project_id == project_id,
+                    WorkOrder.vendor_id == new_vendor_id,
+                )
+            )
+            if not existing_wo.scalar_one_or_none():
+                wo = WorkOrder(
+                    property_id=project.property_id,
+                    vendor_id=new_vendor_id,
+                    project_id=project_id,
+                    title=project.name,
+                    description=project.description or "",
+                    status=WorkOrderStatus.ASSIGNED,
+                    scheduled_date=project.start_date,
+                    estimated_cost=project.budget,
+                )
+                session.add(wo)
+                await session.flush()
 
         # Send SMS to vendor if assigned and checkbox checked
         if project.vendor_id and form.get("notify_vendor"):
