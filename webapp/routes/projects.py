@@ -416,6 +416,40 @@ async def project_add_work_order(request: Request, project_id: int):
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
 
+@router.post("/{project_id}/create-work-order")
+async def project_create_work_order(request: Request, project_id: int):
+    """Create a work order from this project and assign to vendor"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
+        if not project or not project.vendor_id:
+            return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+        wo = WorkOrder(
+            property_id=project.property_id,
+            vendor_id=project.vendor_id,
+            project_id=project.id,
+            title=project.name,
+            description=project.description or "",
+            status=WorkOrderStatus.ASSIGNED,
+            scheduled_date=project.start_date,
+            estimated_cost=project.budget,
+        )
+        session.add(wo)
+        await session.flush()
+
+        # Also notify vendor via SMS
+        await _notify_vendor_project_sms(project.vendor_id, project, session)
+
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
 @router.post("/{project_id}/documents/upload")
 async def project_document_upload(request: Request, project_id: int):
     """Upload a document to a project"""
