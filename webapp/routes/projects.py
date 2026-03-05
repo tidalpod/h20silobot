@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import (
     Project, ProjectStatus, Property, Vendor, WorkOrder, WorkOrderStatus,
-    Invoice, InvoiceStatus, ProjectDocument, SMSMessage, MessageDirection,
+    Invoice, InvoiceStatus, ProjectDocument, ProjectDraw, SMSMessage, MessageDirection,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -252,6 +252,7 @@ async def project_detail(request: Request, project_id: int):
                 selectinload(Project.invoices).selectinload(Invoice.vendor_ref),
                 selectinload(Project.work_orders).selectinload(WorkOrder.vendor_ref),
                 selectinload(Project.documents),
+                selectinload(Project.draws),
             )
         )
         project = result.scalar_one_or_none()
@@ -269,7 +270,7 @@ async def project_detail(request: Request, project_id: int):
         )
         unlinked_work_orders = unlinked_result.scalars().all()
 
-    # Calculate budget stats from invoices + paid work orders
+    # Calculate budget stats from invoices + paid work orders + draws
     invoice_spent = sum(
         float(inv.amount) for inv in project.invoices
         if inv.status in (InvoiceStatus.APPROVED.value, InvoiceStatus.PAID.value)
@@ -282,8 +283,9 @@ async def project_detail(request: Request, project_id: int):
         float(wo.actual_cost) for wo in project.work_orders
         if wo.is_paid and wo.actual_cost
     )
-    total_spent = invoice_spent + wo_paid
-    total_paid = invoice_paid + wo_paid
+    draws_total = sum(float(d.amount) for d in project.draws)
+    total_spent = invoice_spent + wo_paid + draws_total
+    total_paid = invoice_paid + wo_paid + draws_total
 
     return templates.TemplateResponse("projects/detail.html", {
         "request": request,
@@ -292,6 +294,7 @@ async def project_detail(request: Request, project_id: int):
         "total_spent": total_spent,
         "total_paid": total_paid,
         "unlinked_work_orders": unlinked_work_orders,
+        "today": date.today().isoformat(),
     })
 
 
@@ -540,5 +543,86 @@ async def project_document_delete(request: Request, project_id: int, doc_id: int
             if filepath.exists():
                 filepath.unlink()
             await session.delete(doc)
+
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@router.post("/{project_id}/draws/add")
+async def add_project_draw(request: Request, project_id: int):
+    """Record a draw payment to the vendor."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    amount_str = form.get("amount", "")
+    draw_date_str = form.get("draw_date", "")
+    description = form.get("description", "")
+    payment_method = form.get("payment_method", "")
+    receipt_file = form.get("receipt")
+
+    if not amount_str or not draw_date_str:
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    from decimal import Decimal, InvalidOperation
+    try:
+        amount = Decimal(amount_str.strip().replace(",", ""))
+    except (InvalidOperation, ValueError):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    try:
+        draw_date = datetime.strptime(draw_date_str.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    receipt_url = None
+    if receipt_file and hasattr(receipt_file, "read") and receipt_file.filename:
+        allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+        if receipt_file.content_type in allowed:
+            ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
+            filename = f"draw_{project_id}_{uuid.uuid4().hex[:8]}{ext}"
+            draw_dir = Path(UPLOAD_BASE) / "projects" / "draws"
+            draw_dir.mkdir(parents=True, exist_ok=True)
+            content = await receipt_file.read()
+            with open(draw_dir / filename, "wb") as f:
+                f.write(content)
+            receipt_url = f"/uploads/projects/draws/{filename}"
+
+    async with get_session() as session:
+        draw = ProjectDraw(
+            project_id=project_id,
+            amount=amount,
+            draw_date=draw_date,
+            description=description or None,
+            payment_method=payment_method or None,
+            receipt_url=receipt_url,
+        )
+        session.add(draw)
+
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@router.post("/{project_id}/draws/{draw_id}/delete")
+async def delete_project_draw(request: Request, project_id: int, draw_id: int):
+    """Delete a draw payment."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(ProjectDraw).where(
+                ProjectDraw.id == draw_id,
+                ProjectDraw.project_id == project_id,
+            )
+        )
+        draw = result.scalar_one_or_none()
+        if draw:
+            if draw.receipt_url:
+                relative_path = draw.receipt_url.lstrip("/uploads/")
+                filepath = Path(UPLOAD_BASE) / relative_path
+                if filepath.exists():
+                    filepath.unlink()
+            await session.delete(draw)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

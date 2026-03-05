@@ -170,6 +170,110 @@
 
     </div>
 
+    <!-- Draws -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-gray-700">Draws</h2>
+            <button onclick="document.getElementById('draw-form').classList.toggle('hidden')" class="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg hover:bg-blue-100 font-medium cursor-pointer">+ Add Draw</button>
+        </div>
+
+        <!-- Add Draw Form (hidden by default) -->
+        <form id="draw-form" method="POST" action="/projects/{{ project.id }}/draws/add" enctype="multipart/form-data" class="hidden border border-gray-200 rounded-lg p-4 mb-4 space-y-3 bg-gray-50">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                    <label class="text-xs text-gray-500">Amount *</label>
+                    <div class="relative mt-0.5">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <input type="number" name="amount" step="0.01" required class="block w-full rounded-md border-gray-300 text-sm py-1.5 pl-7 focus:border-blue-500 focus:ring-blue-500" placeholder="0.00">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Date *</label>
+                    <input type="date" name="draw_date" required value="{{ today }}" class="block w-full rounded-md border-gray-300 text-sm py-1.5 mt-0.5 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Method</label>
+                    <select name="payment_method" class="block w-full rounded-md border-gray-300 text-sm py-1.5 mt-0.5 focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">— Select —</option>
+                        <option value="Check">Check</option>
+                        <option value="Zelle">Zelle</option>
+                        <option value="Venmo">Venmo</option>
+                        <option value="Apple Cash">Apple Cash</option>
+                        <option value="Cash">Cash</option>
+                        <option value="ACH">ACH</option>
+                        <option value="Wire">Wire</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Description</label>
+                    <input type="text" name="description" class="block w-full rounded-md border-gray-300 text-sm py-1.5 mt-0.5 focus:border-blue-500 focus:ring-blue-500" placeholder="e.g. Draw #1 - demo complete">
+                </div>
+            </div>
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="text-xs text-gray-500">Receipt (optional)</label>
+                    <input type="file" name="receipt" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 mt-0.5 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-500 whitespace-nowrap cursor-pointer">Save Draw</button>
+            </div>
+        </form>
+
+        {% if project.draws %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-gray-500 uppercase tracking-wider border-b">
+                        <th class="text-left py-2 pr-4 font-medium">#</th>
+                        <th class="text-left py-2 pr-4 font-medium">Date</th>
+                        <th class="text-right py-2 pr-4 font-medium">Amount</th>
+                        <th class="text-left py-2 pr-4 font-medium">Method</th>
+                        <th class="text-left py-2 pr-4 font-medium">Description</th>
+                        <th class="text-center py-2 font-medium">Receipt</th>
+                        <th class="text-center py-2 font-medium"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for draw in project.draws|reverse %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-2 pr-4 text-gray-500">{{ loop.index }}</td>
+                        <td class="py-2 pr-4 text-gray-900">{{ draw.draw_date.strftime('%b %d, %Y') }}</td>
+                        <td class="py-2 pr-4 text-right font-medium text-gray-900">${{ "%.2f"|format(draw.amount|float) }}</td>
+                        <td class="py-2 pr-4 text-gray-600">{{ draw.payment_method or '—' }}</td>
+                        <td class="py-2 pr-4 text-gray-600">{{ draw.description or '—' }}</td>
+                        <td class="py-2 text-center">
+                            {% if draw.receipt_url %}
+                            <a href="{{ draw.receipt_url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
+                            </a>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="py-2 text-center">
+                            <form method="POST" action="/projects/{{ project.id }}/draws/{{ draw.id }}/delete" onsubmit="return confirm('Delete this draw?')" class="inline">
+                                <button type="submit" class="text-gray-400 hover:text-red-500 cursor-pointer" title="Delete">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="border-t-2 border-gray-200 font-semibold">
+                        <td class="py-2" colspan="2">Total Draws</td>
+                        <td class="py-2 text-right text-green-700">
+                            {% set draw_sum = project.draws|map(attribute='amount')|map('float')|sum %}
+                            ${{ "%.2f"|format(draw_sum) }}
+                        </td>
+                        <td colspan="4"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">No draws recorded yet. Click "+ Add Draw" to record a payment.</p>
+        {% endif %}
+    </div>
+
     <!-- Documents -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mt-6">
         <div class="flex items-center justify-between mb-4">

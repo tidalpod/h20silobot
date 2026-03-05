@@ -1048,6 +1048,7 @@ class Project(Base):
     work_orders = relationship("WorkOrder", back_populates="project")
     invoices = relationship("Invoice", back_populates="project_ref")
     documents = relationship("ProjectDocument", back_populates="project", cascade="all, delete-orphan", order_by="ProjectDocument.created_at.desc()")
+    draws = relationship("ProjectDraw", back_populates="project", cascade="all, delete-orphan", order_by="ProjectDraw.draw_date.desc()")
 
     # Indexes
     __table_args__ = (
@@ -1105,6 +1106,32 @@ class ProjectDocument(Base):
 
     def __repr__(self):
         return f"<ProjectDocument {self.id}: {self.original_filename}>"
+
+
+class ProjectDraw(Base):
+    """Draw payments made to vendor for a project"""
+    __tablename__ = "project_draws"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+
+    amount = Column(Numeric(10, 2), nullable=False)
+    draw_date = Column(Date, nullable=False)
+    description = Column(String(255), nullable=True)  # e.g. "Draw #1 - framing complete"
+    payment_method = Column(String(50), nullable=True)  # Check, Zelle, Apple Cash, etc.
+    receipt_url = Column(String(500), nullable=True)  # proof of payment
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="draws")
+
+    __table_args__ = (
+        Index("ix_project_draws_project", "project_id"),
+    )
+
+    def __repr__(self):
+        return f"<ProjectDraw {self.id}: ${self.amount} on {self.draw_date}>"
 
 
 # =============================================================================
