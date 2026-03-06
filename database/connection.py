@@ -72,6 +72,19 @@ async def run_migrations(engine):
                 """))
                 print(f"[DB] Column '{column}' added successfully")
 
+        # Add new enum values (idempotent — wrapped in try/except)
+        enum_values = [
+            ("showingstatus", "no_show"),
+        ]
+        for enum_type, new_value in enum_values:
+            try:
+                await conn.execute(text(
+                    f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{new_value}'"
+                ))
+                print(f"[DB] Added '{new_value}' to enum '{enum_type}'")
+            except Exception:
+                pass  # Value may already exist
+
         # Create indexes for new columns (idempotent)
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_sms_messages_vendor ON sms_messages(vendor_id)"
