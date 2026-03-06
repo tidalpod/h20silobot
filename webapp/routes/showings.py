@@ -527,7 +527,7 @@ async def mark_no_show(request: Request, showing_id: int):
             .where(Showing.id == showing_id)
             .options(
                 selectinload(Showing.property_ref),
-                selectinload(Showing.vendor_ref)
+                selectinload(Showing.vendor)
             )
         )
         showing = result.scalar_one_or_none()
@@ -593,7 +593,7 @@ async def reschedule_showing_form(request: Request, showing_id: int):
             .where(Showing.id == showing_id)
             .options(
                 selectinload(Showing.property_ref),
-                selectinload(Showing.vendor_ref)
+                selectinload(Showing.vendor)
             )
         )
         showing = result.scalar_one_or_none()
@@ -630,7 +630,7 @@ async def reschedule_showing(request: Request, showing_id: int):
             .where(Showing.id == showing_id)
             .options(
                 selectinload(Showing.property_ref),
-                selectinload(Showing.vendor_ref)
+                selectinload(Showing.vendor)
             )
         )
         showing = result.scalar_one_or_none()

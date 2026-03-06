@@ -32,7 +32,7 @@
             </div>
             <div>
                 <span class="text-blue-700 font-medium">Vendor:</span>
-                <span class="text-blue-900">{% if showing.vendor_ref %}{{ showing.vendor_ref.name }}{% else %}Unassigned{% endif %}</span>
+                <span class="text-blue-900">{% if showing.vendor %}{{ showing.vendor.name }}{% else %}Unassigned{% endif %}</span>
             </div>
             <div>
                 <span class="text-blue-700 font-medium">Current Date:</span>
@@ -84,7 +84,7 @@
             <div class="border-t border-gray-200 pt-4 space-y-2">
                 <h4 class="text-sm font-semibold text-gray-700 mb-2">Notifications</h4>
 
-                {% if showing.vendor_ref %}
+                {% if showing.vendor %}
                 <div class="flex items-center gap-2">
                     <input
                         type="checkbox"
@@ -94,7 +94,7 @@
                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     >
                     <label for="notify_vendor" class="text-sm text-gray-700">
-                        Notify vendor ({{ showing.vendor_ref.name }}) via SMS
+                        Notify vendor ({{ showing.vendor.name }}) via SMS
                     </label>
                 </div>
                 {% endif %}
