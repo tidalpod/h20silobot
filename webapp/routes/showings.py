@@ -512,3 +512,144 @@ async def delete_showing(request: Request, showing_id: int):
         await session.delete(showing)
 
     return RedirectResponse(url="/showings", status_code=303)
+
+
+@router.post("/{showing_id}/no-show")
+async def mark_no_show(request: Request, showing_id: int):
+    """Mark showing as no-show and notify tenant"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing)
+            .where(Showing.id == showing_id)
+            .options(
+                selectinload(Showing.property_ref),
+                selectinload(Showing.vendor_ref)
+            )
+        )
+        showing = result.scalar_one_or_none()
+        if not showing:
+            return RedirectResponse(url="/showings", status_code=303)
+
+        showing.status = ShowingStatus.NO_SHOW
+        showing.updated_at = datetime.utcnow()
+
+        # Send SMS notification to tenant about no-show
+        if showing.contact_phone:
+            phone = _normalize_phone(showing.contact_phone)
+            if phone:
+                prop_addr = showing.property_ref.address if showing.property_ref else "the property"
+                date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "today"
+                time_str = showing.scheduled_time or ""
+
+                msg = (
+                    f"Blue Deer Property Management\n\n"
+                    f"Hi{' ' + showing.contact_name.split()[0] if showing.contact_name else ''},\n\n"
+                    f"We noticed you did not attend the scheduled showing for {prop_addr} "
+                    f"on {date_str}{' at ' + time_str if time_str else ''}.\n\n"
+                    f"If you'd still like to view this property, please reply to reschedule."
+                )
+
+                try:
+                    sms_result = await twilio_service.send_sms(phone, msg)
+                    if sms_result.success:
+                        logger.info(f"No-show SMS sent to {showing.contact_name}")
+                    else:
+                        logger.error(f"Failed to send no-show SMS: {sms_result.error_message}")
+
+                    # Store in DB
+                    from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+                    sms_message = SMSMessage(
+                        from_number=from_number,
+                        to_number=phone,
+                        body=msg,
+                        direction=MessageDirection.OUTBOUND,
+                        twilio_sid=sms_result.message_sid if sms_result.success else None,
+                        status="sent" if sms_result.success else "failed",
+                        created_at=datetime.utcnow()
+                    )
+                    session.add(sms_message)
+                    await session.flush()
+                except Exception as e:
+                    logger.error(f"Error sending no-show SMS: {e}")
+
+    return RedirectResponse(url=f"/showings/{showing_id}?marked=no_show", status_code=303)
+
+
+@router.get("/{showing_id}/reschedule", response_class=HTMLResponse)
+async def reschedule_showing_form(request: Request, showing_id: int):
+    """Reschedule showing form"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing)
+            .where(Showing.id == showing_id)
+            .options(
+                selectinload(Showing.property_ref),
+                selectinload(Showing.vendor_ref)
+            )
+        )
+        showing = result.scalar_one_or_none()
+        if not showing:
+            return RedirectResponse(url="/showings", status_code=303)
+
+    return templates.TemplateResponse(
+        "showings/reschedule.html",
+        {
+            "request": request,
+            "user": user,
+            "showing": showing,
+        }
+    )
+
+
+@router.post("/{showing_id}/reschedule")
+async def reschedule_showing(request: Request, showing_id: int):
+    """Reschedule a showing to new date/time"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    date_str = form.get("scheduled_date", "").strip()
+    time_str = form.get("scheduled_time", "").strip()
+
+    if not date_str or not time_str:
+        return RedirectResponse(url=f"/showings/{showing_id}/reschedule?error=missing_datetime", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Showing)
+            .where(Showing.id == showing_id)
+            .options(
+                selectinload(Showing.property_ref),
+                selectinload(Showing.vendor_ref)
+            )
+        )
+        showing = result.scalar_one_or_none()
+        if not showing:
+            return RedirectResponse(url="/showings", status_code=303)
+
+        old_date = showing.scheduled_date
+        old_time = showing.scheduled_time
+
+        showing.scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        showing.scheduled_time = time_str
+        showing.status = ShowingStatus.SCHEDULED  # Reset to scheduled after reschedule
+        showing.updated_at = datetime.utcnow()
+
+        # Notify vendor if assigned
+        if showing.vendor_id and form.get("notify_vendor"):
+            await _notify_vendor_showing_sms(showing.vendor_id, showing, session)
+
+        # Notify renter if contact provided
+        if showing.contact_phone and form.get("notify_renter"):
+            await _notify_renter_showing_sms(showing, session)
+
+    return RedirectResponse(url=f"/showings/{showing_id}?rescheduled=1", status_code=303)
