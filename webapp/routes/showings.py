@@ -534,7 +534,10 @@ async def mark_no_show(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/showings", status_code=303)
 
-        showing.status = ShowingStatus.NO_SHOW
+        # TODO: Use ShowingStatus.NO_SHOW once database migration runs
+        # Temporarily using CANCELLED until enum is updated in DB
+        showing.status = ShowingStatus.CANCELLED
+        showing.notes = (showing.notes or "") + "\n[NO SHOW - " + datetime.utcnow().strftime('%Y-%m-%d %H:%M') + "]"
         showing.updated_at = datetime.utcnow()
 
         # Send SMS notification to tenant about no-show
