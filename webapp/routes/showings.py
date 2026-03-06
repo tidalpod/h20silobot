@@ -224,12 +224,16 @@ async def list_showings(
         )
         vendors = vendors_result.scalars().all()
 
-        # Counts by status
+        # Counts by status (defensive — new enum values may not exist in DB yet)
         for s in ShowingStatus:
-            count_result = await session.execute(
-                select(func.count(Showing.id)).where(Showing.status == s)
-            )
-            setattr(s, '_count', count_result.scalar() or 0)
+            try:
+                count_result = await session.execute(
+                    select(func.count(Showing.id)).where(Showing.status == s)
+                )
+                setattr(s, '_count', count_result.scalar() or 0)
+            except Exception:
+                setattr(s, '_count', 0)
+                await session.rollback()
 
     return templates.TemplateResponse(
         "showings/list.html",
