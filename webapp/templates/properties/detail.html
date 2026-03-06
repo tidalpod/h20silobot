@@ -658,9 +658,11 @@
                     {% set has_any_co = property.co_mechanical_date or property.co_electrical_date or property.co_plumbing_date or property.co_zoning_date or property.co_building_date %}
                     {% if has_any_co %}
                     {% set all_passed = true %}
-                    {% for t in ['mechanical', 'electrical', 'plumbing', 'zoning', 'building'] %}
-                        {% if attribute(property, 'co_' ~ t ~ '_date') and attribute(property, 'co_' ~ t ~ '_status') != 'passed' %}{% set all_passed = false %}{% endif %}
-                    {% endfor %}
+                    {% if property.co_mechanical_date and property.co_mechanical_status != 'passed' %}{% set all_passed = false %}{% endif %}
+                    {% if property.co_electrical_date and property.co_electrical_status != 'passed' %}{% set all_passed = false %}{% endif %}
+                    {% if property.co_plumbing_date and property.co_plumbing_status != 'passed' %}{% set all_passed = false %}{% endif %}
+                    {% if property.co_zoning_date and property.co_zoning_status != 'passed' %}{% set all_passed = false %}{% endif %}
+                    {% if property.co_building_date and property.co_building_status != 'passed' %}{% set all_passed = false %}{% endif %}
                     {% if all_passed and has_any_co %}
                     <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">All Passed</span>
                     {% else %}
