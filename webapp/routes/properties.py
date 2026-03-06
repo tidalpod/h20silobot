@@ -352,50 +352,64 @@ async def create_property(
 @router.get("/{property_id}", response_class=HTMLResponse)
 async def property_detail(request: Request, property_id: int):
     """Show property detail page"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(Property)
-            .where(Property.id == property_id)
-            .options(
-                selectinload(Property.bills),
-                selectinload(Property.tenants).selectinload(Tenant.pha),
-                selectinload(Property.taxes),
-                selectinload(Property.violations)
+    try:
+        async with get_session() as session:
+            result = await session.execute(
+                select(Property)
+                .where(Property.id == property_id)
+                .options(
+                    selectinload(Property.bills),
+                    selectinload(Property.tenants).selectinload(Tenant.pha),
+                    selectinload(Property.taxes),
+                    selectinload(Property.violations)
+                )
             )
+            prop = result.scalar_one_or_none()
+
+            if not prop:
+                raise HTTPException(status_code=404, detail="Property not found")
+
+            # Calculate current status
+            current_status = BillStatus.UNKNOWN
+            latest_bill = None
+            if prop.bills:
+                latest_bill = prop.bills[0]
+                current_status = latest_bill.calculate_status()
+
+            # Get active tenants
+            active_tenants = [t for t in prop.tenants if t.is_active]
+
+        return templates.TemplateResponse(
+            "properties/detail.html",
+            {
+                "request": request,
+                "user": user,
+                "property": prop,
+                "current_status": current_status,
+                "latest_bill": latest_bill,
+                "active_tenants": active_tenants,
+                "bills": prop.bills[:10],  # Last 10 bills
+                "today": datetime.now().date(),  # For expiry date comparisons
+                "violations": prop.violations,
+            }
         )
-        prop = result.scalar_one_or_none()
-
-        if not prop:
-            raise HTTPException(status_code=404, detail="Property not found")
-
-        # Calculate current status
-        current_status = BillStatus.UNKNOWN
-        latest_bill = None
-        if prop.bills:
-            latest_bill = prop.bills[0]
-            current_status = latest_bill.calculate_status()
-
-        # Get active tenants
-        active_tenants = [t for t in prop.tenants if t.is_active]
-
-    return templates.TemplateResponse(
-        "properties/detail.html",
-        {
-            "request": request,
-            "user": user,
-            "property": prop,
-            "current_status": current_status,
-            "latest_bill": latest_bill,
-            "active_tenants": active_tenants,
-            "bills": prop.bills[:10],  # Last 10 bills
-            "today": datetime.now().date(),  # For expiry date comparisons
-            "violations": prop.violations,
-        }
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Property detail error for {property_id}: {tb}")
+        return HTMLResponse(
+            content=f"<h2>Error loading property {property_id}</h2><pre>{tb}</pre>",
+            status_code=500
+        )
 
 
 @router.get("/{property_id}/edit", response_class=HTMLResponse)
