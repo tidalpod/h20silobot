@@ -95,7 +95,7 @@ async def run_migrations(engine):
         tmp_engine = _cae(raw_url, isolation_level="AUTOCOMMIT")
         try:
             async with tmp_engine.connect() as raw_conn:
-                for enum_type, new_value in [("showingstatus", "no_show")]:
+                for enum_type, new_value in [("showingstatus", "no_show"), ("showingstatus", "rescheduled")]:
                     try:
                         await raw_conn.execute(text(
                             f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{new_value}'"

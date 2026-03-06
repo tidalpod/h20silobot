@@ -642,15 +642,46 @@ async def reschedule_showing(request: Request, showing_id: int):
 
         showing.scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         showing.scheduled_time = time_str
-        showing.status = ShowingStatus.SCHEDULED  # Reset to scheduled after reschedule
+        showing.status = ShowingStatus.RESCHEDULED
         showing.updated_at = datetime.utcnow()
+
+        new_date_str = showing.scheduled_date.strftime('%b %d, %Y')
+        new_time_str = showing.scheduled_time or "TBD"
 
         # Notify vendor if assigned
         if showing.vendor_id and form.get("notify_vendor"):
             await _notify_vendor_showing_sms(showing.vendor_id, showing, session)
 
-        # Notify renter if contact provided
+        # Notify renter with reschedule-specific message
         if showing.contact_phone and form.get("notify_renter"):
-            await _notify_renter_showing_sms(showing, session)
+            phone = _normalize_phone(showing.contact_phone)
+            if phone:
+                prop_addr = showing.property_ref.address if showing.property_ref else "the property"
+                msg = (
+                    f"Blue Deer Property Management\n\n"
+                    f"Hi{' ' + showing.contact_name.split()[0] if showing.contact_name else ''}! "
+                    f"Your showing for {prop_addr} has been rescheduled.\n\n"
+                    f"New Date: {new_date_str}\n"
+                    f"New Time: {new_time_str}\n\n"
+                    f"Please reply if you have any questions."
+                )
+                try:
+                    sms_result = await twilio_service.send_sms(phone, msg)
+                    if sms_result.success:
+                        logger.info(f"Reschedule SMS sent to {showing.contact_name}")
+                    from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+                    sms_message = SMSMessage(
+                        from_number=from_number,
+                        to_number=phone,
+                        body=msg,
+                        direction=MessageDirection.OUTBOUND,
+                        twilio_sid=sms_result.message_sid if sms_result.success else None,
+                        status="sent" if sms_result.success else "failed",
+                        created_at=datetime.utcnow()
+                    )
+                    session.add(sms_message)
+                    await session.flush()
+                except Exception as e:
+                    logger.error(f"Error sending reschedule SMS: {e}")
 
     return RedirectResponse(url=f"/showings/{showing_id}?rescheduled=1", status_code=303)

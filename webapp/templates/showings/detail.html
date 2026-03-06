@@ -35,6 +35,8 @@
                 <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
                 {% elif showing.status.value == 'no_show' %}
                 <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">No Show</span>
+                {% elif showing.status.value == 'rescheduled' %}
+                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Rescheduled</span>
                 {% endif %}
             </div>
         </div>
@@ -75,7 +77,7 @@
         {% endif %}
 
         <!-- Quick Status Update -->
-        {% if showing.status.value not in ['completed', 'cancelled', 'no_show'] %}
+        {% if showing.status.value not in ['completed', 'cancelled'] %}
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
             <h2 class="text-sm font-semibold text-gray-700 mb-3">Actions</h2>
             <div class="flex flex-wrap gap-2">

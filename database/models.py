@@ -107,7 +107,8 @@ class ShowingStatus(PyEnum):
     CONFIRMED = "confirmed"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
-    # NO_SHOW = "no_show"  # TODO: Add to database enum first with migration
+    NO_SHOW = "no_show"
+    RESCHEDULED = "rescheduled"
 
 
 class ESignStatus(PyEnum):
