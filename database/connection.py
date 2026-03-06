@@ -46,6 +46,7 @@ async def run_migrations(engine):
         ("properties", "monthly_insurance", "NUMERIC(10,2)"),
         ("properties", "monthly_piti", "NUMERIC(10,2)"),
         ("properties", "hoa_monthly", "NUMERIC(10,2)"),
+        ("properties", "rehab_cost", "NUMERIC(12,2)"),
         # Work order payment tracking
         ("work_orders", "is_paid", "BOOLEAN DEFAULT false"),
         ("work_orders", "paid_date", "DATE"),

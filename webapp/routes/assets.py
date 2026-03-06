@@ -79,6 +79,7 @@ async def assets_dashboard(request: Request):
     total_equity = sum(_dec(r["equity"]) for r in rows)
     total_debt = sum(_dec(r["property"].loan_balance) for r in rows)
     total_cash_flow = sum(_dec(r["cash_flow"]) for r in rows)
+    total_rehab = sum(_dec(r["property"].rehab_cost) for r in rows)
 
     return templates.TemplateResponse("assets/dashboard.html", {
         "request": request,
@@ -88,6 +89,7 @@ async def assets_dashboard(request: Request):
         "total_equity": total_equity,
         "total_debt": total_debt,
         "total_cash_flow": total_cash_flow,
+        "total_rehab": total_rehab,
     })
 
 
@@ -136,6 +138,7 @@ async def save_financial_data(
     monthly_insurance: str = Form(None),
     monthly_piti: str = Form(None),
     hoa_monthly: str = Form(None),
+    rehab_cost: str = Form(None),
 ):
     """Save financial data for a single property."""
     user = await get_current_user(request)
@@ -164,6 +167,7 @@ async def save_financial_data(
         prop.monthly_insurance = _parse_decimal(monthly_insurance)
         prop.monthly_piti = _parse_decimal(monthly_piti)
         prop.hoa_monthly = _parse_decimal(hoa_monthly)
+        prop.rehab_cost = _parse_decimal(rehab_cost)
         prop.updated_at = datetime.utcnow()
 
     return RedirectResponse(url="/assets", status_code=303)

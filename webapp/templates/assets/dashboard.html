@@ -83,6 +83,7 @@
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rehab</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Appraised</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Equity</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Bal</th>
@@ -99,7 +100,7 @@
                     {% for entity, rows in grouped.items() %}
                     {# Entity header #}
                     <tr class="bg-gray-100 cursor-pointer hover:bg-gray-200" onclick="toggleEntity('{{ entity|replace(' ', '_')|replace('.', '') }}')">
-                        <td colspan="12" class="px-4 py-2">
+                        <td colspan="13" class="px-4 py-2">
                             <div class="flex items-center gap-2 font-semibold text-sm text-gray-800">
                                 <svg id="chevron-{{ entity|replace(' ', '_')|replace('.', '') }}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
@@ -119,6 +120,7 @@
                             <div class="text-xs text-gray-400">{{ p.city }}, {{ p.state }} {{ p.zip_code }}</div>
                         </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.purchase_price) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.rehab_cost) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.appraised_value) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.loan_balance) }}</td>
@@ -141,7 +143,7 @@
                     {% endfor %}
 
                     {# Subtotals row #}
-                    {% set ns = namespace(val=0, eq=0, debt=0, cf=0, rent=0, piti=0) %}
+                    {% set ns = namespace(val=0, eq=0, debt=0, cf=0, rent=0, piti=0, rehab=0) %}
                     {% for row in rows %}
                         {% set ns.val = ns.val + (row.property.appraised_value|float if row.property.appraised_value else 0) %}
                         {% set ns.eq = ns.eq + (row.equity|float if row.equity else 0) %}
@@ -149,10 +151,12 @@
                         {% set ns.cf = ns.cf + (row.cash_flow|float if row.cash_flow else 0) %}
                         {% set ns.rent = ns.rent + (row.property.monthly_rent|float if row.property.monthly_rent else 0) %}
                         {% set ns.piti = ns.piti + (row.property.monthly_piti|float if row.property.monthly_piti else 0) %}
+                        {% set ns.rehab = ns.rehab + (row.property.rehab_cost|float if row.property.rehab_cost else 0) %}
                     {% endfor %}
                     <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} bg-gray-50 font-medium text-sm">
                         <td class="px-4 py-2 text-gray-600 italic">Subtotal</td>
                         <td class="px-4 py-2"></td>
+                        <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.rehab) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.val) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.eq) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.debt) }}</td>
@@ -201,6 +205,7 @@
                     ("monthly_insurance", "Monthly Insurance", "number", p.monthly_insurance, "$", "0.01"),
                     ("monthly_piti", "Monthly PITI", "number", p.monthly_piti, "$", "0.01"),
                     ("hoa_monthly", "HOA / Month", "number", p.hoa_monthly, "$", "0.01"),
+                    ("rehab_cost", "Total Rehab Cost", "number", p.rehab_cost, "$", "0.01"),
                 ] %}
                 {% for name, label, type, value, prefix, step in fields %}
                 <div>

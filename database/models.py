@@ -215,6 +215,7 @@ class Property(Base):
     monthly_insurance = Column(Numeric(10, 2), nullable=True)  # Insurance escrow
     monthly_piti = Column(Numeric(10, 2), nullable=True)       # Total PITI
     hoa_monthly = Column(Numeric(10, 2), nullable=True)        # HOA/condo fees
+    rehab_cost = Column(Numeric(12, 2), nullable=True)         # Total approx rehab spend
 
     # Tracking
     is_active = Column(Boolean, default=True)
