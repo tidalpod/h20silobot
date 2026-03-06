@@ -30,7 +30,7 @@
     </a>
     {% for s in statuses %}
     <a href="/showings?status={{ s.value }}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == s.value %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">
-        {% if s.value == 'scheduled' %}📅{% elif s.value == 'confirmed' %}✅{% elif s.value == 'completed' %}☑️{% elif s.value == 'cancelled' %}❌{% endif %}
+        {% if s.value == 'scheduled' %}📅{% elif s.value == 'confirmed' %}✅{% elif s.value == 'completed' %}☑️{% elif s.value == 'cancelled' %}❌{% elif s.value == 'no_show' %}🚫{% endif %}
         {{ s.value.replace('_', ' ').title() }}
         {% if s._count %}<span class="ml-1 text-xs opacity-75">({{ s._count }})</span>{% endif %}
     </a>
@@ -115,6 +115,8 @@
                 <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Completed</span>
                 {% elif s.status.value == 'cancelled' %}
                 <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
+                {% elif s.status.value == 'no_show' %}
+                <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">No Show</span>
                 {% endif %}
             </div>
         </div>
@@ -173,6 +175,8 @@
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Completed</span>
                     {% elif s.status.value == 'cancelled' %}
                     <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
+                    {% elif s.status.value == 'no_show' %}
+                    <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">No Show</span>
                     {% endif %}
                 </td>
             </tr>
