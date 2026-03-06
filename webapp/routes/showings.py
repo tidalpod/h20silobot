@@ -186,65 +186,69 @@ async def list_showings(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    async with get_session() as session:
-        query = (
-            select(Showing)
-            .options(
-                selectinload(Showing.property_ref),
-                selectinload(Showing.vendor),
-            )
-        )
-
-        if status:
-            query = query.where(Showing.status == ShowingStatus(status))
-        if showing_type:
-            query = query.where(Showing.showing_type == ShowingType(showing_type))
-        if property_id:
-            query = query.where(Showing.property_id == property_id)
-        if vendor_id:
-            query = query.where(Showing.vendor_id == vendor_id)
-        if date_from:
-            query = query.where(Showing.scheduled_date >= datetime.strptime(date_from, "%Y-%m-%d").date())
-        if date_to:
-            query = query.where(Showing.scheduled_date <= datetime.strptime(date_to, "%Y-%m-%d").date())
-
-        query = query.order_by(desc(Showing.scheduled_date), desc(Showing.scheduled_time))
-        result = await session.execute(query)
-        showings = result.scalars().all()
-
-        # Get properties for filter dropdown
-        props_result = await session.execute(
-            select(Property).where(Property.is_active == True).order_by(Property.address)
-        )
-        properties = props_result.scalars().all()
-
-        # Get vendors for filter dropdown
-        vendors_result = await session.execute(
-            select(Vendor).where(Vendor.is_active == True).order_by(Vendor.name)
-        )
-        vendors = vendors_result.scalars().all()
-
-        # Counts by status (defensive — new enum values may not exist in DB yet)
-        for s in ShowingStatus:
-            try:
-                count_result = await session.execute(
-                    select(func.count(Showing.id)).where(Showing.status == s)
+    try:
+        async with get_session() as session:
+            query = (
+                select(Showing)
+                .options(
+                    selectinload(Showing.property_ref),
+                    selectinload(Showing.vendor),
                 )
-                setattr(s, '_count', count_result.scalar() or 0)
-            except Exception:
-                setattr(s, '_count', 0)
-                await session.rollback()
+            )
 
-    return templates.TemplateResponse(
-        "showings/list.html",
-        {
-            "request": request,
-            "user": user,
-            "showings": showings,
-            "properties": properties,
-            "vendors": vendors,
-            "statuses": ShowingStatus,
-            "showing_types": ShowingType,
+            if status:
+                query = query.where(Showing.status == ShowingStatus(status))
+            if showing_type:
+                query = query.where(Showing.showing_type == ShowingType(showing_type))
+            if property_id:
+                query = query.where(Showing.property_id == property_id)
+            if vendor_id:
+                query = query.where(Showing.vendor_id == vendor_id)
+            if date_from:
+                query = query.where(Showing.scheduled_date >= datetime.strptime(date_from, "%Y-%m-%d").date())
+            if date_to:
+                query = query.where(Showing.scheduled_date <= datetime.strptime(date_to, "%Y-%m-%d").date())
+
+            query = query.order_by(desc(Showing.scheduled_date), desc(Showing.scheduled_time))
+            result = await session.execute(query)
+            showings = result.scalars().all()
+
+            # Get properties for filter dropdown
+            props_result = await session.execute(
+                select(Property).where(Property.is_active == True).order_by(Property.address)
+            )
+            properties = props_result.scalars().all()
+
+            # Get vendors for filter dropdown
+            vendors_result = await session.execute(
+                select(Vendor).where(Vendor.is_active == True).order_by(Vendor.name)
+            )
+            vendors = vendors_result.scalars().all()
+
+            # Counts by status — single query with GROUP BY to avoid enum issues
+            try:
+                from sqlalchemy import cast, String
+                count_result = await session.execute(
+                    select(cast(Showing.status, String), func.count(Showing.id))
+                    .group_by(Showing.status)
+                )
+                status_counts = {row[0]: row[1] for row in count_result.all()}
+            except Exception:
+                status_counts = {}
+
+            for s in ShowingStatus:
+                setattr(s, '_count', status_counts.get(s.value, 0))
+
+        return templates.TemplateResponse(
+            "showings/list.html",
+            {
+                "request": request,
+                "user": user,
+                "showings": showings,
+                "properties": properties,
+                "vendors": vendors,
+                "statuses": ShowingStatus,
+                "showing_types": ShowingType,
             "filter_status": status,
             "filter_type": showing_type,
             "filter_property_id": property_id,
@@ -253,6 +257,14 @@ async def list_showings(
             "filter_date_to": date_to,
         }
     )
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Showings list error: {tb}")
+        return HTMLResponse(
+            content=f"<h2>Error loading showings</h2><pre>{tb}</pre>",
+            status_code=500
+        )
 
 
 @router.get("/new", response_class=HTMLResponse)
