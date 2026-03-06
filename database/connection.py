@@ -72,19 +72,6 @@ async def run_migrations(engine):
                 """))
                 print(f"[DB] Column '{column}' added successfully")
 
-        # Add new enum values (idempotent — wrapped in try/except)
-        enum_values = [
-            ("showingstatus", "no_show"),
-        ]
-        for enum_type, new_value in enum_values:
-            try:
-                await conn.execute(text(
-                    f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{new_value}'"
-                ))
-                print(f"[DB] Added '{new_value}' to enum '{enum_type}'")
-            except Exception:
-                pass  # Value may already exist
-
         # Create indexes for new columns (idempotent)
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_sms_messages_vendor ON sms_messages(vendor_id)"
@@ -98,6 +85,26 @@ async def run_migrations(engine):
                 ))
             except Exception:
                 pass  # Column may already be nullable or table may not exist yet
+
+    # Add new enum values — must run outside a transaction (autocommit)
+    from sqlalchemy.ext.asyncio import create_async_engine as _cae
+    raw_url = os.getenv("DATABASE_URL", "")
+    if raw_url.startswith("postgresql://"):
+        raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if raw_url:
+        tmp_engine = _cae(raw_url, isolation_level="AUTOCOMMIT")
+        try:
+            async with tmp_engine.connect() as raw_conn:
+                for enum_type, new_value in [("showingstatus", "no_show")]:
+                    try:
+                        await raw_conn.execute(text(
+                            f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{new_value}'"
+                        ))
+                        print(f"[DB] Added '{new_value}' to enum '{enum_type}'")
+                    except Exception as e:
+                        print(f"[DB] Enum migration note: {e}")
+        finally:
+            await tmp_engine.dispose()
 
 async def _seed_lease_default_terms(engine):
     """Seed the default Tenant Responsibilities Addendum if the table is empty."""
