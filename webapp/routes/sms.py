@@ -409,7 +409,7 @@ async def get_recent_conversations(request: Request):
                 "contact_name": showing.contact_name or renter_phone,
                 "contact_phone": renter_phone,
                 "property_address": showing.property_ref.address if showing.property_ref else "",
-                "status": showing.status.value,
+                "status": showing.status,
                 "last_message": (latest_msg.body[:50] + "..." if len(latest_msg.body) > 50 else latest_msg.body) if latest_msg else "",
                 "last_message_time": (latest_msg.created_at.isoformat() + "Z") if latest_msg and latest_msg.created_at else None,
                 "last_direction": latest_msg.direction.value if latest_msg else None,
