@@ -3,6 +3,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -93,7 +94,7 @@ async def assets_dashboard(request: Request):
     })
 
 
-def _parse_decimal(val: str | None) -> Decimal | None:
+def _parse_decimal(val: Optional[str]) -> Optional[Decimal]:
     if not val or val.strip() == "":
         return None
     try:
@@ -102,7 +103,7 @@ def _parse_decimal(val: str | None) -> Decimal | None:
         return None
 
 
-def _parse_date(val: str | None):
+def _parse_date(val: Optional[str]):
     if not val or val.strip() == "":
         return None
     try:
@@ -111,7 +112,7 @@ def _parse_date(val: str | None):
         return None
 
 
-def _parse_int(val: str | None) -> int | None:
+def _parse_int(val: Optional[str]) -> Optional[int]:
     if not val or val.strip() == "":
         return None
     try:

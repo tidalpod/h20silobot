@@ -17,6 +17,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from typing import Optional
+
 import aiohttp
 import jwt
 
@@ -37,7 +39,7 @@ _access_token = None
 _token_expires_at = 0
 
 
-def _get_private_key() -> str | None:
+def _get_private_key() -> Optional[str]:
     """Get DocuSign private key from env var content or file path."""
     if config.docusign_private_key:
         return config.docusign_private_key
