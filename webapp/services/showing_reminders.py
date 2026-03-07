@@ -102,7 +102,7 @@ async def check_and_send_reminders():
                 )
                 .where(
                     Showing.scheduled_date == today,
-                    Showing.status.in_([ShowingStatus.SCHEDULED, ShowingStatus.CONFIRMED]),
+                    Showing.status.in_([ShowingStatus.SCHEDULED.value, ShowingStatus.CONFIRMED.value]),
                     Showing.reminder_sent_at.is_(None),
                 )
             )

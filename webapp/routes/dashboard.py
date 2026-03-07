@@ -280,7 +280,7 @@ async def dashboard(request: Request):
         showing_threshold = today + timedelta(days=7)
         upcoming_showings_result = await session.execute(
             select(func.count(Showing.id)).where(
-                Showing.status.in_([ShowingStatus.SCHEDULED, ShowingStatus.CONFIRMED]),
+                Showing.status.in_([ShowingStatus.SCHEDULED.value, ShowingStatus.CONFIRMED.value]),
                 Showing.scheduled_date >= today,
                 Showing.scheduled_date <= showing_threshold,
             )
