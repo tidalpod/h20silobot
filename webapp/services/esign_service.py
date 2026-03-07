@@ -548,6 +548,13 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
 
 async def _send_signing_email(signer, envelope, lease, token: str):
     """Send the 'Please sign' email with unique signing link."""
+    try:
+        return await _send_signing_email_inner(signer, envelope, lease, token)
+    except Exception as e:
+        logger.error(f"[ESIGN] Exception sending signing email to {signer.email}: {e}", exc_info=True)
+
+
+async def _send_signing_email_inner(signer, envelope, lease, token: str):
     from webapp.services.email_service import email_service
 
     signing_url = f"{web_config.site_url.rstrip('/')}/sign/{token}"
@@ -601,14 +608,17 @@ async def _send_signing_email(signer, envelope, lease, token: str):
         f"Blue Deer Property Management"
     )
 
+    logger.info(f"[ESIGN] Sending signing email to {signer.email} (configured: {email_service.is_configured})")
     result = await email_service.send_email(
         to=signer.email,
         subject=subject,
         body=text_body,
         html_body=html_body,
     )
-    if not result.success:
-        logger.error(f"Failed to send signing email to {signer.email}: {result.error_message}")
+    if result.success:
+        logger.info(f"[ESIGN] Signing email sent to {signer.email}: {result.message_id}")
+    else:
+        logger.error(f"[ESIGN] Failed to send signing email to {signer.email}: {result.error_message}")
 
 
 async def _send_completion_emails(envelope_id: int, session=None):
