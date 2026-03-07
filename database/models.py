@@ -1414,7 +1414,7 @@ class Showing(Base):
     scheduled_date = Column(Date, nullable=False)
     scheduled_time = Column(String(5), nullable=False)  # "14:30" format
 
-    status = Column(Enum(ShowingStatus), nullable=False, default=ShowingStatus.SCHEDULED)
+    status = Column(String(20), nullable=False, default=ShowingStatus.SCHEDULED.value)
 
     # Contact info for the person being shown in
     contact_name = Column(String(100), nullable=True)

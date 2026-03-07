@@ -197,7 +197,7 @@ async def list_showings(
             )
 
             if status:
-                query = query.where(Showing.status == ShowingStatus(status))
+                query = query.where(Showing.status == status)
             if showing_type:
                 query = query.where(Showing.showing_type == ShowingType(showing_type))
             if property_id:
@@ -325,7 +325,7 @@ async def create_showing(request: Request):
             description=form.get("description", ""),
             scheduled_date=datetime.strptime(date_str, "%Y-%m-%d").date(),
             scheduled_time=time_str,
-            status=ShowingStatus.SCHEDULED,
+            status=ShowingStatus.SCHEDULED.value,
             contact_name=form.get("contact_name", ""),
             contact_phone=form.get("contact_phone", ""),
             notes=form.get("notes", ""),
@@ -483,7 +483,7 @@ async def cancel_showing(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/showings", status_code=303)
 
-        showing.status = ShowingStatus.CANCELLED
+        showing.status = ShowingStatus.CANCELLED.value
         showing.updated_at = datetime.utcnow()
 
     return RedirectResponse(url=f"/showings/{showing_id}", status_code=303)
@@ -504,7 +504,7 @@ async def complete_showing(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/showings", status_code=303)
 
-        showing.status = ShowingStatus.COMPLETED
+        showing.status = ShowingStatus.COMPLETED.value
         showing.updated_at = datetime.utcnow()
 
     return RedirectResponse(url=f"/showings/{showing_id}", status_code=303)
@@ -550,7 +550,7 @@ async def mark_no_show(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/showings", status_code=303)
 
-        showing.status = ShowingStatus.NO_SHOW
+        showing.status = ShowingStatus.NO_SHOW.value
         showing.notes = (showing.notes or "") + "\n[NO SHOW - " + datetime.utcnow().strftime('%Y-%m-%d %H:%M') + "]"
         showing.updated_at = datetime.utcnow()
 
@@ -658,7 +658,7 @@ async def reschedule_showing(request: Request, showing_id: int):
 
         showing.scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         showing.scheduled_time = time_str
-        showing.status = ShowingStatus.RESCHEDULED
+        showing.status = ShowingStatus.RESCHEDULED.value
         showing.updated_at = datetime.utcnow()
 
         new_date_str = showing.scheduled_date.strftime('%b %d, %Y')

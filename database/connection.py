@@ -86,25 +86,15 @@ async def run_migrations(engine):
             except Exception:
                 pass  # Column may already be nullable or table may not exist yet
 
-    # Add new enum values — must run outside a transaction (autocommit)
-    from sqlalchemy.ext.asyncio import create_async_engine as _cae
-    raw_url = os.getenv("DATABASE_URL", "")
-    if raw_url.startswith("postgresql://"):
-        raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if raw_url:
-        tmp_engine = _cae(raw_url, isolation_level="AUTOCOMMIT")
+    # Convert showings.status from native enum to VARCHAR (allows adding new values without ALTER TYPE)
+    async with engine.begin() as conn:
         try:
-            async with tmp_engine.connect() as raw_conn:
-                for enum_type, new_value in [("showingstatus", "no_show"), ("showingstatus", "rescheduled")]:
-                    try:
-                        await raw_conn.execute(text(
-                            f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{new_value}'"
-                        ))
-                        print(f"[DB] Added '{new_value}' to enum '{enum_type}'")
-                    except Exception as e:
-                        print(f"[DB] Enum migration note: {e}")
-        finally:
-            await tmp_engine.dispose()
+            await conn.execute(text(
+                "ALTER TABLE showings ALTER COLUMN status TYPE VARCHAR(20) USING status::text"
+            ))
+            print("[DB] Converted showings.status from enum to VARCHAR(20)")
+        except Exception as e:
+            pass  # Already converted or column doesn't exist
 
 async def _seed_lease_default_terms(engine):
     """Seed the default Tenant Responsibilities Addendum if the table is empty."""
