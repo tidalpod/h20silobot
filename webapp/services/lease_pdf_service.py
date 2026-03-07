@@ -208,8 +208,15 @@ def _build_section_2(data: dict) -> list:
     return provisions
 
 
-def generate_lease_html(data: dict, property_info: dict, tenant_info: dict, landlord_info: dict) -> str:
-    """Generate the full lease HTML from data + boilerplate."""
+def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
+                        landlord_info: dict, signatures: dict = None) -> str:
+    """Generate the full lease HTML from data + boilerplate.
+
+    signatures: optional dict of signature data for e-signed leases.
+        Keys are like "tenant_5", "landlord_3", values have:
+        {"name", "role", "image_path", "signed_at", "ip_address"}
+    """
+    import base64
     section_2 = _build_section_2(data)
 
     # Build tenant list
@@ -229,6 +236,21 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict, land
 
     additional_terms = data.get("additional_terms", "")
 
+    # Convert signature image files to base64 data URIs for PDF embedding
+    sig_images = {}
+    if signatures:
+        for key, sig in signatures.items():
+            try:
+                with open(sig["image_path"], "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                sig_images[key] = {
+                    **sig,
+                    "image_data_uri": f"data:image/png;base64,{b64}",
+                }
+            except Exception as e:
+                logger.warning(f"Could not read signature image {sig.get('image_path')}: {e}")
+                sig_images[key] = sig
+
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     template = env.get_template("leases/lease_pdf_template.html")
 
@@ -246,6 +268,7 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict, land
         michigan_security_deposit=MICHIGAN_SECURITY_DEPOSIT_LAW,
         michigan_lead_paint=MICHIGAN_LEAD_PAINT_DISCLOSURE if data.get("lead_paint_disclosure") else None,
         additional_terms=additional_terms,
+        signatures=sig_images if sig_images else None,
         format_date=_format_date,
         format_currency=_format_currency,
         generated_date=datetime.utcnow().strftime("%B %d, %Y"),
@@ -274,6 +297,40 @@ def generate_lease_pdf(data: dict, property_info: dict, tenant_info: dict, landl
 
     file_size = filepath.stat().st_size
     file_url = f"/uploads/leases/{filename}"
+
+    return {
+        "file_url": file_url,
+        "file_path": str(filepath),
+        "file_name": filename,
+        "file_size": file_size,
+    }
+
+
+def generate_signed_lease_pdf(data: dict, property_info: dict, tenant_info: dict,
+                              landlord_info: dict, signatures: dict) -> dict:
+    """Generate a signed lease PDF with embedded signature images. Returns file info."""
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        logger.error("weasyprint not installed — cannot generate signed PDF")
+        return {"error": "PDF generation not available (weasyprint not installed)"}
+
+    html = generate_lease_html(data, property_info, tenant_info, landlord_info, signatures=signatures)
+
+    signed_dir = LEASE_PDF_DIR / "signed"
+    signed_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"signed_{uuid.uuid4().hex[:12]}.pdf"
+    filepath = signed_dir / filename
+
+    try:
+        HTML(string=html).write_pdf(str(filepath))
+    except Exception as e:
+        logger.error(f"Signed PDF generation failed: {e}")
+        return {"error": f"Signed PDF generation failed: {str(e)}"}
+
+    file_size = filepath.stat().st_size
+    file_url = f"/uploads/leases/signed/{filename}"
 
     return {
         "file_url": file_url,

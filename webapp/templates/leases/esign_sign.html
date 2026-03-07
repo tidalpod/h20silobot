@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign Document — Blue Deer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #sig-canvas {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            cursor: crosshair;
+            touch-action: none;
+            background: #fff;
+        }
+        #sig-canvas.has-signature { border-color: #2563eb; border-style: solid; }
+        .tab-btn.active { background: #1e40af; color: #fff; }
+        .tab-btn:not(.active) { background: #f3f4f6; color: #374151; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-blue-800 text-white">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        <div>
+            <h1 class="text-lg font-bold">Blue Deer Property Management</h1>
+            <p class="text-blue-200 text-sm">Document Signing</p>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+    {% if request.query_params.get('error') %}
+    <div class="p-4 rounded-lg bg-red-50 border border-red-200">
+        <p class="text-sm font-medium text-red-800">Please provide your signature before submitting.</p>
+    </div>
+    {% endif %}
+
+    <!-- Document Info -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-2">{{ lease.title if lease else 'Document' }}</h2>
+        {% if property_address %}
+        <p class="text-sm text-gray-600">Property: <strong>{{ property_address }}</strong></p>
+        {% endif %}
+        <p class="text-sm text-gray-600 mt-1">Signing as: <strong>{{ signer.name }}</strong> ({{ signer.role|title }})</p>
+    </div>
+
+    <!-- PDF Preview -->
+    {% if lease and lease.file_url %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-700">Document Preview</h3>
+        </div>
+        <iframe src="{{ lease.file_url }}" class="w-full" style="height: 600px;" frameborder="0"></iframe>
+    </div>
+    {% endif %}
+
+    <!-- Signature Capture -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Your Signature</h3>
+
+        <!-- Tabs: Draw / Type -->
+        <div class="flex gap-2 mb-4">
+            <button type="button" class="tab-btn active px-4 py-2 rounded-lg text-sm font-medium transition-colors" data-tab="draw" onclick="switchTab('draw')">Draw</button>
+            <button type="button" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors" data-tab="type" onclick="switchTab('type')">Type</button>
+        </div>
+
+        <!-- Draw Tab -->
+        <div id="tab-draw">
+            <canvas id="sig-canvas" width="500" height="160"></canvas>
+            <div class="mt-2 flex justify-end">
+                <button type="button" onclick="clearCanvas()" class="text-sm text-gray-500 hover:text-gray-700">Clear</button>
+            </div>
+        </div>
+
+        <!-- Type Tab -->
+        <div id="tab-type" class="hidden">
+            <input type="text" id="typed-sig" placeholder="Type your full name" maxlength="100"
+                   class="w-full rounded-lg border border-gray-300 px-4 py-3 text-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   style="font-family: 'Brush Script MT', 'Segoe Script', cursive; font-size: 28px;"
+                   oninput="renderTypedSignature()">
+            <canvas id="typed-canvas" width="500" height="160" class="mt-3 rounded-lg border border-gray-200 bg-white"></canvas>
+        </div>
+
+        <!-- Consent + Submit -->
+        <form method="POST" action="/sign/{{ token }}" id="sign-form" class="mt-6 space-y-4">
+            <input type="hidden" name="signature_data" id="signature-data">
+            <input type="hidden" name="signature_type" id="signature-type" value="draw">
+
+            <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="consent-check" required
+                       class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-sm text-gray-700">
+                    I agree that my electronic signature is the legal equivalent of my manual signature on this document.
+                    I consent to be legally bound by the terms of this document.
+                </span>
+            </label>
+
+            <button type="submit" id="sign-btn" disabled
+                    class="w-full px-6 py-3 rounded-lg text-base font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-sm transition-colors">
+                Sign Document
+            </button>
+        </form>
+
+        <!-- Decline -->
+        <details class="mt-4">
+            <summary class="text-sm text-gray-400 cursor-pointer hover:text-gray-600">I decline to sign</summary>
+            <form method="POST" action="/sign/{{ token }}/decline" class="mt-3 space-y-3">
+                <textarea name="reason" placeholder="Reason for declining (optional)" rows="2"
+                          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+                <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200"
+                        onclick="return confirm('Are you sure you want to decline signing this document?')">
+                    Decline to Sign
+                </button>
+            </form>
+        </details>
+    </div>
+</main>
+
+<script>
+// === Canvas Drawing ===
+const canvas = document.getElementById('sig-canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+let hasDrawn = false;
+
+// High-DPI support
+function setupCanvas(cvs, c) {
+    const rect = cvs.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = rect.width * dpr;
+    cvs.height = 160 * dpr;
+    cvs.style.width = rect.width + 'px';
+    cvs.style.height = '160px';
+    c.scale(dpr, dpr);
+    c.strokeStyle = '#111';
+    c.lineWidth = 2.5;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+}
+
+function initCanvas() {
+    setupCanvas(canvas, ctx);
+}
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+canvas.addEventListener('mousedown', e => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; canvas.classList.add('has-signature'); updateSubmitState(); });
+canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('mouseleave', () => drawing = false);
+
+// Touch support
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); }, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; canvas.classList.add('has-signature'); updateSubmitState(); }, { passive: false });
+canvas.addEventListener('touchend', () => drawing = false);
+
+function clearCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    hasDrawn = false;
+    canvas.classList.remove('has-signature');
+    updateSubmitState();
+}
+
+// === Typed Signature ===
+const typedCanvas = document.getElementById('typed-canvas');
+const typedCtx = typedCanvas.getContext('2d');
+
+function setupTypedCanvas() {
+    const rect = typedCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    typedCanvas.width = rect.width * dpr;
+    typedCanvas.height = 160 * dpr;
+    typedCanvas.style.width = rect.width + 'px';
+    typedCanvas.style.height = '160px';
+    typedCtx.scale(dpr, dpr);
+}
+
+function renderTypedSignature() {
+    const text = document.getElementById('typed-sig').value;
+    const dpr = window.devicePixelRatio || 1;
+    const w = typedCanvas.width / dpr;
+    const h = typedCanvas.height / dpr;
+    typedCtx.clearRect(0, 0, w, h);
+    if (text) {
+        typedCtx.font = 'italic 36px "Brush Script MT", "Segoe Script", cursive';
+        typedCtx.fillStyle = '#111';
+        typedCtx.textBaseline = 'middle';
+        typedCtx.fillText(text, 20, h / 2);
+    }
+    updateSubmitState();
+}
+
+// === Tab Switching ===
+let activeTab = 'draw';
+function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('tab-draw').classList.toggle('hidden', tab !== 'draw');
+    document.getElementById('tab-type').classList.toggle('hidden', tab !== 'type');
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.getElementById('signature-type').value = tab;
+    updateSubmitState();
+}
+
+// === Form Submission ===
+function updateSubmitState() {
+    const consent = document.getElementById('consent-check').checked;
+    let hasSig = false;
+    if (activeTab === 'draw') {
+        hasSig = hasDrawn;
+    } else {
+        hasSig = document.getElementById('typed-sig').value.trim().length > 0;
+    }
+    document.getElementById('sign-btn').disabled = !(consent && hasSig);
+}
+
+document.getElementById('consent-check').addEventListener('change', updateSubmitState);
+
+document.getElementById('sign-form').addEventListener('submit', function(e) {
+    let dataUrl;
+    if (activeTab === 'draw') {
+        dataUrl = canvas.toDataURL('image/png');
+    } else {
+        dataUrl = typedCanvas.toDataURL('image/png');
+    }
+    document.getElementById('signature-data').value = dataUrl;
+});
+
+// Initialize
+window.addEventListener('load', () => {
+    initCanvas();
+    setupTypedCanvas();
+});
+window.addEventListener('resize', () => {
+    // Preserve drawing state note: resize clears canvas
+    initCanvas();
+    setupTypedCanvas();
+});
+</script>
+
+</body>
+</html>

@@ -13,9 +13,9 @@ from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import LeaseDocument, LeaseStatus, Property, Tenant, ESignEnvelope, ESignStatus
+from database.models import LeaseDocument, LeaseStatus, Property, Tenant, ESignEnvelope, ESignSigner, ESignStatus
 from webapp.auth.dependencies import get_current_user
-from webapp.services import docusign_service
+from webapp.services import esign_service
 
 router = APIRouter(tags=["leases"])
 
@@ -203,10 +203,11 @@ async def lease_detail(request: Request, lease_id: int):
         if not lease:
             return RedirectResponse(url="/leases", status_code=303)
 
-        # Load e-sign envelopes for this lease
+        # Load e-sign envelopes with signer records
         esign_result = await session.execute(
             select(ESignEnvelope)
             .where(ESignEnvelope.lease_document_id == lease_id)
+            .options(selectinload(ESignEnvelope.signer_records))
             .order_by(desc(ESignEnvelope.created_at))
         )
         esign_envelopes = esign_result.scalars().all()
@@ -218,7 +219,6 @@ async def lease_detail(request: Request, lease_id: int):
             "user": user,
             "lease": lease,
             "esign_envelopes": esign_envelopes,
-            "docusign_configured": docusign_service.is_configured(),
         },
     )
 
@@ -342,122 +342,53 @@ async def download_lease(request: Request, lease_id: int):
 
 
 # =============================================================================
-# E-Sign (DocuSign) Routes
+# E-Sign (In-House) Routes
 # =============================================================================
 
 @router.post("/{lease_id}/esign")
 async def send_for_esign(request: Request, lease_id: int):
-    """Send a lease document for e-signature via DocuSign."""
+    """Send a lease document for e-signature (in-house)."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
     form = await request.form()
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(LeaseDocument)
-            .where(LeaseDocument.id == lease_id)
-            .options(
-                selectinload(LeaseDocument.property_ref),
-                selectinload(LeaseDocument.tenant_ref),
-            )
-        )
-        lease = result.scalar_one_or_none()
-        if not lease:
-            return RedirectResponse(url="/leases", status_code=303)
+    # Build signers from form
+    signer_names = form.getlist("signer_name")
+    signer_emails = form.getlist("signer_email")
+    signer_roles = form.getlist("signer_role")
+    signers = []
+    for name, email, role in zip(signer_names, signer_emails, signer_roles):
+        if name and email:
+            signers.append({"name": name, "email": email, "role": role})
 
-        # Build signers from form
-        signer_names = form.getlist("signer_name")
-        signer_emails = form.getlist("signer_email")
-        signer_roles = form.getlist("signer_role")
-        signers = []
-        for name, email, role in zip(signer_names, signer_emails, signer_roles):
-            if name and email:
-                signers.append({"name": name, "email": email, "role": role})
-
-        if not signers:
-            return RedirectResponse(
-                url=f"/leases/{lease_id}?error=no_signers",
-                status_code=303,
-            )
-
-        # Resolve PDF file path
-        relative_path = lease.file_url.lstrip("/uploads/")
-        pdf_path = str(Path(UPLOAD_BASE) / relative_path)
-
-        # Send via DocuSign
-        ds_result = await docusign_service.send_for_signature(
-            pdf_path=pdf_path,
-            document_name=lease.title,
-            signers=signers,
+    if not signers:
+        return RedirectResponse(
+            url=f"/leases/{lease_id}?error=no_signers",
+            status_code=303,
         )
 
-        if "error" in ds_result:
-            return RedirectResponse(
-                url=f"/leases/{lease_id}?error={ds_result['error'][:100]}",
-                status_code=303,
-            )
+    result = await esign_service.create_signing_request(
+        lease_document_id=lease_id,
+        signers=signers,
+    )
 
-        # Create envelope record
-        envelope = ESignEnvelope(
-            lease_document_id=lease_id,
-            envelope_id=ds_result["envelope_id"],
-            status=ESignStatus.SENT,
-            signers=json.dumps(signers),
-            sent_at=datetime.utcnow(),
+    if "error" in result:
+        return RedirectResponse(
+            url=f"/leases/{lease_id}?error={result['error'][:100]}",
+            status_code=303,
         )
-        session.add(envelope)
 
     return RedirectResponse(url=f"/leases/{lease_id}?esign=sent", status_code=303)
 
 
 @router.post("/{lease_id}/esign/{envelope_id}/refresh")
 async def refresh_esign_status(request: Request, lease_id: int, envelope_id: int):
-    """Check DocuSign for updated envelope status."""
+    """Refresh e-sign status — in-house status is already live, just redirect."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(ESignEnvelope).where(ESignEnvelope.id == envelope_id)
-        )
-        envelope = result.scalar_one_or_none()
-        if not envelope or not envelope.envelope_id:
-            return RedirectResponse(url=f"/leases/{lease_id}", status_code=303)
-
-        ds_status = await docusign_service.get_envelope_status(envelope.envelope_id)
-        if "error" in ds_status:
-            return RedirectResponse(
-                url=f"/leases/{lease_id}?error=status_check_failed",
-                status_code=303,
-            )
-
-        # Map DocuSign status to our enum
-        status_map = {
-            "sent": ESignStatus.SENT,
-            "delivered": ESignStatus.DELIVERED,
-            "completed": ESignStatus.COMPLETED,
-            "declined": ESignStatus.DECLINED,
-            "voided": ESignStatus.VOIDED,
-        }
-        new_status = status_map.get(ds_status["status"], envelope.status)
-        envelope.status = new_status
-        envelope.updated_at = datetime.utcnow()
-
-        if ds_status.get("completed_at") and new_status == ESignStatus.COMPLETED:
-            envelope.completed_at = datetime.utcnow()
-
-            # Download the signed document
-            signed = await docusign_service.download_signed_document(envelope.envelope_id)
-            if "file_url" in signed:
-                envelope.signed_file_url = signed["file_url"]
-
-        # Update signer info
-        if ds_status.get("signers"):
-            envelope.signers = json.dumps(ds_status["signers"])
-
     return RedirectResponse(url=f"/leases/{lease_id}", status_code=303)
 
 
@@ -468,17 +399,19 @@ async def void_esign(request: Request, lease_id: int, envelope_id: int):
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(ESignEnvelope).where(ESignEnvelope.id == envelope_id)
-        )
-        envelope = result.scalar_one_or_none()
-        if not envelope or not envelope.envelope_id:
-            return RedirectResponse(url=f"/leases/{lease_id}", status_code=303)
+    form = await request.form()
+    reason = form.get("void_reason", "")
 
-        void_result = await docusign_service.void_envelope(envelope.envelope_id)
-        if "error" not in void_result:
-            envelope.status = ESignStatus.VOIDED
-            envelope.updated_at = datetime.utcnow()
-
+    result = await esign_service.void_envelope(envelope_id, reason=reason)
     return RedirectResponse(url=f"/leases/{lease_id}", status_code=303)
+
+
+@router.post("/{lease_id}/esign/{envelope_id}/resend/{signer_id}")
+async def resend_signer_email(request: Request, lease_id: int, envelope_id: int, signer_id: int):
+    """Resend the signing email for a specific signer."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    await esign_service.resend_signing_email(signer_id)
+    return RedirectResponse(url=f"/leases/{lease_id}?esign=resent", status_code=303)

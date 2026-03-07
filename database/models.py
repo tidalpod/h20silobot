@@ -1362,18 +1362,24 @@ class LeaseDefaultTerms(Base):
 
 
 class ESignEnvelope(Base):
-    """DocuSign e-signature envelope tracking."""
+    """E-signature envelope tracking (in-house or legacy DocuSign)."""
     __tablename__ = "esign_envelopes"
 
     id = Column(Integer, primary_key=True)
     lease_document_id = Column(Integer, ForeignKey("lease_documents.id", ondelete="CASCADE"), nullable=False)
 
-    # DocuSign envelope info
+    # DocuSign envelope info (legacy — kept for old records)
     envelope_id = Column(String(100), nullable=True, unique=True)
     status = Column(Enum(ESignStatus), default=ESignStatus.CREATED)
 
-    # Signers (JSON list: [{"name": ..., "email": ..., "role": "tenant|landlord"}])
+    # Signing mode: "inhouse" (new) or "docusign" (legacy)
+    signing_mode = Column(String(20), default="inhouse")
+
+    # Signers (JSON list — legacy; new records use ESignSigner rows)
     signers = Column(Text, nullable=True)
+
+    # Void reason (admin can void with explanation)
+    void_reason = Column(String(500), nullable=True)
 
     # Timestamps
     sent_at = Column(DateTime, nullable=True)
@@ -1388,6 +1394,8 @@ class ESignEnvelope(Base):
 
     # Relationships
     lease_document_ref = relationship("LeaseDocument", backref="esign_envelopes")
+    signer_records = relationship("ESignSigner", back_populates="envelope", cascade="all, delete-orphan")
+    audit_logs = relationship("ESignAuditLog", back_populates="envelope", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_esign_envelopes_lease", "lease_document_id"),
@@ -1395,7 +1403,73 @@ class ESignEnvelope(Base):
     )
 
     def __repr__(self):
-        return f"<ESignEnvelope {self.id}: {self.envelope_id} ({self.status})>"
+        return f"<ESignEnvelope {self.id}: {self.signing_mode} ({self.status})>"
+
+
+class ESignSigner(Base):
+    """Per-signer tracking for in-house e-signatures."""
+    __tablename__ = "esign_signers"
+
+    id = Column(Integer, primary_key=True)
+    envelope_id = Column(Integer, ForeignKey("esign_envelopes.id", ondelete="CASCADE"), nullable=False)
+
+    name = Column(String(200), nullable=False)
+    email = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, default="tenant")  # tenant/landlord/cosigner
+
+    status = Column(String(20), nullable=False, default="pending")  # pending/viewed/signed/declined
+    viewed_at = Column(DateTime, nullable=True)
+    signed_at = Column(DateTime, nullable=True)
+    declined_at = Column(DateTime, nullable=True)
+    decline_reason = Column(String(500), nullable=True)
+
+    # Signature capture
+    signature_file_url = Column(String(500), nullable=True)  # path to saved PNG
+    signature_type = Column(String(10), nullable=True)  # draw/type
+
+    # Audit fields captured at signing time
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    envelope = relationship("ESignEnvelope", back_populates="signer_records")
+
+    __table_args__ = (
+        Index("ix_esign_signers_envelope", "envelope_id"),
+        Index("ix_esign_signers_email", "email"),
+    )
+
+    def __repr__(self):
+        return f"<ESignSigner {self.id}: {self.name} ({self.status})>"
+
+
+class ESignAuditLog(Base):
+    """Audit trail for all e-sign actions."""
+    __tablename__ = "esign_audit_logs"
+
+    id = Column(Integer, primary_key=True)
+    envelope_id = Column(Integer, ForeignKey("esign_envelopes.id", ondelete="CASCADE"), nullable=False)
+    signer_id = Column(Integer, ForeignKey("esign_signers.id", ondelete="SET NULL"), nullable=True)
+
+    action = Column(String(50), nullable=False)  # envelope_created, email_sent, link_opened, signed, declined, voided, pdf_generated
+    details = Column(Text, nullable=True)  # JSON text for extra context
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    envelope = relationship("ESignEnvelope", back_populates="audit_logs")
+    signer = relationship("ESignSigner")
+
+    __table_args__ = (
+        Index("ix_esign_audit_envelope", "envelope_id"),
+    )
+
+    def __repr__(self):
+        return f"<ESignAuditLog {self.id}: {self.action}>"
 
 
 class Showing(Base):

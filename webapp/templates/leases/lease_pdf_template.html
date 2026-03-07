@@ -271,6 +271,26 @@
     Residential Rental Agreement and agree to be bound by all of its provisions.
 </p>
 
+{% if signatures %}
+{# ── E-Signed: render captured signature images ── #}
+<div class="signature-block">
+    {% for key, sig in signatures.items() %}
+    <div class="signature-row">
+        <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">{{ sig.role|upper }}:</h3>
+        {% if sig.image_data_uri %}
+        <img src="{{ sig.image_data_uri }}" style="height: 50pt; max-width: 300pt;" />
+        {% else %}
+        <p><span class="signature-line">&nbsp;</span></p>
+        {% endif %}
+        <p class="signature-label">
+            {{ sig.name }} — Electronically signed on {{ sig.signed_at }}
+            {% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+{# ── Blank signature lines (unsigned / print version) ── #}
 <div class="signature-block">
     <h3>LANDLORD:</h3>
     <div class="signature-row">
@@ -299,6 +319,7 @@
     {% endfor %}
     {% endif %}
 </div>
+{% endif %}
 
 </body>
 </html>

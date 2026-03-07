@@ -53,6 +53,9 @@ async def run_migrations(engine):
         ("work_orders", "payment_method", "VARCHAR(50)"),
         ("work_orders", "payment_notes", "TEXT"),
         ("work_orders", "payment_receipt_url", "VARCHAR(500)"),
+        # In-house e-signing columns on existing esign_envelopes
+        ("esign_envelopes", "signing_mode", "VARCHAR(20) DEFAULT 'inhouse'"),
+        ("esign_envelopes", "void_reason", "VARCHAR(500)"),
     ]
 
     async with engine.begin() as conn:

@@ -37,6 +37,9 @@ class WebConfig:
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 
+    # Site URL (for absolute links in signing emails)
+    site_url: str = os.getenv("SITE_URL", "https://bluedeer.space")
+
     # Database (shared with bot)
     database_url: str = os.getenv("DATABASE_URL", "")
 

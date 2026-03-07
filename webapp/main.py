@@ -154,11 +154,13 @@ from .routes.entity_accounts import router as entity_accounts_router
 from .routes.lease_builder import router as lease_builder_router
 from .routes.assets import router as assets_router
 from .routes.pwa import router as pwa_router
+from .routes.esign_public import router as esign_public_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
 
 # PWA routes must be registered before portal/vendor prefix routes
 app.include_router(pwa_router)
+app.include_router(esign_public_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(assets_router, prefix="/assets")

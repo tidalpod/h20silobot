@@ -97,40 +97,85 @@
 
         <!-- E-Sign Section -->
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
-            <h2 class="text-sm font-semibold text-gray-700 mb-3">E-Sign (DocuSign)</h2>
+            <h2 class="text-sm font-semibold text-gray-700 mb-3">E-Signature</h2>
 
             {% if request.query_params.get('esign') == 'sent' %}
             <div class="mb-3 p-3 rounded-lg bg-green-50 border border-green-200">
-                <p class="text-xs font-medium text-green-800">Envelope sent for signature!</p>
+                <p class="text-xs font-medium text-green-800">Signing request sent!</p>
+            </div>
+            {% endif %}
+            {% if request.query_params.get('esign') == 'resent' %}
+            <div class="mb-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p class="text-xs font-medium text-blue-800">Signing email resent.</p>
             </div>
             {% endif %}
 
             {% if esign_envelopes %}
             <div class="space-y-3 mb-4">
                 {% for env in esign_envelopes %}
-                <div class="p-3 rounded-lg border {% if env.status.value == 'completed' %}border-green-200 bg-green-50{% elif env.status.value == 'declined' or env.status.value == 'voided' %}border-red-200 bg-red-50{% elif env.status.value == 'delivered' %}border-blue-200 bg-blue-50{% else %}border-yellow-200 bg-yellow-50{% endif %}">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-medium {% if env.status.value == 'completed' %}text-green-800{% elif env.status.value == 'declined' or env.status.value == 'voided' %}text-red-800{% elif env.status.value == 'delivered' %}text-blue-800{% else %}text-yellow-800{% endif %}">
-                            {% if env.status.value == 'completed' %}Completed{% elif env.status.value == 'sent' %}Sent{% elif env.status.value == 'delivered' %}Delivered{% elif env.status.value == 'declined' %}Declined{% elif env.status.value == 'voided' %}Voided{% else %}{{ env.status.value|title }}{% endif %}
+                <div class="p-3 rounded-lg border {% if env.status.value == 'completed' %}border-green-200 bg-green-50{% elif env.status.value == 'declined' or env.status.value == 'voided' %}border-red-200 bg-red-50{% else %}border-yellow-200 bg-yellow-50{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium {% if env.status.value == 'completed' %}text-green-800{% elif env.status.value == 'declined' or env.status.value == 'voided' %}text-red-800{% else %}text-yellow-800{% endif %}">
+                            {% if env.status.value == 'completed' %}Completed{% elif env.status.value == 'sent' %}Awaiting Signatures{% elif env.status.value == 'delivered' %}Delivered{% elif env.status.value == 'declined' %}Declined{% elif env.status.value == 'voided' %}Voided{% else %}{{ env.status.value|title }}{% endif %}
                         </span>
-                        <span class="text-xs text-gray-400">{{ env.created_at.strftime('%b %d') }}</span>
+                        <span class="text-xs text-gray-400">{{ env.created_at.strftime('%b %d, %Y') }}</span>
                     </div>
 
-                    {% if env.signers %}
+                    <!-- Per-signer status table -->
+                    {% if env.signer_records %}
+                    <div class="space-y-1.5 mb-2">
+                        {% for s in env.signer_records %}
+                        <div class="flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                {% if s.status == 'signed' %}
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                {% elif s.status == 'viewed' %}
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                {% elif s.status == 'declined' %}
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                {% else %}
+                                <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+                                {% endif %}
+                                <span class="text-gray-700 font-medium">{{ s.name }}</span>
+                                <span class="text-gray-400">({{ s.role|title }})</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                {% if s.status == 'signed' %}
+                                <span class="text-green-700">Signed {{ s.signed_at.strftime('%b %d') if s.signed_at else '' }}</span>
+                                {% elif s.status == 'viewed' %}
+                                <span class="text-blue-600">Viewed</span>
+                                {% elif s.status == 'declined' %}
+                                <span class="text-red-600">Declined</span>
+                                {% else %}
+                                <span class="text-gray-400">Pending</span>
+                                {% endif %}
+                                {% if s.status in ('pending', 'viewed') and env.status.value in ('sent', 'delivered') %}
+                                <form method="POST" action="/leases/{{ lease.id }}/esign/{{ env.id }}/resend/{{ s.id }}" class="inline">
+                                    <button type="submit" class="text-blue-500 hover:text-blue-700" title="Resend email">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% elif env.signers %}
+                    <!-- Legacy JSON signers display -->
                     <p class="text-xs text-gray-600 mb-2" data-signers="{{ env.signers|e }}"></p>
                     {% endif %}
 
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 pt-1 border-t border-gray-200/50">
                         {% if env.status.value in ['sent', 'delivered'] %}
-                        <form method="POST" action="/leases/{{ lease.id }}/esign/{{ env.id }}/refresh" class="inline">
-                            <button type="submit" class="text-xs text-blue-600 hover:text-blue-500 font-medium">Refresh Status</button>
-                        </form>
-                        <form method="POST" action="/leases/{{ lease.id }}/esign/{{ env.id }}/void" class="inline" onsubmit="return confirm('Void this e-sign request?')">
+                        <form method="POST" action="/leases/{{ lease.id }}/esign/{{ env.id }}/void" class="inline" onsubmit="return confirm('Void this e-sign request? All pending signers will be unable to sign.')">
                             <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium">Void</button>
                         </form>
                         {% endif %}
                         {% if env.signed_file_url %}
                         <a href="{{ env.signed_file_url }}" class="text-xs text-green-600 hover:text-green-500 font-medium" target="_blank">Download Signed</a>
+                        {% endif %}
+                        {% if env.void_reason %}
+                        <span class="text-xs text-gray-400">Reason: {{ env.void_reason }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -138,7 +183,7 @@
             </div>
             {% endif %}
 
-            {% if docusign_configured and lease.file_type == 'pdf' %}
+            {% if lease.file_type == 'pdf' %}
             <details class="{% if esign_envelopes %}border-t border-gray-100 pt-3{% endif %}">
                 <summary class="text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-500">Send for E-Signature</summary>
                 <form method="POST" action="/leases/{{ lease.id }}/esign" class="mt-3 space-y-3">
@@ -157,8 +202,6 @@
                     </button>
                 </form>
             </details>
-            {% elif not docusign_configured %}
-            <p class="text-xs text-gray-400">DocuSign not configured. Set DOCUSIGN_* environment variables to enable e-signing.</p>
             {% endif %}
         </div>
     </div>

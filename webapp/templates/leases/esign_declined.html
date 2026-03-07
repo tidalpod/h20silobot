@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Declined — Blue Deer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<header class="bg-blue-800 text-white">
+    <div class="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <h1 class="text-lg font-bold">Blue Deer Property Management</h1>
+    </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 py-12">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+        <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </div>
+
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Signing Declined</h2>
+        <p class="text-gray-600 mb-4">
+            {% if signer %}
+            {{ signer.name }}, you have declined to sign this document.
+            {% else %}
+            You have declined to sign this document.
+            {% endif %}
+        </p>
+        <p class="text-sm text-gray-500">
+            The property manager has been notified. If this was done in error, please contact them to request a new signing link.
+        </p>
+
+        <p class="text-sm text-gray-400 mt-6">You may close this window.</p>
+    </div>
+</main>
+
+</body>
+</html>
