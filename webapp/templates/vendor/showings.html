@@ -18,13 +18,13 @@
                     {% if s.property_ref %}{{ s.property_ref.address }}{% endif %}
                 </div>
             </div>
-            {% if s.status.value == 'scheduled' %}
+            {% if s.status == 'scheduled' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex-shrink-0">Scheduled</span>
-            {% elif s.status.value == 'confirmed' %}
+            {% elif s.status == 'confirmed' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 flex-shrink-0">Confirmed</span>
-            {% elif s.status.value == 'completed' %}
+            {% elif s.status == 'completed' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">Completed</span>
-            {% elif s.status.value == 'cancelled' %}
+            {% elif s.status == 'cancelled' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex-shrink-0">Cancelled</span>
             {% endif %}
         </div>
@@ -47,7 +47,7 @@
                 {% endif %}
             </div>
         </div>
-        {% if s.status.value == 'scheduled' %}
+        {% if s.status == 'scheduled' %}
         <div class="mt-2 pt-2 border-t border-gray-100">
             <span class="text-xs text-purple-600 font-medium">Tap to view & confirm</span>
         </div>
