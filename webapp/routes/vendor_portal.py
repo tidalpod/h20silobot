@@ -27,6 +27,23 @@ router = APIRouter(tags=["vendor-portal"])
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+def _fmt_time_12h(value):
+    """Convert '15:00' to '3:00 PM'"""
+    if not value:
+        return value
+    try:
+        parts = value.split(":")
+        h, m = int(parts[0]), parts[1]
+        ampm = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m} {ampm}"
+    except Exception:
+        return value
+
+
+templates.env.filters["time12"] = _fmt_time_12h
+
 # Upload directories
 UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
     "/app/uploads" if Path("/app/uploads").exists()

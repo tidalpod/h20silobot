@@ -71,7 +71,7 @@
             {{ status_badge(s.status) }}
         </div>
     </div>
-    <div class="text-xs text-gray-400 mt-1.5">{{ s.scheduled_date.strftime('%b %d, %Y') }} at {{ s.scheduled_time }}</div>
+    <div class="text-xs text-gray-400 mt-1.5">{{ s.scheduled_date.strftime('%b %d, %Y') }} at {{ s.scheduled_time|time12 }}</div>
 </a>
 {% endmacro %}
 
@@ -93,7 +93,7 @@
             <tr class="hover:bg-gray-50 transition-colors cursor-pointer {{ 'opacity-60' if muted }}" onclick="window.location='/showings/{{ s.id }}'">
                 <td class="px-6 py-4 text-sm text-gray-900">
                     {{ s.scheduled_date.strftime('%b %d, %Y') }}
-                    <div class="text-xs text-gray-500">{{ s.scheduled_time }}</div>
+                    <div class="text-xs text-gray-500">{{ s.scheduled_time|time12 }}</div>
                 </td>
                 <td class="px-6 py-4">
                     <div class="text-sm font-medium text-gray-900">{{ s.title }}</div>
