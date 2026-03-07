@@ -658,7 +658,7 @@ async def vendor_confirm_showing(request: Request, showing_id: int):
         if not showing:
             return RedirectResponse(url="/vendor/showings", status_code=303)
 
-        if showing.status == ShowingStatus.SCHEDULED.value:
+        if showing.status and showing.status.lower() == ShowingStatus.SCHEDULED.value:
             showing.status = ShowingStatus.CONFIRMED.value
             from datetime import datetime
             showing.updated_at = datetime.utcnow()

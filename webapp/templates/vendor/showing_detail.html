@@ -15,17 +15,18 @@
 <div class="portal-card p-4 mb-4">
     <div class="flex items-start justify-between gap-2 mb-3">
         <h1 class="text-lg font-bold text-gray-900">{{ showing.title }}</h1>
-        {% if showing.status == 'scheduled' %}
+        {% set st = showing.status|lower %}
+        {% if st == 'scheduled' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 font-medium flex-shrink-0">Scheduled</span>
-        {% elif showing.status == 'confirmed' %}
+        {% elif st == 'confirmed' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-800 font-medium flex-shrink-0">Confirmed</span>
-        {% elif showing.status == 'completed' %}
+        {% elif st == 'completed' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium flex-shrink-0">Completed</span>
-        {% elif showing.status == 'cancelled' %}
+        {% elif st == 'cancelled' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-medium flex-shrink-0">Cancelled</span>
-        {% elif showing.status == 'no_show' %}
+        {% elif st == 'no_show' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 font-medium flex-shrink-0">No Show</span>
-        {% elif showing.status == 'rescheduled' %}
+        {% elif st == 'rescheduled' %}
         <span class="text-xs px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 font-medium flex-shrink-0">Rescheduled</span>
         {% endif %}
     </div>
@@ -92,7 +93,7 @@
 {% endif %}
 
 <!-- Actions -->
-{% if showing.status == 'scheduled' %}
+{% if showing.status|lower == 'scheduled' %}
 <div class="mt-4">
     <form method="POST" action="/vendor/showings/{{ showing.id }}/confirm">
         <button type="submit" class="w-full bg-purple-700 text-white text-sm font-medium rounded-xl py-3 hover:bg-purple-600 transition-colors">

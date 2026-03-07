@@ -96,6 +96,15 @@ async def run_migrations(engine):
         except Exception as e:
             pass  # Already converted or column doesn't exist
 
+    # Normalize showings.status to lowercase (old enum stored as UPPERCASE)
+    async with engine.begin() as conn:
+        try:
+            await conn.execute(text(
+                "UPDATE showings SET status = LOWER(status) WHERE status != LOWER(status)"
+            ))
+        except Exception:
+            pass
+
 async def _seed_lease_default_terms(engine):
     """Seed the default Tenant Responsibilities Addendum if the table is empty."""
     default_content = """TENANT RESPONSIBILITIES ADDENDUM

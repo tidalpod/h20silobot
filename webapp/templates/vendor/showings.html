@@ -18,14 +18,19 @@
                     {% if s.property_ref %}{{ s.property_ref.address }}{% endif %}
                 </div>
             </div>
-            {% if s.status == 'scheduled' %}
+            {% set st = s.status|lower %}
+            {% if st == 'scheduled' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex-shrink-0">Scheduled</span>
-            {% elif s.status == 'confirmed' %}
+            {% elif st == 'confirmed' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 flex-shrink-0">Confirmed</span>
-            {% elif s.status == 'completed' %}
+            {% elif st == 'completed' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">Completed</span>
-            {% elif s.status == 'cancelled' %}
+            {% elif st == 'cancelled' %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex-shrink-0">Cancelled</span>
+            {% elif st == 'no_show' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 flex-shrink-0">No Show</span>
+            {% elif st == 'rescheduled' %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 flex-shrink-0">Rescheduled</span>
             {% endif %}
         </div>
         <div class="flex items-center justify-between">
@@ -47,7 +52,7 @@
                 {% endif %}
             </div>
         </div>
-        {% if s.status == 'scheduled' %}
+        {% if s.status|lower == 'scheduled' %}
         <div class="mt-2 pt-2 border-t border-gray-100">
             <span class="text-xs text-purple-600 font-medium">Tap to view & confirm</span>
         </div>

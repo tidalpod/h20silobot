@@ -25,17 +25,18 @@
 {# ── Macros for reusable card / table-row markup ── #}
 
 {% macro status_badge(status) %}
-{% if status == 'scheduled' %}
+{% set st = status|lower %}
+{% if st == 'scheduled' %}
 <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Scheduled</span>
-{% elif status == 'confirmed' %}
+{% elif st == 'confirmed' %}
 <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Confirmed</span>
-{% elif status == 'completed' %}
+{% elif st == 'completed' %}
 <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Completed</span>
-{% elif status == 'cancelled' %}
+{% elif st == 'cancelled' %}
 <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
-{% elif status == 'no_show' %}
+{% elif st == 'no_show' %}
 <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">No Show</span>
-{% elif status == 'rescheduled' %}
+{% elif st == 'rescheduled' %}
 <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Rescheduled</span>
 {% endif %}
 {% endmacro %}
