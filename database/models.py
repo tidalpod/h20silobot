@@ -95,6 +95,15 @@ class LeaseBuilderStatus(PyEnum):
     VOIDED = "voided"
 
 
+class ApplicationStatus(PyEnum):
+    PENDING = "pending"
+    SCREENING = "screening"
+    COMPLETED = "completed"
+    APPROVED = "approved"
+    DENIED = "denied"
+    CANCELLED = "cancelled"
+
+
 class ShowingType(PyEnum):
     INSPECTOR = "inspector"
     TENANT = "tenant"
@@ -1517,3 +1526,61 @@ class Showing(Base):
 
     def __repr__(self):
         return f"<Showing {self.id}: {self.title}>"
+
+
+# =============================================================================
+# Tenant Applications / Screening
+# =============================================================================
+
+class TenantApplication(Base):
+    """Prospective tenant application with screening integration"""
+    __tablename__ = "tenant_applications"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    # Applicant info
+    applicant_first_name = Column(String(100), nullable=False)
+    applicant_last_name = Column(String(100), nullable=False)
+    applicant_email = Column(String(255), nullable=False)
+    applicant_phone = Column(String(20), nullable=True)
+    applicant_current_address = Column(String(500), nullable=True)
+    applicant_employer = Column(String(255), nullable=True)
+    applicant_income = Column(Numeric(10, 2), nullable=True)
+    applicant_move_in_date = Column(Date, nullable=True)
+    applicant_num_occupants = Column(Integer, nullable=True)
+    has_section8_voucher = Column(Boolean, default=False)
+    voucher_amount = Column(Numeric(10, 2), nullable=True)
+    applicant_notes = Column(Text, nullable=True)
+
+    # TenantReportX screening
+    trx_order_id = Column(String(100), unique=True, nullable=True)
+    trx_report_url = Column(String(500), nullable=True)
+    trx_status = Column(String(50), nullable=True)
+    credit_score = Column(Integer, nullable=True)
+    criminal_records_found = Column(Boolean, nullable=True)
+    eviction_records_found = Column(Boolean, nullable=True)
+    screening_recommendation = Column(String(50), nullable=True)
+
+    # Application status
+    status = Column(Enum(ApplicationStatus), default=ApplicationStatus.PENDING, nullable=False)
+    landlord_notes = Column(Text, nullable=True)
+
+    # Timestamps
+    applied_at = Column(DateTime, default=datetime.utcnow)
+    screened_at = Column(DateTime, nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    property_ref = relationship("Property", backref="applications")
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_tenant_applications_property", "property_id"),
+        Index("ix_tenant_applications_status", "status"),
+        Index("ix_tenant_applications_email", "applicant_email"),
+    )
+
+    def __repr__(self):
+        return f"<TenantApplication {self.id}: {self.applicant_first_name} {self.applicant_last_name}>"

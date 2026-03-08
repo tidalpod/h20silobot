@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply | {{ property.address }} | Blue Deer Rentals</title>
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/listings" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
+                    <div>
+                        <h1 class="text-xl font-bold">Blue Deer Rentals</h1>
+                    </div>
+                </a>
+                <a href="/listings/{{ property.id }}" class="text-sm text-blue-100 hover:text-white transition-colors flex items-center gap-1">
+                    <span>&larr;</span> Back to Property
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Property Summary -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+            <div class="flex flex-col sm:flex-row">
+                {% if photo %}
+                <div class="sm:w-48 h-40 sm:h-auto flex-shrink-0">
+                    <img src="{{ photo }}" alt="{{ property.address }}" class="w-full h-full object-cover">
+                </div>
+                {% endif %}
+                <div class="p-6 flex-1">
+                    <h2 class="text-xl font-bold text-gray-900">{{ property.address }}</h2>
+                    <p class="text-gray-500 text-sm mt-1">{{ property.city or 'Detroit' }}, {{ property.state or 'MI' }} {{ property.zip_code or '' }}</p>
+                    <div class="flex items-center gap-4 mt-3">
+                        {% if rent %}
+                        <span class="text-lg font-bold text-blue-600">${{ "{:,.0f}".format(rent) }}/mo</span>
+                        {% endif %}
+                        {% if property.bedrooms %}
+                        <span class="text-sm text-gray-600">{{ property.bedrooms }} bed</span>
+                        {% endif %}
+                        {% if property.bathrooms %}
+                        <span class="text-sm text-gray-600">{{ property.bathrooms }} bath</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Application Form -->
+        <form method="POST" action="/apply/{{ property.id }}">
+            <div class="space-y-6">
+                <!-- Personal Information -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Personal Information</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                            <input type="text" name="first_name" required
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                            <input type="text" name="last_name" required
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                            <input type="email" name="email" required
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                            <input type="tel" name="phone"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Current Address</label>
+                            <input type="text" name="current_address"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employment & Income -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Employment & Income</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Current Employer</label>
+                            <input type="text" name="employer"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Income</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-gray-400">$</span>
+                                <input type="text" name="income" placeholder="0.00"
+                                       class="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 8 Voucher -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Housing Voucher</h3>
+                    <div class="space-y-4">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="has_section8_voucher" id="voucher-toggle"
+                                   onchange="document.getElementById('voucher-fields').classList.toggle('hidden', !this.checked)"
+                                   class="rounded text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm text-gray-700">I have a Section 8 / Housing Choice Voucher</span>
+                        </label>
+                        <div id="voucher-fields" class="hidden">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Voucher Amount (monthly)</label>
+                            <div class="relative max-w-xs">
+                                <span class="absolute left-3 top-2 text-gray-400">$</span>
+                                <input type="text" name="voucher_amount" placeholder="0.00"
+                                       class="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Move-in Details -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Move-in Details</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Desired Move-in Date</label>
+                            <input type="date" name="move_in_date"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Number of Occupants</label>
+                            <input type="number" name="num_occupants" min="1" value="1"
+                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Notes -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Additional Notes</h3>
+                    <textarea name="notes" rows="3" placeholder="Anything else you'd like us to know..."
+                              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+
+                <!-- Screening Fee Notice -->
+                {% if screening_fee and screening_fee != "0" and screening_fee != "0.00" %}
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                    <div class="flex items-start gap-3">
+                        <span class="text-blue-600 text-xl mt-0.5">&#9432;</span>
+                        <div>
+                            <p class="text-sm font-medium text-blue-900">Screening Fee: ${{ screening_fee }}</p>
+                            <p class="text-sm text-blue-700 mt-1">
+                                A background and credit screening may be conducted as part of this application.
+                                You will be contacted with details about the screening fee before any charges are applied.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Submit -->
+                <div class="flex justify-end">
+                    <button type="submit"
+                            class="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-500 transition-colors shadow-lg">
+                        Submit Application
+                    </button>
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain opacity-50">
+                    <span class="font-medium text-white">Blue Deer</span>
+                </div>
+                <div class="flex items-center gap-6 text-sm">
+                    <a href="/listings" class="hover:text-white transition-colors">All Properties</a>
+                    <a href="/privacy" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="/terms" class="hover:text-white transition-colors">Terms</a>
+                </div>
+                <p class="text-sm">&copy; 2025 Blue Deer Property Management</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

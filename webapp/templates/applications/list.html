@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Applications{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900">Applications</h1>
+                <p class="mt-1 text-sm text-gray-500">{{ counts.all }} total application{{ 's' if counts.all != 1 else '' }}</p>
+            </div>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Status Filter Tabs -->
+<div class="mb-6 flex flex-wrap gap-2">
+    {% set tabs = [
+        ('all', 'All', counts.all),
+        ('pending', 'Pending', counts.pending),
+        ('screening', 'Screening', counts.screening),
+        ('completed', 'Completed', counts.completed),
+        ('approved', 'Approved', counts.approved),
+        ('denied', 'Denied', counts.denied),
+    ] %}
+    {% for key, label, count in tabs %}
+    <a href="/applications{% if key != 'all' %}?status={{ key }}{% endif %}"
+       class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+              {% if current_status == key %}bg-blue-600 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50 ring-1 ring-gray-200{% endif %}">
+        {{ label }}
+        {% if count %}<span class="ml-1 {% if current_status == key %}text-blue-200{% else %}text-gray-400{% endif %}">{{ count }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Applications Table -->
+{% if applications %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applied</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recommendation</th>
+                    <th class="px-6 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for app in applications %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">{{ app.applicant_first_name }} {{ app.applicant_last_name }}</div>
+                        <div class="text-xs text-gray-500">{{ app.applicant_email }}</div>
+                        {% if app.has_section8_voucher %}
+                        <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">S8</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        {{ app.property_ref.address if app.property_ref else 'Unknown' }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {{ app.applied_at.strftime('%m/%d/%Y') if app.applied_at else '' }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% set status_colors = {
+                            'pending': 'bg-yellow-100 text-yellow-800',
+                            'screening': 'bg-blue-100 text-blue-800',
+                            'completed': 'bg-cyan-100 text-cyan-800',
+                            'approved': 'bg-green-100 text-green-800',
+                            'denied': 'bg-red-100 text-red-800',
+                            'cancelled': 'bg-gray-100 text-gray-800',
+                        } %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ status_colors.get(app.status.value, 'bg-gray-100 text-gray-800') }}">
+                            {{ app.status.value|title }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {{ app.screening_recommendation|title if app.screening_recommendation else '---' }}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <a href="/applications/{{ app.id }}" class="text-blue-600 hover:text-blue-500 text-sm font-medium">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <div class="text-5xl mb-4">&#128196;</div>
+    <h3 class="text-lg font-medium text-gray-900 mb-1">No applications</h3>
+    <p class="text-gray-500 text-sm">Applications from prospective tenants will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

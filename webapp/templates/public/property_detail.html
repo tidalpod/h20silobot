@@ -374,6 +374,12 @@
                     {% endif %}
 
                     <div class="space-y-3">
+                        {% if is_available %}
+                        <a href="/apply/{{ property.id }}"
+                           class="w-full flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-500 transition-colors shadow-lg">
+                            <span>&#128221;</span> Apply Now
+                        </a>
+                        {% endif %}
                         <a href="tel:+12489638704"
                            class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-500 transition-colors">
                             <span>📞</span> Call (248) 963-8704

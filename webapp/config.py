@@ -49,6 +49,18 @@ class WebConfig:
     plaid_env: str = os.getenv("PLAID_ENV", "sandbox")
     plaid_webhook_url: str = os.getenv("PLAID_WEBHOOK_URL", "")
 
+    # TenantReportX Screening
+    tenantreportx_api_url: str = os.getenv("TENANTREPORTX_API_URL", "https://api.tenantreportx.com")
+    tenantreportx_api_key: str = os.getenv("TENANTREPORTX_API_KEY", "")
+    tenantreportx_account_id: str = os.getenv("TENANTREPORTX_ACCOUNT_ID", "")
+    tenantreportx_webhook_secret: str = os.getenv("TENANTREPORTX_WEBHOOK_SECRET", "")
+    tenantreportx_applicant_fee: str = os.getenv("TENANTREPORTX_APPLICANT_FEE", "25.00")
+
+    @property
+    def has_tenantreportx(self) -> bool:
+        """Check if TenantReportX is configured"""
+        return bool(self.tenantreportx_api_key and self.tenantreportx_account_id)
+
     @property
     def has_plaid(self) -> bool:
         """Check if Plaid is configured"""
