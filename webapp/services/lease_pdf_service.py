@@ -1,7 +1,8 @@
 """Lease PDF generation via weasyprint.
 
 Renders a full HTML template with all lease data + boilerplate,
-then converts to multi-page PDF.
+then converts to multi-page PDF.  Structured to match TurboTenant
+Michigan lease format with numbered sections and tables.
 """
 
 import json
@@ -14,7 +15,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from webapp.services.lease_templates import (
-    SECTION_2_TEMPLATES,
+    SECTION_2_PROVISIONS,
     SECTION_3_GENERAL_PROVISIONS,
     MICHIGAN_TRUTH_IN_RENTING,
     MICHIGAN_SECURITY_DEPOSIT_LAW,
@@ -39,7 +40,7 @@ def _format_date(date_str: str) -> str:
         return "___________"
     try:
         d = datetime.strptime(date_str, "%Y-%m-%d")
-        return d.strftime("%B %d, %Y")
+        return d.strftime("%m/%d/%Y")
     except (ValueError, TypeError):
         return str(date_str)
 
@@ -51,161 +52,106 @@ def _format_currency(amount) -> str:
     return f"${float(amount):,.2f}"
 
 
+def _ordinal_suffix(n) -> str:
+    """Return ordinal suffix for a number."""
+    try:
+        n = int(n)
+    except (ValueError, TypeError):
+        return ""
+    return ordinal(n)
+
+
 def _build_section_2(data: dict) -> list:
-    """Build Section 2 (Special Provisions) from lease data."""
+    """Build Section 2 (Special Provisions) from lease data + templates.
+
+    Returns a list of dicts with 'key', 'title', 'text' for each provision.
+    Some provisions have variable data interpolated.
+    """
     provisions = []
 
-    # 1. Lease Term
-    lease_type = data.get("lease_type", "fixed")
-    if lease_type == "fixed":
-        exp_action = data.get("expiration_action", "continue_mtm")
-        exp_text = SECTION_2_TEMPLATES.get(f"expiration_{exp_action}", "")
-        provisions.append(
-            SECTION_2_TEMPLATES["lease_term_fixed"].format(
-                start_date=_format_date(data.get("start_date")),
-                end_date=_format_date(data.get("end_date")),
-                expiration_action=exp_text,
-            )
-        )
-    else:
-        provisions.append(
-            SECTION_2_TEMPLATES["lease_term_mtm"].format(
-                start_date=_format_date(data.get("start_date")),
-            )
-        )
-
-    # 2. Rent
     due_day = data.get("rent_due_day", 1)
-    methods = data.get("payment_methods", [])
+    maintenance_methods = data.get("maintenance_communication", [])
     method_labels = {
-        "ach": "ACH Bank Transfer",
-        "check": "Personal Check",
-        "money_order": "Money Order",
-        "bluedeer": "Blue Deer Tenant Portal",
-        "cash": "Cash",
+        "bluedeer_portal": "Online Maintenance Requests via Blue Deer",
+        "email": "Email",
+        "text": "Text Message",
+        "phone": "Phone Call",
+        "us_mail": "US Mail",
+        "other": "Other",
     }
-    method_str = ", ".join(method_labels.get(m, m) for m in methods) if methods else "as agreed"
-    provisions.append(
-        SECTION_2_TEMPLATES["rent_payment"].format(
-            monthly_rent=_format_currency(data.get("monthly_rent", 0)).lstrip("$"),
-            rent_due_day=due_day,
-            ordinal=ordinal(due_day),
-            payment_methods=method_str,
-        )
-    )
+    method_str = ", ".join(method_labels.get(m, m) for m in maintenance_methods) if maintenance_methods else "As agreed"
 
-    # 3. Late Fee
-    provisions.append(
-        SECTION_2_TEMPLATES["late_fee"].format(
-            grace_days=data.get("late_fee_grace_days", 5),
-            ordinal_grace=ordinal(data.get("late_fee_grace_days", 5)),
-            late_fee_daily=_format_currency(data.get("late_fee_daily", 15)).lstrip("$"),
-            late_fee_max_days=data.get("late_fee_max_days", 5),
-            late_fee_max=_format_currency(
-                float(data.get("late_fee_daily", 15)) * int(data.get("late_fee_max_days", 5))
-            ).lstrip("$"),
-        )
-    )
+    for template in SECTION_2_PROVISIONS:
+        key = template.get("key", "")
+        title = template["title"]
+        text = template["text"]
 
-    # 4. Security Deposit
-    if data.get("security_deposit"):
-        provisions.append(
-            SECTION_2_TEMPLATES["security_deposit"].format(
-                security_deposit=_format_currency(data.get("security_deposit")).lstrip("$"),
-                deposit_bank_name=data.get("deposit_bank_name", "___________"),
-                deposit_bank_address=data.get("deposit_bank_address", "___________"),
+        # Interpolate variables for provisions that need them
+        if key == "late_rent":
+            text = text.format(
+                rent_due_day=due_day,
+                ordinal=ordinal(due_day),
+                late_fee_daily=_format_currency(data.get("late_fee_daily", 15)).lstrip("$"),
+                late_fee_grace_days=data.get("late_fee_grace_days", 5),
+                late_fee_max_days=data.get("late_fee_max_days", 5),
             )
-        )
-
-    # 5. Prorated Rent
-    if data.get("prorated_rent"):
-        provisions.append(
-            SECTION_2_TEMPLATES["prorated_rent"].format(
-                prorated_rent=_format_currency(data.get("prorated_rent")).lstrip("$"),
-                prorated_month=_format_date(data.get("start_date")),
+        elif key == "security_deposit_provisions":
+            bank_name = data.get("deposit_bank_name", "___________")
+            bank_addr = data.get("deposit_bank_address", "___________")
+            # Split text for the template to render the bank table separately
+            text_before_bank = (
+                "Upon the due execution of this Agreement, Tenant shall deposit with Landlord a security "
+                "deposit referenced in Section 1.8. The security deposit shall be held in a FDIC insured "
+                "institution as shown below. The security deposit shall not exceed a sum equal to one and "
+                "a half (1.5) times the monthly rent. Such deposit shall be returned to Tenant, and less "
+                "any set-off for unpaid rent, unpaid late fees, unpaid utilities, damages, or any other "
+                "money owing Landlord, along with an itemized statement showing any lawful charges or "
+                "deductions, within thirty (30) days of lease termination, in accordance with the terms "
+                "of this section and applicable laws."
             )
-        )
+            provisions.append({
+                "key": key,
+                "title": title,
+                "text": text.format(
+                    deposit_bank_name=bank_name,
+                    deposit_bank_address=bank_addr,
+                ),
+                "text_before_bank": text_before_bank,
+            })
+            continue
+        elif key == "maintenance_communication":
+            text = text.format(maintenance_methods=method_str)
 
-    # 6. Move-in Fees
-    fees = data.get("move_in_fees", [])
-    if fees:
-        rows = "\n".join(f"  - {f.get('description', '')}: {_format_currency(f.get('amount', 0))}" for f in fees)
-        provisions.append(
-            SECTION_2_TEMPLATES["move_in_fees"].format(fees_table=rows)
-        )
-
-    # 7. Pets
-    if data.get("pets_allowed"):
-        pets = data.get("pets", [])
-        pet_list = ", ".join(
-            f"{p.get('type', '')} ({p.get('breed', 'Unknown')}, {p.get('weight', '?')} lbs)"
-            for p in pets
-        ) if pets else "As approved by Landlord"
-        provisions.append(
-            SECTION_2_TEMPLATES["pet_policy_allowed"].format(
-                pet_deposit=_format_currency(data.get("pet_deposit", 0)).lstrip("$"),
-                pet_rent=_format_currency(data.get("pet_rent", 0)).lstrip("$"),
-                pet_list=pet_list,
-            )
-        )
-    else:
-        provisions.append(SECTION_2_TEMPLATES["pet_policy_not_allowed"])
-
-    # 8. Smoking
-    smoking = data.get("smoking_policy", "not_permitted")
-    if smoking == "not_permitted":
-        provisions.append(SECTION_2_TEMPLATES["smoking_not_permitted"])
-    else:
-        provisions.append(SECTION_2_TEMPLATES["smoking_designated_areas"])
-
-    # 9. Parking
-    if data.get("parking_rules"):
-        provisions.append(
-            SECTION_2_TEMPLATES["parking"].format(parking_rules=data["parking_rules"])
-        )
-
-    # 10. Renters Insurance
-    if data.get("renters_insurance_required"):
-        provisions.append(SECTION_2_TEMPLATES["renters_insurance"])
-
-    # 11. Utilities
-    utilities = data.get("utilities", {})
-    if utilities:
-        rows = "\n".join(
-            f"  - {name.replace('_', ' ').title()}: {resp.title()}"
-            for name, resp in utilities.items()
-        )
-        provisions.append(
-            SECTION_2_TEMPLATES["utilities"].format(utility_table=rows)
-        )
-
-    # 12. Maintenance
-    methods = data.get("maintenance_communication", [])
-    if methods:
-        method_labels = {
-            "bluedeer_portal": "Blue Deer Tenant Portal",
-            "email": "Email",
-            "text": "Text Message",
-            "phone": "Phone Call",
-        }
-        method_str = ", ".join(method_labels.get(m, m) for m in methods)
-        provisions.append(
-            SECTION_2_TEMPLATES["maintenance"].format(maintenance_methods=method_str)
-        )
-
-    # 13. Keys
-    keys = data.get("keys", [])
-    if keys:
-        rows = "\n".join(f"  - {k.get('type', '')}: {k.get('count', 1)} key(s)" for k in keys)
-        provisions.append(
-            SECTION_2_TEMPLATES["keys"].format(keys_table=rows)
-        )
-
-    # 14. Early Termination
-    if data.get("early_termination"):
-        provisions.append(SECTION_2_TEMPLATES["early_termination"])
+        provisions.append({"key": key, "title": title, "text": text})
 
     return provisions
+
+
+def _build_utilities_display(data: dict) -> dict:
+    """Build a display-friendly utility responsibility dict."""
+    utilities = data.get("utilities", {})
+
+    # Full list of utility types matching TurboTenant format
+    all_utilities = [
+        ("electricity", "Electricity"),
+        ("gas", "Gas"),
+        ("sewer", "Sewer / Septic"),
+        ("trash", "Trash"),
+        ("water", "Water"),
+        ("cable", "Cable / Satellite"),
+        ("hoa", "HOA / Condo Fee"),
+        ("internet", "Internet"),
+        ("landscaping", "Landscaping"),
+        ("phone", "Phone"),
+        ("snow_removal", "Snow Removal"),
+    ]
+
+    display = {}
+    for key, label in all_utilities:
+        resp = utilities.get(key, "tenant")
+        display[label] = resp.title() if resp else "Tenant"
+
+    return display
 
 
 def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
@@ -235,6 +181,22 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
     full_address = f"{address}, {city}, {state} {zip_code}"
 
     additional_terms = data.get("additional_terms", "")
+
+    # Calculate totals for summary table
+    monthly_rent = float(data.get("monthly_rent", 0) or 0)
+    pet_rent = float(data.get("pet_rent", 0) or 0) if data.get("pets_allowed") else 0
+    total_monthly_rent = monthly_rent + pet_rent
+
+    security_deposit = float(data.get("security_deposit", 0) or 0)
+    pet_deposit = float(data.get("pet_deposit", 0) or 0) if data.get("pets_allowed") else 0
+    other_deposit = float(data.get("other_deposit", 0) or 0)
+    total_deposits = security_deposit + pet_deposit + other_deposit
+
+    move_in_fees = data.get("move_in_fees", [])
+    move_in_fee_total = sum(float(f.get("amount", 0)) for f in move_in_fees) if move_in_fees else 0
+
+    # Build utilities display
+    utilities_display = _build_utilities_display(data)
 
     # Convert signature image files to base64 data URIs for PDF embedding
     sig_images = {}
@@ -269,8 +231,13 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
         michigan_lead_paint=MICHIGAN_LEAD_PAINT_DISCLOSURE if data.get("lead_paint_disclosure") else None,
         additional_terms=additional_terms,
         signatures=sig_images if sig_images else None,
+        total_monthly_rent=total_monthly_rent,
+        total_deposits=total_deposits,
+        move_in_fee_total=move_in_fee_total,
+        utilities_display=utilities_display,
         format_date=_format_date,
         format_currency=_format_currency,
+        ordinal_suffix=_ordinal_suffix,
         generated_date=datetime.utcnow().strftime("%B %d, %Y"),
     )
     return html

@@ -347,8 +347,11 @@ async def save_step(request: Request, builder_id: int, step: int):
             data["renters_insurance_required"] = form.get("renters_insurance_required") == "true"
 
         elif step == 5:
-            # Utilities
-            utility_names = ["electricity", "gas", "water", "sewer", "trash", "internet", "cable"]
+            # Utilities (expanded to match TurboTenant format)
+            utility_names = [
+                "electricity", "gas", "water", "sewer", "trash",
+                "internet", "cable", "hoa", "landscaping", "phone", "snow_removal",
+            ]
             utilities = {}
             for name in utility_names:
                 utilities[name] = form.get(f"utility_{name}", "tenant")

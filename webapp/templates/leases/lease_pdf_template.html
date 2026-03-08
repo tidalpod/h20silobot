@@ -7,77 +7,70 @@
         @page {
             size: letter;
             margin: 1in 1in 1.2in 1in;
-            @bottom-center {
+            @bottom-right {
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 9pt;
                 color: #666;
             }
         }
         body {
-            font-family: "Times New Roman", Times, serif;
-            font-size: 11pt;
-            line-height: 1.5;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.45;
             color: #222;
         }
         h1 {
-            font-size: 18pt;
+            font-size: 20pt;
             text-align: center;
             margin-bottom: 5pt;
             font-weight: bold;
         }
         h2 {
-            font-size: 13pt;
-            margin-top: 18pt;
-            margin-bottom: 8pt;
+            font-size: 14pt;
+            text-align: center;
+            margin-top: 24pt;
+            margin-bottom: 12pt;
             font-weight: bold;
-            border-bottom: 1px solid #999;
-            padding-bottom: 3pt;
         }
         h3 {
             font-size: 11pt;
-            font-weight: bold;
-            margin-top: 12pt;
-            margin-bottom: 4pt;
+            font-weight: normal;
+            margin-top: 16pt;
+            margin-bottom: 6pt;
+        }
+        h3 .section-num {
+            font-weight: normal;
+        }
+        h3 .section-title {
+            font-weight: normal;
         }
         .cover-page {
             text-align: center;
-            padding-top: 2in;
+            padding-top: 40pt;
         }
         .cover-page h1 {
-            font-size: 24pt;
-            margin-bottom: 20pt;
-        }
-        .cover-page .subtitle {
             font-size: 14pt;
-            color: #555;
-            margin-bottom: 40pt;
+            margin-bottom: 2pt;
         }
-        .cover-info {
-            text-align: left;
-            margin: 40pt auto;
-            max-width: 400pt;
+        .cover-between {
+            font-size: 10pt;
+            margin: 4pt 0;
         }
-        .cover-info table {
-            width: 100%;
-        }
-        .cover-info td {
-            padding: 4pt 8pt;
-            vertical-align: top;
-        }
-        .cover-info .label {
+        .cover-entity {
+            font-size: 14pt;
             font-weight: bold;
-            width: 140pt;
-            color: #555;
+            margin: 4pt 0;
+        }
+        .cover-date {
+            font-size: 10pt;
+            margin: 4pt 0 20pt 0;
         }
         .page-break {
             page-break-before: always;
         }
         .provision {
-            margin-bottom: 12pt;
+            margin-bottom: 10pt;
             text-align: justify;
-        }
-        .provision-number {
-            font-weight: bold;
         }
         .signature-block {
             margin-top: 40pt;
@@ -85,7 +78,7 @@
         }
         .signature-line {
             border-bottom: 1px solid #333;
-            width: 300pt;
+            width: 250pt;
             display: inline-block;
             margin-bottom: 3pt;
         }
@@ -97,11 +90,12 @@
             color: #666;
         }
         .notice-box {
-            border: 1px solid #999;
-            padding: 10pt;
-            margin: 12pt 0;
-            background: #f9f9f9;
-            font-size: 10pt;
+            border: 2px solid #333;
+            padding: 12pt 16pt;
+            margin: 16pt 0;
+            font-weight: bold;
+            font-size: 11pt;
+            line-height: 1.5;
         }
         table.data-table {
             width: 100%;
@@ -110,14 +104,72 @@
         }
         table.data-table th,
         table.data-table td {
-            border: 1px solid #ccc;
-            padding: 4pt 8pt;
+            border: 1px solid #999;
+            padding: 5pt 8pt;
             text-align: left;
             font-size: 10pt;
         }
         table.data-table th {
-            background: #f0f0f0;
+            background: #e8e8e8;
             font-weight: bold;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12pt 0;
+        }
+        .summary-table td {
+            border: 1px solid #999;
+            padding: 5pt 8pt;
+            font-size: 10pt;
+        }
+        .summary-table .label {
+            font-weight: bold;
+            width: 200pt;
+            background: #f0f0f0;
+        }
+        .summary-table .indent {
+            padding-left: 24pt;
+        }
+        .summary-table .see-ref {
+            font-style: italic;
+            color: #555;
+            text-align: right;
+            width: 100pt;
+        }
+        .checkbox {
+            display: inline-block;
+            width: 12pt;
+            height: 12pt;
+            border: 1px solid #333;
+            text-align: center;
+            line-height: 12pt;
+            font-size: 10pt;
+            margin-right: 4pt;
+            vertical-align: middle;
+        }
+        .checkbox.checked::after {
+            content: "\2717";
+            font-weight: bold;
+        }
+        .bold-notice {
+            font-weight: bold;
+            font-size: 12pt;
+            line-height: 1.5;
+            margin: 16pt 0;
+        }
+        ul.provision-list {
+            margin: 6pt 0 10pt 16pt;
+            padding: 0;
+        }
+        ul.provision-list li {
+            margin-bottom: 4pt;
+        }
+        .generated-footer {
+            margin-top: 60pt;
+            font-size: 9pt;
+            color: #888;
+            text-align: center;
         }
     </style>
 </head>
@@ -125,201 +177,743 @@
 
 <!-- ==================== COVER PAGE ==================== -->
 <div class="cover-page">
-    <h1>MICHIGAN<br>RESIDENTIAL RENTAL AGREEMENT</h1>
-    <p class="subtitle">Michigan Truth in Renting Act Compliant</p>
+    <p style="font-size: 11pt;">Rental Agreement between:</p>
+    <p class="cover-entity">{{ landlord.get('entity_name', '___________') }}</p>
+    <p class="cover-between">and</p>
+    <p class="cover-entity">{% for t in tenants %}{{ t.get('name', '') }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    <p class="cover-date">Dated: {{ format_date(lease_data.get('start_date', '')) }}</p>
 
-    <div class="cover-info">
-        <table>
-            <tr>
-                <td class="label">Property Address:</td>
-                <td>{{ property_address }}</td>
-            </tr>
-            <tr>
-                <td class="label">Landlord:</td>
-                <td>{{ landlord.get('entity_name', '') }}{% if landlord.get('owner_name') %}<br>{{ landlord.get('owner_name') }}{% endif %}</td>
-            </tr>
-            <tr>
-                <td class="label">Tenant(s):</td>
-                <td>
-                    {% for t in tenants %}
-                    {{ t.get('name', '') }}{% if not loop.last %}<br>{% endif %}
-                    {% endfor %}
-                </td>
-            </tr>
-            <tr>
-                <td class="label">Lease Term:</td>
-                <td>
-                    {% if lease_data.get('lease_type', 'fixed') == 'fixed' %}
-                    {{ format_date(lease_data.get('start_date', '')) }} to {{ format_date(lease_data.get('end_date', '')) }}
-                    {% else %}
-                    Month-to-Month beginning {{ format_date(lease_data.get('start_date', '')) }}
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td class="label">Monthly Rent:</td>
-                <td>{{ format_currency(lease_data.get('monthly_rent', 0)) }}</td>
-            </tr>
-            <tr>
-                <td class="label">Security Deposit:</td>
-                <td>{{ format_currency(lease_data.get('security_deposit', 0)) }}</td>
-            </tr>
-        </table>
-    </div>
+    <h2 style="margin-top: 30pt;">Summary of Key Information</h2>
 
-    <p style="margin-top: 60pt; font-size: 10pt; color: #888;">Generated {{ generated_date }} by Blue Deer Property Management</p>
+    <table class="summary-table">
+        <tr>
+            <td class="label">Property Address:</td>
+            <td colspan="2">{{ property_address }}</td>
+        </tr>
+        <tr>
+            <td class="label">Lease Start Date:</td>
+            <td>{{ format_date(lease_data.get('start_date', '')) }}</td>
+            <td class="see-ref">See section 1.5</td>
+        </tr>
+        <tr>
+            <td class="label">Lease End Date:</td>
+            <td>{% if lease_data.get('lease_type') == 'fixed' and lease_data.get('end_date') %}{{ format_date(lease_data.get('end_date', '')) }}{% else %}N/A{% endif %}</td>
+            <td class="see-ref">See section 1.5</td>
+        </tr>
+        <tr>
+            <td class="label">Total Monthly Rent:</td>
+            <td><strong>{{ format_currency(total_monthly_rent) }}</strong></td>
+            <td class="see-ref">See section 1.6</td>
+        </tr>
+        <tr>
+            <td class="indent">Monthly Rent Amount:</td>
+            <td>{{ format_currency(lease_data.get('monthly_rent', 0)) }}</td>
+            <td class="see-ref">See section 1.6</td>
+        </tr>
+        <tr>
+            <td class="indent">Monthly Pet Rent:</td>
+            <td>{% if lease_data.get('pet_rent') and lease_data.get('pets_allowed') %}{{ format_currency(lease_data.get('pet_rent', 0)) }}{% else %}N/A{% endif %}</td>
+            <td class="see-ref">See section 1.6</td>
+        </tr>
+        <tr>
+            <td class="label">Pro-Rated Rent Amount:</td>
+            <td>{% if lease_data.get('prorated_rent') %}{{ format_currency(lease_data.get('prorated_rent', 0)) }}{% else %}N/A{% endif %}</td>
+            <td class="see-ref">See section 1.10</td>
+        </tr>
+        <tr>
+            <td class="label">Total Deposit(s):</td>
+            <td><strong>{{ format_currency(total_deposits) }}</strong></td>
+            <td class="see-ref">See section 1.8</td>
+        </tr>
+        <tr>
+            <td class="indent">Security Deposit:</td>
+            <td>{{ format_currency(lease_data.get('security_deposit', 0)) }}</td>
+            <td class="see-ref">See section 1.8</td>
+        </tr>
+        <tr>
+            <td class="indent">Pet Deposit:</td>
+            <td>{% if lease_data.get('pet_deposit') and lease_data.get('pets_allowed') %}{{ format_currency(lease_data.get('pet_deposit', 0)) }}{% else %}N/A{% endif %}</td>
+            <td class="see-ref">See section 1.8</td>
+        </tr>
+        <tr>
+            <td class="indent">Other Deposit:</td>
+            <td>{% if lease_data.get('other_deposit') %}{{ format_currency(lease_data.get('other_deposit', 0)) }}{% else %}N/A{% endif %}</td>
+            <td class="see-ref">See section 1.8</td>
+        </tr>
+        {% if lease_data.get('move_in_fees') %}
+        <tr>
+            <td class="label">Move-in Fee Amount:</td>
+            <td>{{ format_currency(move_in_fee_total) }}</td>
+            <td class="see-ref">See section 1.9</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td class="label">Move-in Fee Amount:</td>
+            <td>N/A</td>
+            <td class="see-ref">See section 1.9</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td class="label">Late Fee:</td>
+            <td>Applied</td>
+            <td class="see-ref">See section 2.1</td>
+        </tr>
+    </table>
+
+    <p style="font-size: 9pt; margin-top: 10pt; text-align: left;">The above summary table is provided as a reference. The Agreement will control if there is a conflict.</p>
 </div>
 
-<!-- ==================== SECTION 1: PARTIES & PREMISES ==================== -->
+<!-- ==================== SECTION 1: GENERAL INFORMATION ==================== -->
 <div class="page-break"></div>
 
-<h2>SECTION 1: PARTIES AND PREMISES</h2>
+<h1>Michigan Residential Rental Agreement<br>("Agreement")</h1>
 
-<p class="provision">
-    This Residential Rental Agreement ("Lease") is entered into on {{ format_date(lease_data.get('start_date', '')) }}
-    between:
-</p>
+<h2>1. GENERAL INFORMATION</h2>
 
-<p class="provision">
-    <strong>LANDLORD:</strong>
-    {{ landlord.get('entity_name', '___________') }}{% if landlord.get('owner_name') %}, represented by {{ landlord.get('owner_name') }}{% endif %}
-    {% if landlord.get('mailing_address') %}<br>Address: {{ landlord.get('mailing_address') }}{% endif %}
-    {% if landlord.get('email') %}<br>Email: {{ landlord.get('email') }}{% endif %}
-    {% if landlord.get('phone') %}<br>Phone: {{ landlord.get('phone') }}{% endif %}
-</p>
+<!-- 1.1 DATE -->
+<h3>1.1 DATE</h3>
+<p class="provision">The date of this Agreement is <strong>{{ format_date(lease_data.get('start_date', '')) }}</strong>.</p>
 
-<p class="provision">
-    <strong>TENANT(S):</strong>
+<!-- 1.2 TENANT(S) -->
+<h3>1.2 TENANT(S)</h3>
+<p class="provision">The Tenant(s) herein is/are:</p>
+
+<table class="data-table">
+    <tr>
+        <th>Tenant Name</th>
+        <th>Tenant Email</th>
+        <th>Tenant Phone</th>
+    </tr>
     {% for t in tenants %}
-    {{ t.get('name', '') }}{% if t.get('email') %} ({{ t.get('email') }}){% endif %}{% if not loop.last %}; {% endif %}
+    <tr>
+        <td>{{ t.get('name', '') }}</td>
+        <td>{{ t.get('email', '') or 'N/A' }}</td>
+        <td>{{ t.get('phone', '') or 'N/A' }}</td>
+    </tr>
     {% endfor %}
+</table>
+
+<p class="provision">
+    If more than one person is named above as Tenant, all persons named shall have joint and
+    several liability as to the obligations of Tenant herein, and all references to Tenant,
+    although stated in the singular, shall apply as appropriate as if written in the plural.
+</p>
+<p class="provision">
+    The address of Tenant, for purposes of mailing notices is:<br>
+    <strong>{{ property_address }}</strong>
+</p>
+
+<!-- 1.3 LANDLORD -->
+<h3>1.3 LANDLORD</h3>
+<p class="provision">The Landlord herein is:</p>
+
+<table class="data-table">
+    <tr>
+        <th>Landlord Name</th>
+        <th>Landlord Email</th>
+        <th>Landlord Phone</th>
+    </tr>
+    <tr>
+        <td>{{ landlord.get('entity_name', '') }}</td>
+        <td>{{ landlord.get('email', '') or 'N/A' }}</td>
+        <td>{{ landlord.get('phone', '') or 'N/A' }}</td>
+    </tr>
+</table>
+
+<p class="provision">
+    Landlord manages the Premises (as defined below) as the owner. Landlord is authorized to
+    accept service of process, notices and demands.
+</p>
+<p class="provision">
+    The address of Landlord, for purposes of mailing payments and notices, is:<br>
+    <strong>{{ landlord.get('mailing_address', '') }}</strong>
+</p>
+
+<!-- 1.4 RENTAL PROPERTY -->
+<h3>1.4 RENTAL PROPERTY</h3>
+<p class="provision">
+    The property herein, known as (the "Premises") is the structure or the part of a structure
+    that is used as a home, residence, or sleeping place by the Tenant who maintains a
+    household there.
+</p>
+
+<table class="data-table">
+    <tr>
+        <th>Property Address</th>
+        <th>Unit / Apt #</th>
+        <th>City</th>
+        <th>State</th>
+        <th>Zip</th>
+    </tr>
+    <tr>
+        <td>{{ property_info.get('address', '') }}</td>
+        <td>{{ property_info.get('unit', '') or '' }}</td>
+        <td>{{ property_info.get('city', '') }}</td>
+        <td>{{ property_info.get('state', 'MI') }}</td>
+        <td>{{ property_info.get('zip_code', '') }}</td>
+    </tr>
+</table>
+
+<!-- 1.5 TERM -->
+<h3>1.5 TERM</h3>
+<p class="provision">The Term herein shall be as follows:</p>
+<p class="provision">Lease Start Date: <strong>{{ format_date(lease_data.get('start_date', '')) }}</strong></p>
+<p class="provision">Lease Type:</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('lease_type') == 'month_to_month' %}checked{% endif %}"></span>
+    <strong>Month-to-Month:</strong> a month-to-month lease terminates by Landlord or Tenant
+    giving the other Party (defined below) to this Agreement thirty days written notice
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('lease_type') == 'fixed' %}checked{% endif %}"></span>
+    <strong>Fixed Term:</strong> for a period ending on: {% if lease_data.get('lease_type') == 'fixed' and lease_data.get('end_date') %}<strong>{{ format_date(lease_data.get('end_date', '')) }}</strong>{% else %}N/A{% endif %}
+</p>
+
+{% if lease_data.get('lease_type') == 'fixed' %}
+<p class="provision">
+    In the event Fixed Term is selected above, upon expiration of the Fixed Term, Landlord and
+    Tenant (collectively known as "Parties", or individually as "Party") agree that the following
+    shall occur by default:
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('expiration_action') == 'continue_mtm' %}checked{% endif %}"></span>
+    <strong>Continue as Month-to-Month:</strong> the lease shall automatically be renewed on a
+    month-to-month basis.
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('expiration_action') == 'terminate' %}checked{% endif %}"></span>
+    <strong>Terminate:</strong> the lease shall automatically terminate at the conclusion of the initial
+    Fixed Term.
+</p>
+{% endif %}
+
+<!-- 1.6 RENT -->
+<h3>1.6 RENT</h3>
+<p class="provision">
+    Rent for the Term hereof shall be payable, in advance, on or before 5pm on the {{ lease_data.get('rent_due_day', 1) }}{{ ordinal_suffix(lease_data.get('rent_due_day', 1)) }} day
+    of each month ("Due Date"), regardless of whether that day is a Saturday, Sunday, or Holiday,
+    in equal installments of {{ format_currency(lease_data.get('monthly_rent', 0)) }}.
+</p>
+
+<table class="data-table">
+    <tr>
+        <td style="width: 50%;">Monthly Base Rent:</td>
+        <td>{{ format_currency(lease_data.get('monthly_rent', 0)) }}</td>
+    </tr>
+    <tr>
+        <td>Additional Monthly Pet Rent:</td>
+        <td>{% if lease_data.get('pet_rent') and lease_data.get('pets_allowed') %}{{ format_currency(lease_data.get('pet_rent', 0)) }}{% else %}N/A{% endif %}</td>
+    </tr>
+    <tr>
+        <td><strong>Total Monthly Rent:</strong></td>
+        <td><strong>{{ format_currency(total_monthly_rent) }}</strong></td>
+    </tr>
+</table>
+
+<!-- 1.7 FORM OF RENT PAYMENTS -->
+<h3>1.7 FORM OF RENT PAYMENTS</h3>
+<p class="provision">
+    All payments shall be made to Landlord without demand at Landlord's mailing address
+    such that they can be received on or before the Due Date. Landlord's acceptance of Rent
+    from a person other than the Tenant shall not be a waiver of any right and shall not
+    constitute acceptance of such person as a Tenant. All payments for Rent should be made
+    via one of the following methods:
+</p>
+
+<table class="data-table">
+    <tr>
+        <td style="width: 40%; font-weight: bold;">Payments Allowed:</td>
+        <td>
+            {% set methods = lease_data.get('payment_methods', []) %}
+            <span class="checkbox {% if 'cash' in methods %}checked{% endif %}"></span> Cash<br>
+            <span class="checkbox {% if 'check' in methods %}checked{% endif %}"></span> Personal Check<br>
+            <span class="checkbox {% if 'cashiers_check' in methods %}checked{% endif %}"></span> Cashier's Check<br>
+            <span class="checkbox {% if 'money_order' in methods %}checked{% endif %}"></span> Money Order<br>
+            <span class="checkbox {% if 'ach' in methods %}checked{% endif %}"></span> ACH / Direct Deposit<br>
+            <span class="checkbox {% if 'bluedeer' in methods %}checked{% endif %}"></span> Rent Payments by Blue Deer
+        </td>
+    </tr>
+</table>
+
+<!-- 1.8 SECURITY DEPOSIT AND OTHER DEPOSITS -->
+<h3>1.8 SECURITY DEPOSIT AND OTHER DEPOSITS</h3>
+<p class="provision">
+    Upon the due execution of this Agreement, Tenant shall deposit with Landlord the
+    following deposit amount(s):
+</p>
+
+<table class="data-table">
+    <tr>
+        <td style="width: 50%;">Security Deposit:</td>
+        <td><strong>{{ format_currency(lease_data.get('security_deposit', 0)) }}</strong></td>
+    </tr>
+    <tr>
+        <td>Pet Deposit:</td>
+        <td><strong>{% if lease_data.get('pet_deposit') and lease_data.get('pets_allowed') %}{{ format_currency(lease_data.get('pet_deposit', 0)) }}{% else %}N/A{% endif %}</strong></td>
+    </tr>
+    <tr>
+        <td>Other Deposit:</td>
+        <td>{% if lease_data.get('other_deposit') %}{{ format_currency(lease_data.get('other_deposit', 0)) }}{% else %}N/A{% endif %}</td>
+    </tr>
+</table>
+
+<!-- 1.9 NONREFUNDABLE FEES -->
+<h3>1.9 NONREFUNDABLE FEES</h3>
+<p class="provision">
+    Upon the due execution of this Agreement, Tenant shall pay to Landlord the following non-refundable fee(s):
+</p>
+
+{% if lease_data.get('move_in_fees') %}
+<table class="data-table">
+    <tr>
+        <th>Fee Description</th>
+        <th>Amount</th>
+    </tr>
+    {% for fee in lease_data.get('move_in_fees', []) %}
+    <tr>
+        <td>{{ fee.get('description', '') }}</td>
+        <td>{{ format_currency(fee.get('amount', 0)) }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<table class="data-table">
+    <tr>
+        <td style="width: 50%;">Nonrefundable Fee(s):</td>
+        <td>N/A</td>
+    </tr>
+</table>
+{% endif %}
+
+<!-- 1.10 PRORATED RENT -->
+<h3>1.10 PRORATED RENT</h3>
+<p class="provision">
+    Upon the due execution of this Agreement, Tenant shall pay to Landlord the following
+    amount representing the amount due for the partial first month of the Term ("Prorated Rent"):
+</p>
+
+<table class="data-table">
+    <tr>
+        <td style="width: 50%;">Prorated Rent:</td>
+        <td><strong>{% if lease_data.get('prorated_rent') %}{{ format_currency(lease_data.get('prorated_rent', 0)) }}{% else %}N/A{% endif %}</strong></td>
+    </tr>
+</table>
+
+<!-- 1.11 UTILITIES AND OTHER SERVICES -->
+<h3>1.11 UTILITIES AND OTHER SERVICES</h3>
+<p class="provision">
+    Landlord and Tenant agree that Utilities and Other Services (listed below) will be the
+    responsibility of, and paid for by, Tenant, in addition to Rent, as outlined below:
+</p>
+
+<table class="data-table">
+    <tr>
+        <th>Utility or Other Service</th>
+        <th>Responsibility</th>
+    </tr>
+    {% for name, resp in utilities_display.items() %}
+    <tr>
+        <td>{{ name }}</td>
+        <td>{{ resp }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<p class="provision">
+    Tenant's obligation to pay the above Utilities or Other Services shall include any and all
+    seasonal fees, late fees, installation or connection fees and maintenance charges. Failure
+    by Tenant to comply with the above responsibility for Utilities or Other Services will
+    constitute a default to this Agreement and Landlord may terminate this Agreement. If
+    Tenant fails to notify the service provider or does not assume responsibility of billing as of
+    the Lease Start Date of this Agreement or cancels the Utilities or Other Services prior to the
+    termination of this Agreement, which results in the account being billed to Landlord,
+    Tenant's Utilities or Other Services will be paid and charged back to Tenant in addition to Rent.
+</p>
+
+<!-- 1.12 ADDITIONAL OCCUPANTS -->
+<h3>1.12 ADDITIONAL OCCUPANTS</h3>
+<p class="provision">
+    In addition to Tenant, the following individuals (if any) may occupy the Premises ("Additional Occupants"):
 </p>
 
 {% if additional_occupants %}
-<p class="provision">
-    <strong>ADDITIONAL OCCUPANTS:</strong>
+<table class="data-table">
+    <tr>
+        <th>Additional Occupant Name</th>
+        <th>Age</th>
+        <th>Relationship</th>
+    </tr>
     {% for o in additional_occupants %}
-    {{ o.get('name', '') }} ({{ o.get('relationship', '') }}, age {{ o.get('age', '') }}){% if not loop.last %}; {% endif %}
+    <tr>
+        <td>{{ o.get('name', '') }}</td>
+        <td>{{ o.get('age', '') }}</td>
+        <td>{{ o.get('relationship', '') }}</td>
+    </tr>
     {% endfor %}
-</p>
+</table>
+{% else %}
+<p class="provision" style="font-style: italic;">None listed.</p>
 {% endif %}
 
-{% if cosigners %}
+<!-- 1.13 PETS -->
+<h3>1.13 PETS</h3>
 <p class="provision">
-    <strong>CO-SIGNER(S):</strong>
-    {% for c in cosigners %}
-    {{ c.get('name', '') }}{% if c.get('email') %} ({{ c.get('email') }}){% endif %}{% if not loop.last %}; {% endif %}
-    {% endfor %}
+    Unless otherwise provided under federal, state, or local law, no animals (including
+    mammals, reptiles, birds, fish, rodents, and insects) are allowed, even temporarily,
+    anywhere on the Premises unless so authorized in writing.
 </p>
+
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if not lease_data.get('pets_allowed') %}checked{% endif %}"></span>
+    Tenant shall not bring, keep, "baby-sit", or maintain any pet on the Premises.
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('pets_allowed') %}checked{% endif %}"></span>
+    This Agreement grants permission to Tenant to keep the below named pet(s),
+    subject to the following:
+</p>
+
+{% if lease_data.get('pets_allowed') and lease_data.get('pets') %}
+<table class="data-table">
+    <tr>
+        <th>Type (dog, cat, etc.)</th>
+        <th>Breed</th>
+        <th>Weight (lbs)</th>
+        <th>Age (years)</th>
+    </tr>
+    {% for p in lease_data.get('pets', []) %}
+    <tr>
+        <td>{{ p.get('type', '') }}</td>
+        <td>{{ p.get('breed', '') }}</td>
+        <td>{{ p.get('weight', '') }}</td>
+        <td>{{ p.get('age', '') }}</td>
+    </tr>
+    {% endfor %}
+</table>
 {% endif %}
 
 <p class="provision">
-    <strong>PREMISES:</strong> The Landlord agrees to rent to the Tenant(s) the residential property
-    located at <strong>{{ property_address }}</strong> ("Premises"), for use as a private residential dwelling only.
+    Tenant agrees that Landlord has the right to request Tenant to remove a pet permanently
+    from the Premises if pet becomes a nuisance, causes disturbances, or damages the
+    Premises or personal property belonging to the Premises. Pets of guests are not allowed
+    on the Premises.
+</p>
+
+<!-- 1.14 SMOKING -->
+<h3>1.14 SMOKING</h3>
+<p class="provision">The Premises are designated as a property where smoking is:</p>
+<p class="provision" style="margin-left: 48pt;">
+    <span class="checkbox {% if lease_data.get('smoking_policy') == 'not_permitted' %}checked{% endif %}"></span> Not Permitted<br>
+    <span class="checkbox {% if lease_data.get('smoking_policy') == 'permitted' %}checked{% endif %}"></span> Permitted<br>
+    <span class="checkbox {% if lease_data.get('smoking_policy') == 'outdoors_only' %}checked{% endif %}"></span> Permitted Outdoors Only
+</p>
+<p class="provision">
+    For the purposes of clarifying and restricting its use, the term "Smoking" is defined to
+    include the use of cigarettes, pipes, cigars, electronic vaporizing or aerosol devices, or
+    other devices intended for the inhalation of tobacco, marijuana, or similar substances.
+    Tenant understands and agrees that any damage caused by Smoking shall not constitute
+    ordinary wear and tear. Landlord may deduct from the Security Deposit all damages
+    and/or costs for the cleaning or repairing of any damage caused by or related to Smoking,
+    including but not limited to: deodorizing the Premises, sealing and painting the walls and
+    ceiling, and/or repairing or replacing the carpet and pads.
+</p>
+
+<!-- 1.15 TENANT INSURANCE -->
+<h3>1.15 TENANT INSURANCE</h3>
+<p class="provision">Landlord shall not insure Tenant for any personal injury or property damage. Tenant is:</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if lease_data.get('renters_insurance_required') %}checked{% endif %}"></span>
+    <strong>Required to buy and maintain renters or liability insurance.</strong> Tenant shall
+    provide Landlord with evidence of required insurance prior to Tenant moving into
+    Premises and upon request during the Term.
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    <span class="checkbox {% if not lease_data.get('renters_insurance_required') %}checked{% endif %}"></span>
+    <strong>Not required to buy renters or liability insurance,</strong> however it is strongly
+    recommended to protect Tenant, Tenant's family, Tenant's invitees, and/or guests,
+    and all personal property on the Premises and/or in any common areas from any
+    and all damages.
+</p>
+
+<!-- 1.16 KEYS -->
+<h3>1.16 KEYS</h3>
+<p class="provision">Tenant acknowledges receipt of the following keys:</p>
+
+{% if lease_data.get('keys') %}
+<table class="data-table">
+    <tr>
+        <th>Key Type</th>
+        <th>Number of copies</th>
+    </tr>
+    {% for k in lease_data.get('keys', []) %}
+    <tr>
+        <td>{{ k.get('type', '') }}</td>
+        <td>{{ k.get('count', 1) }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="provision" style="font-style: italic;">To be provided at move-in.</p>
+{% endif %}
+
+<p class="provision">
+    Tenant shall return these keys, garage door openers, and all copies made of these keys to
+    Landlord upon termination of the Agreement. Tenant is responsible for the cost of rekeying
+    if all keys are not returned upon vacating.
+</p>
+
+<!-- 1.17 ADDITIONAL TERMS -->
+{% if additional_terms %}
+<h3>1.17 ADDITIONAL TERMS</h3>
+<p class="provision">
+    The following Additional Terms (as defined below) will become a part of this Agreement
+    and will supersede any conflicting terms of this Agreement:
+</p>
+<div style="border: 1px solid #999; padding: 10pt; margin: 8pt 0; background: #fafafa;">
+    <p style="font-weight: bold; margin-bottom: 6pt;">Additional Terms:</p>
+    <div style="white-space: pre-wrap; font-size: 10pt;">{{ additional_terms }}</div>
+</div>
+{% endif %}
+
+<p class="provision" style="font-weight: bold; margin-top: 20pt;">
+    For consideration of Rent and adherence to the covenants in this Agreement by the
+    Tenant, the Landlord leases to the Tenant the Premises for the Term.
 </p>
 
 <!-- ==================== SECTION 2: SPECIAL PROVISIONS ==================== -->
-<h2>SECTION 2: SPECIAL PROVISIONS</h2>
-
-{% for provision in section_2_provisions %}
-<p class="provision">
-    <span class="provision-number">{{ loop.index }}.</span> {{ provision }}
+<div class="page-break"></div>
+<h2>2. SPECIAL PROVISIONS</h2>
+<p class="provision" style="text-align: center; font-weight: bold; margin-bottom: 16pt;">
+    THE PARTIES FURTHER AGREE TO THE FOLLOWING SPECIAL PROVISIONS:
 </p>
+
+{% for prov in section_2_provisions %}
+<h3>2.{{ loop.index }} {{ prov.title }}</h3>
+{% if prov.key == 'security_deposit_provisions' and lease_data.get('deposit_bank_name') %}
+<p class="provision">{{ prov.text_before_bank }}</p>
+<p class="provision">Financial institution holding the deposit:</p>
+<table class="data-table">
+    <tr>
+        <th>Bank / Depository Name</th>
+        <th>Bank / Depository Address</th>
+    </tr>
+    <tr>
+        <td>{{ lease_data.get('deposit_bank_name', '') }}</td>
+        <td>{{ lease_data.get('deposit_bank_address', '') }}</td>
+    </tr>
+</table>
+<div class="bold-notice">
+    You must notify your landlord in writing within 4 days after you
+    move of a forwarding address where you can be reached and
+    where you will receive mail; otherwise your landlord shall be
+    relieved of sending you an itemized list of damages and the
+    penalties adherent to that failure.
+</div>
+{% else %}
+<p class="provision" style="white-space: pre-wrap;">{{ prov.text }}</p>
+{% endif %}
 {% endfor %}
 
 <!-- ==================== SECTION 3: GENERAL PROVISIONS ==================== -->
 <div class="page-break"></div>
-<h2>SECTION 3: GENERAL PROVISIONS</h2>
+<h2>3. GENERAL PROVISIONS</h2>
+<p class="provision" style="text-align: center; font-weight: bold; margin-bottom: 16pt;">
+    THE PARTIES FURTHER AGREE TO THE FOLLOWING GENERAL PROVISIONS:
+</p>
 
 {% for gp in section_3_provisions %}
-<h3>{{ loop.index }}. {{ gp.title }}</h3>
+<h3>3.{{ loop.index }} {{ gp.title }}</h3>
 <p class="provision">{{ gp.text }}</p>
 {% endfor %}
 
-<!-- ==================== MICHIGAN NOTICES ==================== -->
-<div class="page-break"></div>
-<h2>MICHIGAN LEGAL NOTICES</h2>
-
-<div class="notice-box">
-    <strong>Truth in Renting Act Notice</strong><br>
-    {{ michigan_truth_in_renting }}
-</div>
-
-<div class="notice-box">
-    <strong>Security Deposit Notice</strong><br>
-    {{ michigan_security_deposit }}
-</div>
-
-{% if michigan_lead_paint %}
-<div class="notice-box">
-    <strong>Lead-Based Paint Disclosure</strong><br>
-    {{ michigan_lead_paint }}
-</div>
-{% endif %}
-
-<!-- ==================== ADDITIONAL TERMS ==================== -->
-{% if additional_terms %}
-<h2>ADDITIONAL TERMS AND CONDITIONS</h2>
-<div class="provision" style="white-space: pre-wrap;">{{ additional_terms }}</div>
-{% endif %}
-
 <!-- ==================== SIGNATURE PAGE ==================== -->
 <div class="page-break"></div>
-<h2>SIGNATURES</h2>
+<h2>4. SIGNATURES</h2>
 
-<p class="provision">
-    By signing below, the parties acknowledge that they have read and understood the terms of this
-    Residential Rental Agreement and agree to be bound by all of its provisions.
+<p class="provision" style="text-align: center; text-transform: uppercase; font-size: 9pt; line-height: 1.6;">
+    THE TENANT UNDERSTANDS THAT THE EXECUTION OF THIS AGREEMENT ENTAILS AN
+    IMPORTANT DECISION THAT HAS LEGAL IMPLICATIONS. TENANT IS ADVISED TO SEEK HIS
+    OR HER OWN COUNSEL, LEGAL OR OTHERWISE, REGARDING THE EXECUTION OF THIS
+    AGREEMENT. TENANT HEREBY ACKNOWLEDGES THAT HE OR SHE HAS READ THIS
+    AGREEMENT, UNDERSTANDS IT, AGREES TO IT, AND HAS BEEN GIVEN A COPY. ELECTRONIC
+    SIGNATURES MAY BE USED TO EXECUTE THIS AGREEMENT. IF USED, THE PARTIES
+    ACKNOWLEDGE THAT ONCE THE ELECTRONIC SIGNATURE PROCESS IS COMPLETED, THE
+    ELECTRONIC SIGNATURES ON THIS AGREEMENT WILL BE AS BINDING AS IF THE
+    SIGNATURES WERE PHYSICALLY SIGNED BY HAND.
 </p>
 
+<p class="provision" style="font-weight: bold;">WITNESS THE SIGNATURES OF THE PARTIES TO THIS AGREEMENT:</p>
+
 {% if signatures %}
-{# ── E-Signed: render cursive name signatures (DocuSign-style) ── #}
+{# ── E-Signed: render cursive name signatures ── #}
 <div class="signature-block">
     {% for key, sig in signatures.items() %}
     <div class="signature-row">
         <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">{{ sig.role|upper }}:</h3>
-        <p style="font-family: 'Dancing Script', 'Brush Script MT', 'Segoe Script', cursive;
-                  font-size: 28pt; color: #1a237e; margin: 0; line-height: 1.2;
-                  border-bottom: 1px solid #333; display: inline-block; padding-bottom: 2pt; min-width: 300pt;">
-            {{ sig.name }}
+        <table style="border: none; border-collapse: collapse;">
+            <tr>
+                <td style="border: none; width: 60pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; min-width: 200pt;">{{ sig.name }}</td>
+                <td style="border: none; width: 40pt; padding-left: 16pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; min-width: 200pt;">
+                    <span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>
+                </td>
+                <td style="border: none; width: 40pt; padding-left: 16pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; min-width: 120pt;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</td>
+            </tr>
+        </table>
+        <p class="signature-label" style="margin-top: 2pt;">
+            Electronically signed{% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
         </p>
-        <p class="signature-label">
-            {{ sig.name }}{% if sig.email %} ({{ sig.email }}){% endif %} — Electronically signed on {{ sig.signed_at }}
-            {% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
-        </p>
-        <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</span></p>
     </div>
     {% endfor %}
 </div>
 {% else %}
 {# ── Blank signature lines (unsigned / print version) ── #}
 <div class="signature-block">
-    <h3>LANDLORD:</h3>
-    <div class="signature-row">
-        <p><span class="signature-line">&nbsp;</span></p>
-        <p class="signature-label">{{ landlord.get('entity_name', 'Landlord') }}{% if landlord.get('owner_name') %} — {{ landlord.get('owner_name') }}{% endif %}</p>
-        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
-    </div>
-
-    <h3>TENANT(S):</h3>
+    <p style="font-weight: bold;">TENANT(S):</p>
     {% for t in tenants %}
     <div class="signature-row">
-        <p><span class="signature-line">&nbsp;</span></p>
-        <p class="signature-label">{{ t.get('name', 'Tenant') }}</p>
-        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 50pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">{{ t.get('name', '') }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">&nbsp;</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 100pt;">&nbsp;</td>
+            </tr>
+        </table>
     </div>
     {% endfor %}
 
+    <p style="font-weight: bold; margin-top: 24pt;">LANDLORD(S):</p>
+    <div class="signature-row">
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 80pt;">Authorized<br>Signer<br>Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 160pt;">{{ landlord.get('owner_name', '') }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 160pt;">&nbsp;</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 100pt;">&nbsp;</td>
+            </tr>
+        </table>
+        <table style="border: none; border-collapse: collapse; margin-top: 8pt;">
+            <tr>
+                <td style="border: none; width: 80pt;">Company<br>Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 200pt;">{{ landlord.get('entity_name', '') }}</td>
+            </tr>
+        </table>
+    </div>
+
     {% if cosigners %}
-    <h3>CO-SIGNER(S):</h3>
+    <p style="font-weight: bold; margin-top: 24pt;">CO-SIGNER(S):</p>
     {% for c in cosigners %}
     <div class="signature-row">
-        <p><span class="signature-line">&nbsp;</span></p>
-        <p class="signature-label">{{ c.get('name', 'Co-signer') }}</p>
-        <p style="margin-top: 10pt;">Date: <span class="signature-line" style="width: 200pt;">&nbsp;</span></p>
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 50pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">{{ c.get('name', '') }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">&nbsp;</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 100pt;">&nbsp;</td>
+            </tr>
+        </table>
     </div>
     {% endfor %}
     {% endif %}
+</div>
+{% endif %}
+
+<!-- ==================== LEAD-BASED PAINT DISCLOSURE ==================== -->
+{% if lease_data.get('lead_paint_disclosure') %}
+<div class="page-break"></div>
+<h1 style="font-size: 16pt;">LEAD-BASED PAINT DISCLOSURE</h1>
+
+<p class="provision" style="font-weight: bold;">LEAD WARNING STATEMENT</p>
+<p class="provision">
+    Housing built before 1978 may contain lead-based paint. Lead from paint, paint chips, and
+    dust can pose health hazards if not managed properly. Lead exposure is especially harmful
+    to young children and pregnant women. Before renting pre-1978 housing, landlords must
+    disclose the presence of known lead-based paint and/or lead-based paint hazards in the
+    dwelling. Lessees must also receive a federally approved pamphlet on lead poisoning
+    prevention.
+</p>
+
+<p class="provision" style="font-weight: bold; font-style: italic;">Landlord's Disclosure:</p>
+<p class="provision">
+    (a) Presence of lead-based paint and/or lead-based paint hazards (check (i) or (ii) below):
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    (i) <span class="checkbox"></span> Known lead-based paint and/or lead-based paint hazards are present in the housing (explain).
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    (ii) <span class="checkbox checked"></span> Landlord has no knowledge of lead-based paint and/or lead-based paint hazards in the housing.
+</p>
+
+<p class="provision">
+    (b) Records and reports available to the lessor (check (i) or (ii) below):
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    (i) <span class="checkbox"></span> Landlord has provided the lessee with all available records and reports pertaining to
+    lead-based paint and/or lead-based paint hazards in the housing (list documents below).
+</p>
+<p class="provision" style="margin-left: 24pt;">
+    (ii) <span class="checkbox checked"></span> Landlord has no reports or records pertaining to lead-based paint and/or lead-based
+    paint hazards in the housing.
+</p>
+
+<p class="provision" style="font-weight: bold; font-style: italic;">Tenant's Acknowledgment (initial): ________</p>
+<p class="provision">
+    (c) Tenant has read the Lead Warning Statement above and understands its contents.<br>
+    (d) Tenant has received copies of all information listed above.<br>
+    (e) Tenant has received the pamphlet Protect Your Family from Lead in Your Home.
+</p>
+
+<p class="provision" style="font-weight: bold; font-style: italic;">Certification of Accuracy:</p>
+<p class="provision">
+    The following parties have reviewed the information above and certify, to the best of their
+    knowledge, that the information they have provided is true and accurate.
+</p>
+
+<div class="signature-block">
+    <p style="font-weight: bold;">TENANT(S):</p>
+    {% for t in tenants %}
+    <div class="signature-row">
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 50pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">{{ t.get('name', '') }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 180pt;">&nbsp;</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 100pt;">&nbsp;</td>
+            </tr>
+        </table>
+    </div>
+    {% endfor %}
+
+    <p style="font-weight: bold; margin-top: 16pt;">LANDLORD(S):</p>
+    <div class="signature-row">
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 80pt;">Authorized<br>Signer<br>Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 160pt;">{{ landlord.get('owner_name', '') }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 160pt;">&nbsp;</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 100pt;">&nbsp;</td>
+            </tr>
+        </table>
+        <table style="border: none; border-collapse: collapse; margin-top: 8pt;">
+            <tr>
+                <td style="border: none; width: 80pt;">Company<br>Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 200pt;">{{ landlord.get('entity_name', '') }}</td>
+            </tr>
+        </table>
+    </div>
 </div>
 {% endif %}
 
