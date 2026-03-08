@@ -284,7 +284,7 @@
             {{ sig.name }}
         </p>
         <p class="signature-label">
-            {{ sig.name }} — Electronically signed on {{ sig.signed_at }}
+            {{ sig.name }}{% if sig.email %} ({{ sig.email }}){% endif %} — Electronically signed on {{ sig.signed_at }}
             {% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
         </p>
         <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</span></p>

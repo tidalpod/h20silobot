@@ -444,6 +444,7 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
                 logger.info(f"[ESIGN] Signer {signer.name} sig path: {sig_path}, exists: {Path(sig_path).exists()}")
                 signatures[f"{signer.role}_{signer.id}"] = {
                     "name": signer.name,
+                    "email": signer.email,
                     "role": signer.role,
                     "image_path": sig_path,
                     "signed_at": signer.signed_at.strftime("%B %d, %Y at %I:%M %p") if signer.signed_at else "",
@@ -537,7 +538,7 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
                 {sig['name']}
             </p>
             <p style="font-size: 9pt; color: #666; margin-top: 2pt;">
-                {sig['name']} — Electronically signed on {sig['signed_at']}
+                {sig['name']} ({sig.get('email', '')}) — Electronically signed on {sig['signed_at']}
                 {(' — IP: ' + sig['ip_address']) if sig['ip_address'] else ''}
             </p>
             <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{signed_date}</span></p>
