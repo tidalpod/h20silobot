@@ -191,8 +191,10 @@
                         <!-- Signer 1: Pre-fill with tenant -->
                         <div class="signer-row space-y-2 p-3 rounded-lg bg-gray-50 mb-2">
                             <p class="text-xs font-medium text-gray-500">Signer 1</p>
-                            <input type="text" name="signer_name" value="{{ lease.tenant_ref.name if lease.tenant_ref else '' }}" placeholder="Full Name" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
-                            <input type="email" name="signer_email" value="{{ lease.tenant_ref.email if lease.tenant_ref else '' }}" placeholder="Email Address" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
+                            <label class="block text-xs text-gray-500 mb-0.5">Full Name</label>
+                            <input type="text" name="signer_name" value="{{ lease.tenant_ref.name if lease.tenant_ref and lease.tenant_ref.name else '' }}" placeholder="Full Name" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
+                            <label class="block text-xs text-gray-500 mb-0.5">Email Address</label>
+                            <input type="email" name="signer_email" value="{{ lease.tenant_ref.email if lease.tenant_ref and lease.tenant_ref.email else '' }}" placeholder="Email Address" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
                             <input type="hidden" name="signer_role" value="tenant">
                         </div>
                     </div>
