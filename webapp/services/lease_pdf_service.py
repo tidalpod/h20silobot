@@ -144,6 +144,8 @@ def _build_utilities_display(data: dict) -> dict:
         ("landscaping", "Landscaping"),
         ("phone", "Phone"),
         ("snow_removal", "Snow Removal"),
+        ("stove", "Stove"),
+        ("fridge", "Refrigerator"),
     ]
 
     display = {}

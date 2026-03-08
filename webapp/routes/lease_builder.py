@@ -351,6 +351,7 @@ async def save_step(request: Request, builder_id: int, step: int):
             utility_names = [
                 "electricity", "gas", "water", "sewer", "trash",
                 "internet", "cable", "hoa", "landscaping", "phone", "snow_removal",
+                "stove", "fridge",
             ]
             utilities = {}
             for name in utility_names:

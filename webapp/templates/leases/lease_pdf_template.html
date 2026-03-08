@@ -750,16 +750,20 @@
     {% for key, sig in signatures.items() %}
     <div class="signature-row">
         <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">{{ sig.role|upper }}:</h3>
-        <table style="border: none; border-collapse: collapse;">
+        <table style="border: none; border-collapse: collapse; width: 100%;">
             <tr>
-                <td style="border: none; width: 60pt;">Name:</td>
-                <td style="border: none; border-bottom: 1px solid #333; min-width: 200pt;">{{ sig.name }}</td>
-                <td style="border: none; width: 40pt; padding-left: 16pt;">Sign:</td>
-                <td style="border: none; border-bottom: 1px solid #333; min-width: 200pt;">
+                <td style="border: none; width: 45pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 55%;">{{ sig.name }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</td>
+            </tr>
+        </table>
+        <table style="border: none; border-collapse: collapse; width: 100%; margin-top: 12pt;">
+            <tr>
+                <td style="border: none; width: 45pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333;">
                     <span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>
                 </td>
-                <td style="border: none; width: 40pt; padding-left: 16pt;">Date:</td>
-                <td style="border: none; border-bottom: 1px solid #333; min-width: 120pt;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</td>
             </tr>
         </table>
         <p class="signature-label" style="margin-top: 2pt;">
@@ -878,6 +882,34 @@
     knowledge, that the information they have provided is true and accurate.
 </p>
 
+{% if signatures %}
+<div class="signature-block">
+    {% for key, sig in signatures.items() %}
+    <div class="signature-row">
+        <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">{{ sig.role|upper }}:</h3>
+        <table style="border: none; border-collapse: collapse; width: 100%;">
+            <tr>
+                <td style="border: none; width: 45pt;">Name:</td>
+                <td style="border: none; border-bottom: 1px solid #333; width: 55%;">{{ sig.name }}</td>
+                <td style="border: none; width: 40pt; padding-left: 12pt;">Date:</td>
+                <td style="border: none; border-bottom: 1px solid #333;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</td>
+            </tr>
+        </table>
+        <table style="border: none; border-collapse: collapse; width: 100%; margin-top: 12pt;">
+            <tr>
+                <td style="border: none; width: 45pt;">Sign:</td>
+                <td style="border: none; border-bottom: 1px solid #333;">
+                    <span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>
+                </td>
+            </tr>
+        </table>
+        <p class="signature-label" style="margin-top: 2pt;">
+            Electronically signed{% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
 <div class="signature-block">
     <p style="font-weight: bold;">TENANT(S):</p>
     {% for t in tenants %}
@@ -915,6 +947,7 @@
         </table>
     </div>
 </div>
+{% endif %}
 {% endif %}
 
 </body>
