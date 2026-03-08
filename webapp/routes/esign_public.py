@@ -62,6 +62,13 @@ async def signing_page(request: Request, token: str):
                 "signer": signer,
             })
 
+        # Waiting for prior signers?
+        if signer.status == "waiting":
+            return templates.TemplateResponse("leases/esign_waiting.html", {
+                "request": request,
+                "signer": signer,
+            })
+
         # Load envelope
         env_result = await session.execute(
             select(ESignEnvelope).where(ESignEnvelope.id == envelope_id)

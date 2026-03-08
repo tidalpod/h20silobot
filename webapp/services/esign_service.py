@@ -115,23 +115,32 @@ async def create_signing_request(lease_document_id: int, signers: list[dict]) ->
         await _log_audit(session, envelope.id, "envelope_created",
                          details={"signers": [s["email"] for s in signers]})
 
-        # Create signer rows and send emails
+        # Assign signing order: tenants=1, cosigners=1, landlords=2
         for signer_data in signers:
+            role = signer_data.get("role", "tenant")
+            order = 2 if role == "landlord" else 1
             signer = ESignSigner(
                 envelope_id=envelope.id,
                 name=signer_data["name"],
                 email=signer_data["email"],
-                role=signer_data.get("role", "tenant"),
+                role=role,
+                signing_order=order,
+                status="pending" if order == 1 else "waiting",
             )
             session.add(signer)
             await session.flush()
 
-            # Send signing email
-            token = generate_signing_token(signer.id, envelope.id)
-            await _send_signing_email(signer, envelope, lease, token)
-            await _log_audit(session, envelope.id, "email_sent",
-                             signer_id=signer.id,
-                             details={"email": signer.email})
+            # Only send email to order=1 signers now; order=2 wait
+            if order == 1:
+                token = generate_signing_token(signer.id, envelope.id)
+                await _send_signing_email(signer, envelope, lease, token)
+                await _log_audit(session, envelope.id, "email_sent",
+                                 signer_id=signer.id,
+                                 details={"email": signer.email})
+            else:
+                await _log_audit(session, envelope.id, "signer_queued",
+                                 signer_id=signer.id,
+                                 details={"email": signer.email, "order": order})
 
         return {"envelope_id": envelope.id, "status": "sent"}
 
@@ -276,7 +285,7 @@ async def submit_signature(signer_id: int, signature_data_base64: str,
                          details={"signature_type": signature_type},
                          ip=ip, user_agent=user_agent)
 
-        # Check if all signers have signed
+        # Reload envelope with all signers
         env_result = await session.execute(
             select(ESignEnvelope)
             .where(ESignEnvelope.id == signer.envelope_id)
@@ -284,6 +293,38 @@ async def submit_signature(signer_id: int, signature_data_base64: str,
         )
         envelope = env_result.scalar_one_or_none()
 
+        # Check if all signers at the current order level have signed
+        current_order = signer.signing_order
+        same_order_signers = [s for s in envelope.signer_records if s.signing_order == current_order]
+        all_current_order_signed = all(s.status == "signed" for s in same_order_signers)
+
+        if all_current_order_signed:
+            # Activate next-order signers (send them emails)
+            next_order_signers = [s for s in envelope.signer_records
+                                  if s.signing_order == current_order + 1 and s.status == "waiting"]
+            if next_order_signers:
+                # Load lease for email context
+                from database.models import LeaseDocument
+                lease_result = await session.execute(
+                    select(LeaseDocument)
+                    .where(LeaseDocument.id == envelope.lease_document_id)
+                    .options(
+                        selectinload(LeaseDocument.property_ref),
+                        selectinload(LeaseDocument.tenant_ref),
+                    )
+                )
+                lease = lease_result.scalar_one_or_none()
+
+                for next_signer in next_order_signers:
+                    next_signer.status = "pending"
+                    token = generate_signing_token(next_signer.id, envelope.id)
+                    await _send_signing_email(next_signer, envelope, lease, token)
+                    await _log_audit(session, envelope.id, "email_sent",
+                                     signer_id=next_signer.id,
+                                     details={"email": next_signer.email, "triggered_by": signer.name})
+                    logger.info(f"[ESIGN] Sequential: sent signing email to {next_signer.name} (order {next_signer.signing_order})")
+
+        # Check if ALL signers are done
         all_signed = all(s.status == "signed" for s in envelope.signer_records)
 
         if all_signed:

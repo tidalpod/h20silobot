@@ -1416,8 +1416,9 @@ class ESignSigner(Base):
     name = Column(String(200), nullable=False)
     email = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="tenant")  # tenant/landlord/cosigner
+    signing_order = Column(Integer, nullable=False, default=1)  # 1=first to sign, 2=after first, etc.
 
-    status = Column(String(20), nullable=False, default="pending")  # pending/viewed/signed/declined
+    status = Column(String(20), nullable=False, default="pending")  # pending/viewed/signed/declined/waiting
     viewed_at = Column(DateTime, nullable=True)
     signed_at = Column(DateTime, nullable=True)
     declined_at = Column(DateTime, nullable=True)

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Waiting for Other Signers — Blue Deer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<header class="bg-blue-800 text-white">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        <div>
+            <h1 class="text-lg font-bold">Blue Deer Property Management</h1>
+            <p class="text-blue-200 text-sm">Document Signing</p>
+        </div>
+    </div>
+</header>
+<main class="max-w-lg mx-auto px-4 py-16 text-center">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Other Signers</h2>
+        <p class="text-gray-600 mb-4">
+            Hi {{ signer.name }}, this document requires other parties to sign before you.
+            You'll receive a new email when it's your turn to sign.
+        </p>
+        <p class="text-sm text-gray-400">You can close this page.</p>
+    </div>
+</main>
+</body>
+</html>

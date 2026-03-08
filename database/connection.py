@@ -56,6 +56,8 @@ async def run_migrations(engine):
         # In-house e-signing columns on existing esign_envelopes
         ("esign_envelopes", "signing_mode", "VARCHAR(20) DEFAULT 'inhouse'"),
         ("esign_envelopes", "void_reason", "VARCHAR(500)"),
+        # Sequential signing order
+        ("esign_signers", "signing_order", "INTEGER DEFAULT 1"),
     ]
 
     async with engine.begin() as conn:
