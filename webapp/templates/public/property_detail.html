@@ -167,7 +167,8 @@
                     {% for photo in photos %}
                     <div class="carousel-slide">
                         <img src="{{ photo.url }}" alt="{{ property.address }} - Photo {{ loop.index }}"
-                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 300%22><rect fill=%22%23e5e7eb%22 width=%22400%22 height=%22300%22/><text x=%22200%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2220%22>Photo unavailable</text></svg>'">
+                             onload="handleImageLoad(this, {{ loop.index0 }})"
+                             onerror="handleImageError(this, {{ loop.index0 }})">
                     </div>
                     {% endfor %}
                 </div>
@@ -211,8 +212,7 @@
             <div class="thumb-strip border-t border-gray-100">
                 {% for photo in photos %}
                 <div class="thumb {% if loop.index == 1 %}active{% endif %}" onclick="goToSlide({{ loop.index0 }})" id="thumb-{{ loop.index0 }}">
-                    <img src="{{ photo.url }}" alt="Thumbnail {{ loop.index }}"
-                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 60%22><rect fill=%22%23e5e7eb%22 width=%2280%22 height=%2260%22/></svg>'">
+                    <img src="{{ photo.url }}" alt="Thumbnail {{ loop.index }}">
                 </div>
                 {% endfor %}
             </div>
@@ -248,7 +248,7 @@
                 <div class="bg-white rounded-2xl shadow-lg p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div>
-                            {% if rent %}
+                            {% if rent and is_available %}
                             <div class="flex items-baseline gap-2 mb-2">
                                 <span class="text-3xl font-bold text-gray-900">${{ "{:,.0f}".format(rent) }}</span>
                                 <span class="text-gray-500">/month</span>
@@ -380,9 +380,9 @@
                             <span>&#128221;</span> Apply Now
                         </a>
                         {% endif %}
-                        <a href="tel:+12489638704"
+                        <a href="sms:+12489638704"
                            class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-500 transition-colors">
-                            <span>📞</span> Call (248) 963-8704
+                            <span>💬</span> Text (248) 963-8704
                         </a>
                         <a href="mailto:rentals@bluedeer.space?subject=Inquiry: {{ property.address }}"
                            class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
@@ -430,9 +430,78 @@
     </footer>
 
     <script>
+        // Track which photos actually loaded vs broke
+        const validSlides = [];
         let currentSlide = 0;
         const totalSlides = {{ photos|length if photos else 0 }};
         const track = document.getElementById('carousel-track');
+
+        // Handle broken images - hide them and track valid ones
+        function handleImageError(img, slideIndex) {
+            const slide = img.closest('.carousel-slide');
+            if (slide) slide.style.display = 'none';
+            const thumb = document.getElementById('thumb-' + slideIndex);
+            if (thumb) thumb.style.display = 'none';
+            const dot = document.querySelectorAll('.carousel-dot')[slideIndex];
+            if (dot) dot.style.display = 'none';
+            rebuildCarousel();
+        }
+
+        function handleImageLoad(img, slideIndex) {
+            if (!validSlides.includes(slideIndex)) {
+                validSlides.push(slideIndex);
+                validSlides.sort((a, b) => a - b);
+            }
+        }
+
+        function rebuildCarousel() {
+            // After all images have tried loading, rearrange
+            const slides = document.querySelectorAll('.carousel-slide');
+            let visibleCount = 0;
+            slides.forEach(s => { if (s.style.display !== 'none') visibleCount++; });
+
+            // Update counter
+            const counter = document.querySelector('.carousel-counter');
+            if (counter) {
+                if (visibleCount === 0) {
+                    counter.style.display = 'none';
+                } else {
+                    counter.innerHTML = `<span id="current-slide">1</span> / ${visibleCount}`;
+                }
+            }
+
+            // If no valid photos, show fallback
+            if (visibleCount === 0) {
+                const container = document.querySelector('.carousel-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                            <div class="text-center">
+                                <span class="text-8xl text-gray-300">🏠</span>
+                                <p class="mt-4 text-gray-400">Photos coming soon</p>
+                            </div>
+                        </div>`;
+                }
+                const thumbStrip = document.querySelector('.thumb-strip');
+                if (thumbStrip) thumbStrip.style.display = 'none';
+            }
+
+            // Hide arrows if 0 or 1 visible
+            if (visibleCount <= 1) {
+                document.querySelectorAll('.carousel-btn').forEach(b => b.style.display = 'none');
+                document.querySelectorAll('.carousel-dots').forEach(d => d.style.display = 'none');
+                if (counter) counter.style.display = 'none';
+            }
+
+            // Reset to first valid slide
+            if (validSlides.length > 0) {
+                currentSlide = validSlides[0];
+                updateCarousel();
+            }
+        }
+
+        // Run rebuild after a short delay to let images load/fail
+        setTimeout(rebuildCarousel, 2000);
 
         function updateCarousel() {
             if (!track) return;
@@ -440,7 +509,10 @@
 
             // Update counter
             const counter = document.getElementById('current-slide');
-            if (counter) counter.textContent = currentSlide + 1;
+            if (counter) {
+                const pos = validSlides.indexOf(currentSlide);
+                counter.textContent = pos >= 0 ? pos + 1 : 1;
+            }
 
             // Update dots
             document.querySelectorAll('.carousel-dot').forEach((dot, i) => {
@@ -460,12 +532,18 @@
         }
 
         function nextSlide() {
-            currentSlide = (currentSlide + 1) % totalSlides;
+            if (validSlides.length === 0) return;
+            const pos = validSlides.indexOf(currentSlide);
+            const nextPos = (pos + 1) % validSlides.length;
+            currentSlide = validSlides[nextPos];
             updateCarousel();
         }
 
         function prevSlide() {
-            currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+            if (validSlides.length === 0) return;
+            const pos = validSlides.indexOf(currentSlide);
+            const prevPos = (pos - 1 + validSlides.length) % validSlides.length;
+            currentSlide = validSlides[prevPos];
             updateCarousel();
         }
 
