@@ -480,11 +480,32 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
 
         if lease_data and lease.property_ref:
             # Builder lease — re-render with signatures inline
-            return _generate_signed_builder_pdf(lease, lease_data, signatures)
+            pdf_result = _generate_signed_builder_pdf(lease, lease_data, signatures)
         else:
             # Uploaded PDF — append signature page
             logger.info(f"[ESIGN] Using pypdf append path for uploaded PDF")
-            return _generate_signature_page_pdf(lease, envelope, signatures)
+            pdf_result = _generate_signature_page_pdf(lease, envelope, signatures)
+
+        if "error" in pdf_result:
+            return pdf_result
+
+        # Load audit logs and append audit trail page
+        from database.models import ESignAuditLog
+        audit_result = await session.execute(
+            select(ESignAuditLog)
+            .where(ESignAuditLog.envelope_id == envelope_id)
+            .options(selectinload(ESignAuditLog.signer))
+            .order_by(ESignAuditLog.created_at)
+        )
+        audit_logs = audit_result.scalars().all()
+
+        try:
+            _append_audit_trail(pdf_result["file_path"], lease, envelope, audit_logs)
+            logger.info(f"[ESIGN] Audit trail appended to {pdf_result['file_path']}")
+        except Exception as e:
+            logger.error(f"[ESIGN] Failed to append audit trail: {e}", exc_info=True)
+
+        return pdf_result
 
     finally:
         if own_session:
@@ -612,6 +633,194 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
         "file_path": str(output_path),
         "file_size": output_path.stat().st_size,
     }
+
+
+# =============================================================================
+# Audit Trail
+# =============================================================================
+
+# Map action codes to display info
+_AUDIT_ICONS = {
+    "envelope_created": ("CREATED", "#6b7280"),
+    "email_sent": ("SENT", "#2563eb"),
+    "email_resent": ("RESENT", "#2563eb"),
+    "signer_queued": ("QUEUED", "#6b7280"),
+    "link_opened": ("VIEWED", "#8b5cf6"),
+    "signed": ("SIGNED", "#059669"),
+    "declined": ("DECLINED", "#dc2626"),
+    "voided": ("VOIDED", "#dc2626"),
+    "pdf_generated": ("PDF", "#059669"),
+    "completion_emails_sent": ("NOTIFIED", "#2563eb"),
+}
+
+
+def _build_audit_trail_html(lease, envelope, audit_logs) -> str:
+    """Build the audit trail HTML page matching Dropbox Sign style."""
+    property_address = ""
+    if lease.property_ref:
+        p = lease.property_ref
+        property_address = f"{p.address}, {p.city}, {p.state} {p.zip_code}"
+
+    # Document info
+    doc_id = f"{envelope.id:08d}"
+    status = envelope.status.value.title() if envelope.status else "Unknown"
+    completed_at = envelope.completed_at.strftime("%m/%d/%Y %H:%M:%S UTC") if envelope.completed_at else "—"
+
+    # Build event rows
+    event_rows = ""
+    for log in audit_logs:
+        label, color = _AUDIT_ICONS.get(log.action, (log.action.upper(), "#6b7280"))
+        ts = log.created_at.strftime("%m / %d / %Y") if log.created_at else ""
+        time_str = log.created_at.strftime("%H:%M:%S UTC") if log.created_at else ""
+
+        # Build description
+        details = {}
+        if log.details:
+            try:
+                details = json.loads(log.details)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        signer_name = log.signer.name if log.signer else ""
+        signer_email = log.signer.email if log.signer else details.get("email", "")
+        desc = _audit_description(log.action, signer_name, signer_email, details)
+        ip_line = f"<br/>IP: {log.ip_address}" if log.ip_address else ""
+
+        event_rows += f"""
+        <tr>
+            <td style="padding: 18pt 8pt; vertical-align: top; width: 70pt; text-align: center;">
+                <span style="font-size: 8pt; font-weight: bold; color: {color};
+                             letter-spacing: 1pt; text-transform: uppercase;">{label}</span>
+            </td>
+            <td style="padding: 18pt 8pt; vertical-align: top; width: 110pt;">
+                <strong style="font-size: 10pt;">{ts}</strong><br/>
+                <span style="font-size: 9pt; color: #666;">{time_str}</span>
+            </td>
+            <td style="padding: 18pt 8pt; vertical-align: top; font-size: 9.5pt; color: #333;">
+                {desc}{ip_line}
+            </td>
+        </tr>
+        """
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {{ size: letter; margin: 0.75in; }}
+        body {{ font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #333; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center;
+                   border-bottom: 2px solid #111; padding-bottom: 12pt; margin-bottom: 20pt; }}
+        .brand {{ font-size: 16pt; font-weight: bold; color: #1e40af; }}
+        .trail-title {{ font-size: 14pt; color: #666; }}
+        .info-table {{ width: 100%; margin-bottom: 20pt; border-collapse: collapse; }}
+        .info-table td {{ padding: 6pt 8pt; font-size: 9.5pt; border-bottom: 1px solid #eee; }}
+        .info-table td:first-child {{ font-weight: bold; color: #333; width: 140pt; }}
+        .info-table td:last-child {{ color: #555; }}
+        .note {{ background: #f9fafb; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;
+                 padding: 8pt 12pt; font-size: 9pt; font-weight: bold; margin-bottom: 20pt; }}
+        .history-title {{ font-size: 16pt; color: #999; margin-bottom: 12pt; }}
+        .events {{ width: 100%; border-collapse: collapse; }}
+        .events tr {{ border-bottom: 1px solid #eee; }}
+        .status-dot {{ display: inline-block; width: 8pt; height: 8pt; border-radius: 50%;
+                       background: #059669; margin-right: 4pt; vertical-align: middle; }}
+    </style>
+</head>
+<body>
+    <table style="width: 100%; margin-bottom: 20pt;">
+        <tr>
+            <td><span class="brand">Blue Deer</span></td>
+            <td style="text-align: right;"><span class="trail-title">Audit trail</span></td>
+        </tr>
+    </table>
+    <hr style="border: none; border-top: 2px solid #111; margin-bottom: 20pt;">
+
+    <table class="info-table">
+        <tr><td>Title</td><td>{lease.title}</td></tr>
+        <tr><td>Property</td><td>{property_address}</td></tr>
+        <tr><td>Document ID</td><td>{doc_id}</td></tr>
+        <tr><td>Status</td><td><span class="status-dot"></span> {status}</td></tr>
+        <tr><td>Completed</td><td>{completed_at}</td></tr>
+    </table>
+
+    <div class="note">
+        This document was requested on bluedeer.space and signed on bluedeer.space
+    </div>
+
+    <p class="history-title">Document History</p>
+
+    <table class="events">
+        {event_rows}
+    </table>
+</body>
+</html>"""
+
+
+def _audit_description(action: str, name: str, email: str, details: dict) -> str:
+    """Generate a human-readable description for an audit event."""
+    email_str = f" ({email})" if email else ""
+    triggered_by = details.get("triggered_by", "")
+
+    if action == "envelope_created":
+        signers = details.get("signers", [])
+        return f"Signing request created for {', '.join(signers)}"
+    elif action == "email_sent":
+        extra = f" (triggered by {triggered_by} signing)" if triggered_by else ""
+        return f"Sent for signature to {name}{email_str}{extra}"
+    elif action == "email_resent":
+        return f"Signing email resent to {name}{email_str}"
+    elif action == "signer_queued":
+        order = details.get("order", 2)
+        return f"{name}{email_str} queued as signer #{order} (sequential)"
+    elif action == "link_opened":
+        return f"Viewed by {name}{email_str}"
+    elif action == "signed":
+        sig_type = details.get("signature_type", "")
+        return f"Signed by {name}{email_str}" + (f" ({sig_type})" if sig_type else "")
+    elif action == "declined":
+        reason = details.get("reason", "")
+        return f"Declined by {name}{email_str}" + (f" — {reason}" if reason else "")
+    elif action == "voided":
+        reason = details.get("reason", "")
+        return f"Voided" + (f" — {reason}" if reason else "")
+    elif action == "pdf_generated":
+        return "Signed PDF generated"
+    elif action == "completion_emails_sent":
+        return "Completion notifications sent to all parties"
+    else:
+        return f"{action}: {name}{email_str}"
+
+
+def _append_audit_trail(signed_pdf_path: str, lease, envelope, audit_logs):
+    """Generate audit trail PDF and append to the signed PDF."""
+    try:
+        from weasyprint import HTML
+        from pypdf import PdfReader, PdfWriter
+    except ImportError as e:
+        logger.error(f"Missing dependency for audit trail: {e}")
+        return
+
+    html = _build_audit_trail_html(lease, envelope, audit_logs)
+
+    # Render audit trail to temp PDF
+    trail_path = SIGNED_DIR / f"trail_{uuid.uuid4().hex[:8]}.pdf"
+    HTML(string=html).write_pdf(str(trail_path))
+
+    # Append to signed PDF
+    writer = PdfWriter()
+    reader = PdfReader(signed_pdf_path)
+    for page in reader.pages:
+        writer.add_page(page)
+
+    trail_reader = PdfReader(str(trail_path))
+    for page in trail_reader.pages:
+        writer.add_page(page)
+
+    with open(signed_pdf_path, "wb") as f:
+        writer.write(f)
+
+    # Clean up temp file
+    trail_path.unlink(missing_ok=True)
 
 
 # =============================================================================
