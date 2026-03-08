@@ -88,7 +88,7 @@
             </dl>
         </div>
 
-        {% if lease.notes %}
+        {% if lease.notes and lease.notes != 'None' %}
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
             <h2 class="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
             <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ lease.notes }}</p>
