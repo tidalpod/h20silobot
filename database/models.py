@@ -1551,7 +1551,10 @@ class TenantApplication(Base):
     applicant_num_occupants = Column(Integer, nullable=True)
     has_section8_voucher = Column(Boolean, default=False)
     voucher_amount = Column(Numeric(10, 2), nullable=True)
+    applicant_dob = Column(Date, nullable=True)
+    applicant_type = Column(String(20), default="tenant")  # tenant or cosigner
     applicant_notes = Column(Text, nullable=True)
+    application_data = Column(Text, nullable=True)  # JSON blob for extended TurboTenant-style fields
 
     # TenantReportX screening
     trx_order_id = Column(String(100), unique=True, nullable=True)

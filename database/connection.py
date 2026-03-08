@@ -58,6 +58,10 @@ async def run_migrations(engine):
         ("esign_envelopes", "void_reason", "VARCHAR(500)"),
         # Sequential signing order
         ("esign_signers", "signing_order", "INTEGER DEFAULT 1"),
+        # Extended tenant application fields
+        ("tenant_applications", "applicant_dob", "DATE"),
+        ("tenant_applications", "applicant_type", "VARCHAR(20) DEFAULT 'tenant'"),
+        ("tenant_applications", "application_data", "TEXT"),
     ]
 
     async with engine.begin() as conn:
