@@ -876,7 +876,7 @@ async def delete_work_order(request: Request, wo_id: int):
         # Delete photo files from disk
         for photo in wo.photos:
             if photo.url:
-                filepath = Path(UPLOAD_BASE) / photo.url.lstrip("/uploads/")
+                filepath = Path(UPLOAD_BASE) / photo.url.removeprefix("/uploads/")
                 if filepath.exists():
                     filepath.unlink()
             await session.delete(photo)
@@ -906,7 +906,7 @@ async def delete_work_order_photo(request: Request, wo_id: int, photo_id: int):
 
         # Delete file from disk
         if photo.url:
-            filepath = Path(UPLOAD_BASE) / photo.url.lstrip("/uploads/")
+            filepath = Path(UPLOAD_BASE) / photo.url.removeprefix("/uploads/")
             if filepath.exists():
                 filepath.unlink()
 

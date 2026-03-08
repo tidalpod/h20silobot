@@ -292,11 +292,18 @@ async def submit_signature(signer_id: int, signature_data_base64: str,
             envelope.updated_at = datetime.utcnow()
 
             # Generate signed PDF
-            pdf_result = await generate_signed_pdf(envelope.id, session=session)
-            if "error" not in pdf_result:
-                envelope.signed_file_url = pdf_result.get("file_url")
-                await _log_audit(session, envelope.id, "pdf_generated",
-                                 details={"file_url": pdf_result.get("file_url")})
+            logger.info(f"[ESIGN] Generating signed PDF for envelope {envelope.id}")
+            try:
+                pdf_result = await generate_signed_pdf(envelope.id, session=session)
+                logger.info(f"[ESIGN] Signed PDF result: {pdf_result}")
+                if "error" not in pdf_result:
+                    envelope.signed_file_url = pdf_result.get("file_url")
+                    await _log_audit(session, envelope.id, "pdf_generated",
+                                     details={"file_url": pdf_result.get("file_url")})
+                else:
+                    logger.error(f"[ESIGN] Signed PDF generation failed: {pdf_result['error']}")
+            except Exception as e:
+                logger.error(f"[ESIGN] Exception generating signed PDF: {e}", exc_info=True)
 
             # Send completion emails
             await _send_completion_emails(envelope.id, session=session)
@@ -392,7 +399,8 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
         signatures = {}
         for signer in envelope.signer_records:
             if signer.status == "signed" and signer.signature_file_url:
-                sig_path = str(Path(UPLOAD_BASE) / signer.signature_file_url.lstrip("/uploads/"))
+                sig_path = str(Path(UPLOAD_BASE) / signer.signature_file_url.removeprefix("/uploads/"))
+                logger.info(f"[ESIGN] Signer {signer.name} sig path: {sig_path}, exists: {Path(sig_path).exists()}")
                 signatures[f"{signer.role}_{signer.id}"] = {
                     "name": signer.name,
                     "role": signer.role,
@@ -409,11 +417,17 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
             except json.JSONDecodeError:
                 pass
 
+        logger.info(f"[ESIGN] lease.notes type: {type(lease.notes).__name__}, "
+                     f"has_data: {lease_data is not None}, "
+                     f"has_prop: {lease.property_ref is not None}, "
+                     f"file_url: {lease.file_url}")
+
         if lease_data and lease.property_ref:
             # Builder lease — re-render with signatures
             return _generate_signed_builder_pdf(lease, lease_data, signatures)
         else:
             # Uploaded PDF — append signature page
+            logger.info(f"[ESIGN] Using pypdf append path for uploaded PDF")
             return _generate_signature_page_pdf(lease, envelope, signatures)
 
     finally:
@@ -503,9 +517,11 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
         return {"error": f"Signature page generation failed: {e}"}
 
     # Append to original PDF
-    original_path = str(Path(UPLOAD_BASE) / lease.file_url.lstrip("/uploads/"))
+    original_path = str(Path(UPLOAD_BASE) / lease.file_url.removeprefix("/uploads/"))
     output_filename = f"signed_{uuid.uuid4().hex[:12]}.pdf"
     output_path = SIGNED_DIR / output_filename
+    logger.info(f"[ESIGN] Original PDF path: {original_path}, exists: {Path(original_path).exists()}")
+    logger.info(f"[ESIGN] Output path: {output_path}")
 
     try:
         from pypdf import PdfReader, PdfWriter

@@ -328,7 +328,7 @@ async def download_lease(request: Request, lease_id: int):
             return RedirectResponse(url="/leases", status_code=303)
 
         # Convert URL path to file path
-        relative_path = lease.file_url.lstrip("/uploads/")
+        relative_path = lease.file_url.removeprefix("/uploads/")
         filepath = Path(UPLOAD_BASE) / relative_path
 
         if not filepath.exists():

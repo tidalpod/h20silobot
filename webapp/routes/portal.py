@@ -413,7 +413,7 @@ async def portal_lease_download(request: Request, lease_id: int):
             "/app/uploads" if Path("/app/uploads").exists()
             else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
         )
-        relative_path = lease.file_url.lstrip("/uploads/")
+        relative_path = lease.file_url.removeprefix("/uploads/")
         filepath = Path(upload_base) / relative_path
 
         if not filepath.exists():

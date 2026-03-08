@@ -538,7 +538,7 @@ async def project_document_delete(request: Request, project_id: int, doc_id: int
         doc = result.scalar_one_or_none()
         if doc:
             # Delete file from disk
-            relative_path = doc.file_url.lstrip("/uploads/")
+            relative_path = doc.file_url.removeprefix("/uploads/")
             filepath = Path(UPLOAD_BASE) / relative_path
             if filepath.exists():
                 filepath.unlink()
@@ -619,7 +619,7 @@ async def delete_project_draw(request: Request, project_id: int, draw_id: int):
         draw = result.scalar_one_or_none()
         if draw:
             if draw.receipt_url:
-                relative_path = draw.receipt_url.lstrip("/uploads/")
+                relative_path = draw.receipt_url.removeprefix("/uploads/")
                 filepath = Path(UPLOAD_BASE) / relative_path
                 if filepath.exists():
                     filepath.unlink()
