@@ -57,6 +57,11 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Starting Blue Deer Web App...")
 
+    # Debug: log email config status
+    logger.info(f"[CONFIG] SENDGRID_API_KEY set: {bool(web_config.sendgrid_api_key)}")
+    logger.info(f"[CONFIG] EMAIL_FROM set: {bool(web_config.email_from)} ({web_config.email_from[:20] if web_config.email_from else 'empty'})")
+    logger.info(f"[CONFIG] Email configured: {web_config.has_sendgrid}")
+
     # Initialize database
     db_success = await init_db()
     if not db_success:
