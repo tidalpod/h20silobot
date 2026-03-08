@@ -481,26 +481,25 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
     except ImportError:
         return {"error": "weasyprint not installed"}
 
-    # Build signature page HTML
+    # Build signature page HTML with cursive names (DocuSign-style)
     sig_rows = ""
     for key, sig in signatures.items():
-        img_b64 = ""
-        try:
-            with open(sig["image_path"], "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode()
-        except Exception:
-            pass
-
+        signed_date = sig['signed_at'].split(' at ')[0] if ' at ' in sig['signed_at'] else sig['signed_at']
         sig_rows += f"""
         <div style="margin-bottom: 30pt; page-break-inside: avoid;">
             <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">
                 {sig['role'].upper()}:
             </h3>
-            <img src="data:image/png;base64,{img_b64}" style="height: 50pt; max-width: 300pt;" />
+            <p style="font-family: 'Dancing Script', cursive; font-size: 28pt; color: #1a237e;
+                      margin: 0; line-height: 1.2; border-bottom: 1px solid #333;
+                      display: inline-block; padding-bottom: 2pt; min-width: 300pt;">
+                {sig['name']}
+            </p>
             <p style="font-size: 9pt; color: #666; margin-top: 2pt;">
                 {sig['name']} — Electronically signed on {sig['signed_at']}
                 {(' — IP: ' + sig['ip_address']) if sig['ip_address'] else ''}
             </p>
+            <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{signed_date}</span></p>
         </div>
         """
 
@@ -509,6 +508,7 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
 <head>
     <meta charset="utf-8">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
         @page {{ size: letter; margin: 1in; }}
         body {{ font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.5; }}
         h2 {{ font-size: 13pt; border-bottom: 1px solid #999; padding-bottom: 3pt; }}

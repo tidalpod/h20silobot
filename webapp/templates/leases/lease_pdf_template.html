@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
         @page {
             size: letter;
             margin: 1in 1in 1.2in 1in;
@@ -272,20 +273,21 @@
 </p>
 
 {% if signatures %}
-{# ── E-Signed: render captured signature images ── #}
+{# ── E-Signed: render cursive name signatures (DocuSign-style) ── #}
 <div class="signature-block">
     {% for key, sig in signatures.items() %}
     <div class="signature-row">
         <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">{{ sig.role|upper }}:</h3>
-        {% if sig.image_data_uri %}
-        <img src="{{ sig.image_data_uri }}" style="height: 50pt; max-width: 300pt;" />
-        {% else %}
-        <p><span class="signature-line">&nbsp;</span></p>
-        {% endif %}
+        <p style="font-family: 'Dancing Script', 'Brush Script MT', 'Segoe Script', cursive;
+                  font-size: 28pt; color: #1a237e; margin: 0; line-height: 1.2;
+                  border-bottom: 1px solid #333; display: inline-block; padding-bottom: 2pt; min-width: 300pt;">
+            {{ sig.name }}
+        </p>
         <p class="signature-label">
             {{ sig.name }} — Electronically signed on {{ sig.signed_at }}
             {% if sig.ip_address %} — IP: {{ sig.ip_address }}{% endif %}
         </p>
+        <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{{ sig.signed_at.split(' at ')[0] if ' at ' in sig.signed_at else sig.signed_at }}</span></p>
     </div>
     {% endfor %}
 </div>

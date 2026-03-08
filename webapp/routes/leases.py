@@ -212,6 +212,20 @@ async def lease_detail(request: Request, lease_id: int):
         )
         esign_envelopes = esign_result.scalars().all()
 
+        # Load landlord info from builder data (for e-sign form pre-fill)
+        from database.models import LeaseBuilder
+        landlord_info = {}
+        builder_result = await session.execute(
+            select(LeaseBuilder).where(LeaseBuilder.lease_document_id == lease_id)
+        )
+        builder = builder_result.scalar_one_or_none()
+        if builder and builder.lease_data:
+            try:
+                builder_data = json.loads(builder.lease_data)
+                landlord_info = builder_data.get("landlord", {})
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
     return templates.TemplateResponse(
         "leases/detail.html",
         {
@@ -219,6 +233,7 @@ async def lease_detail(request: Request, lease_id: int):
             "user": user,
             "lease": lease,
             "esign_envelopes": esign_envelopes,
+            "landlord_info": landlord_info,
         },
     )
 

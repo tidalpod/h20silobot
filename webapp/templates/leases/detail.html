@@ -188,14 +188,23 @@
                 <summary class="text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-500">Send for E-Signature</summary>
                 <form method="POST" action="/leases/{{ lease.id }}/esign" class="mt-3 space-y-3">
                     <div id="signers-container">
-                        <!-- Signer 1: Pre-fill with tenant -->
+                        <!-- Signer 1: Tenant -->
                         <div class="signer-row space-y-2 p-3 rounded-lg bg-gray-50 mb-2">
-                            <p class="text-xs font-medium text-gray-500">Signer 1</p>
+                            <p class="text-xs font-medium text-gray-500">Signer 1 — Tenant</p>
                             <label class="block text-xs text-gray-500 mb-0.5">Full Name</label>
                             <input type="text" name="signer_name" value="{{ lease.tenant_ref.name if lease.tenant_ref and lease.tenant_ref.name else '' }}" placeholder="Full Name" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
                             <label class="block text-xs text-gray-500 mb-0.5">Email Address</label>
                             <input type="email" name="signer_email" value="{{ lease.tenant_ref.email if lease.tenant_ref and lease.tenant_ref.email else '' }}" placeholder="Email Address" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
                             <input type="hidden" name="signer_role" value="tenant">
+                        </div>
+                        <!-- Signer 2: Landlord (auto-populated from builder data) -->
+                        <div class="signer-row space-y-2 p-3 rounded-lg bg-gray-50 mb-2">
+                            <p class="text-xs font-medium text-gray-500">Signer 2 — Landlord</p>
+                            <label class="block text-xs text-gray-500 mb-0.5">Full Name</label>
+                            <input type="text" name="signer_name" value="{{ landlord_info.owner_name if landlord_info and landlord_info.owner_name else (landlord_info.entity_name if landlord_info and landlord_info.entity_name else '') }}" placeholder="Full Name" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
+                            <label class="block text-xs text-gray-500 mb-0.5">Email Address</label>
+                            <input type="email" name="signer_email" value="{{ landlord_info.email if landlord_info and landlord_info.email else '' }}" placeholder="Email Address" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm" required>
+                            <input type="hidden" name="signer_role" value="landlord">
                         </div>
                     </div>
                     <button type="button" onclick="addSigner()" class="text-xs text-blue-600 hover:text-blue-500 font-medium">+ Add Another Signer</button>
@@ -240,7 +249,7 @@ document.querySelectorAll('[data-signers]').forEach(el => {
     } catch (e) { /* ignore parse errors */ }
 });
 
-let signerCount = 1;
+let signerCount = 2;
 function addSigner() {
     signerCount++;
     const container = document.getElementById('signers-container');
