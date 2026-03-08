@@ -409,21 +409,35 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
                     "ip_address": signer.ip_address or "",
                 }
 
-        # Check if this was a builder-generated PDF (has lease_data JSON in notes)
+        # Check if this was a builder-generated lease by looking up LeaseBuilder
+        from database.models import LeaseBuilder
         lease_data = None
-        if lease.notes and lease.notes.startswith("{"):
+
+        builder_result = await session.execute(
+            select(LeaseBuilder).where(LeaseBuilder.lease_document_id == lease.id)
+        )
+        builder = builder_result.scalar_one_or_none()
+
+        if builder and builder.lease_data:
+            try:
+                lease_data = json.loads(builder.lease_data)
+                logger.info(f"[ESIGN] Found builder data for lease {lease.id}")
+            except json.JSONDecodeError:
+                logger.warning(f"[ESIGN] Builder lease_data is not valid JSON")
+
+        # Fallback: check notes field for legacy builder data
+        if not lease_data and lease.notes and lease.notes.startswith("{"):
             try:
                 lease_data = json.loads(lease.notes)
             except json.JSONDecodeError:
                 pass
 
-        logger.info(f"[ESIGN] lease.notes type: {type(lease.notes).__name__}, "
-                     f"has_data: {lease_data is not None}, "
+        logger.info(f"[ESIGN] has_builder_data: {lease_data is not None}, "
                      f"has_prop: {lease.property_ref is not None}, "
                      f"file_url: {lease.file_url}")
 
         if lease_data and lease.property_ref:
-            # Builder lease — re-render with signatures
+            # Builder lease — re-render with signatures inline
             return _generate_signed_builder_pdf(lease, lease_data, signatures)
         else:
             # Uploaded PDF — append signature page
