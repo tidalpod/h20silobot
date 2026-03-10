@@ -195,15 +195,15 @@
             <div class="flex gap-1 bg-white/5 rounded-lg p-0.5">
                 <button id="tab-tenants" onclick="switchTab('tenants')"
                     class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm">
-                    Tenants
+                    Tenants <span id="badge-tenants" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-blue-500 rounded-full min-w-[18px]">0</span>
                 </button>
                 <button id="tab-vendors" onclick="switchTab('vendors')"
                     class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200">
-                    Vendors
+                    Vendors <span id="badge-vendors" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-purple-500 rounded-full min-w-[18px]">0</span>
                 </button>
                 <button id="tab-showings" onclick="switchTab('showings')"
                     class="flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200">
-                    Showings
+                    Showings <span id="badge-showings" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500 rounded-full min-w-[18px]">0</span>
                 </button>
             </div>
         </div>
@@ -383,14 +383,20 @@ function showListPanel() {
 // Tab switching for conversation list
 function switchTab(tab) {
     activeListTab = tab;
-    const tenantBtn = document.getElementById('tab-tenants');
-    const vendorBtn = document.getElementById('tab-vendors');
-    const showingsBtn = document.getElementById('tab-showings');
-    const activeClass = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors bg-white/10 text-white shadow-sm';
-    const inactiveClass = 'flex-1 text-xs font-semibold py-1.5 px-2 rounded-md transition-colors text-gray-400 hover:text-gray-200';
-    tenantBtn.className = tab === 'tenants' ? activeClass : inactiveClass;
-    vendorBtn.className = tab === 'vendors' ? activeClass : inactiveClass;
-    showingsBtn.className = tab === 'showings' ? activeClass : inactiveClass;
+    const buttons = [
+        { el: document.getElementById('tab-tenants'), key: 'tenants' },
+        { el: document.getElementById('tab-vendors'), key: 'vendors' },
+        { el: document.getElementById('tab-showings'), key: 'showings' },
+    ];
+    for (const btn of buttons) {
+        if (btn.key === tab) {
+            btn.el.classList.add('bg-white/10', 'text-white', 'shadow-sm');
+            btn.el.classList.remove('text-gray-400', 'hover:text-gray-200');
+        } else {
+            btn.el.classList.remove('bg-white/10', 'text-white', 'shadow-sm');
+            btn.el.classList.add('text-gray-400', 'hover:text-gray-200');
+        }
+    }
     renderConversationsList();
 }
 
@@ -418,6 +424,26 @@ function renderConversationsList() {
         renderVendorConversations(container, cachedData.vendor_conversations || []);
     } else {
         renderShowingConversations(container, cachedData.showing_conversations || []);
+    }
+    updateTabBadges();
+}
+
+function updateTabBadges() {
+    if (!cachedData) return;
+    const counts = {
+        tenants: (cachedData.conversations || []).reduce((sum, c) => sum + (c.unread_count || 0), 0),
+        vendors: (cachedData.vendor_conversations || []).reduce((sum, c) => sum + (c.unread_count || 0), 0),
+        showings: (cachedData.showing_conversations || []).reduce((sum, c) => sum + (c.unread_count || 0), 0),
+    };
+    for (const [key, count] of Object.entries(counts)) {
+        const badge = document.getElementById(`badge-${key}`);
+        if (!badge) continue;
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
     }
 }
 
