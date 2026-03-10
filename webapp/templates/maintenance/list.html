@@ -80,7 +80,7 @@
 {% set active_orders = [] %}
 {% set closed_orders = [] %}
 {% for wo in work_orders %}
-    {% if wo.status.value == 'closed' %}
+    {% if wo.status.value in ['completed', 'closed'] %}
         {% set _ = closed_orders.append(wo) %}
     {% else %}
         {% set _ = active_orders.append(wo) %}
@@ -204,7 +204,7 @@
 <!-- Closed Work Orders — Mobile Cards -->
 {% if closed_orders %}
 <div class="mt-8">
-    <h2 class="text-lg font-semibold text-gray-600 mb-3">Closed Work Orders</h2>
+    <h2 class="text-lg font-semibold text-gray-600 mb-3">Completed / Closed Work Orders</h2>
     <div class="md:hidden space-y-3">
         {% for wo in closed_orders %}
         <a href="/maintenance/{{ wo.id }}" class="block bg-gray-50 shadow-sm rounded-xl border border-gray-200 p-4 hover:bg-gray-100 transition-colors opacity-75">
@@ -220,7 +220,11 @@
                     {% if wo.property_ref %}{{ wo.property_ref.address }}{% endif %}
                 </div>
                 <div class="flex gap-1.5 flex-shrink-0">
+                    {% if wo.status.value == 'completed' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                    {% else %}
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="text-xs text-gray-400 mt-1.5">{{ wo.created_at.strftime('%b %d, %Y') }}{% if wo.category %} · {{ wo.category.value.replace('_', ' ').title() }}{% endif %}</div>
@@ -276,7 +280,11 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4">
+                        {% if wo.status.value == 'completed' %}
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                        {% else %}
                         <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Closed</span>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-500">
                         {% if wo.category %}{{ wo.category.value.replace('_', ' ').title() }}{% else %}—{% endif %}
