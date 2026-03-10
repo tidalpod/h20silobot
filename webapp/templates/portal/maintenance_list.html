@@ -11,8 +11,20 @@
 </div>
 
 {% if work_orders %}
+{% set active_orders = [] %}
+{% set done_orders = [] %}
+{% for wo in work_orders %}
+    {% if wo.status.value in ['completed', 'closed'] %}
+        {% set _ = done_orders.append(wo) %}
+    {% else %}
+        {% set _ = active_orders.append(wo) %}
+    {% endif %}
+{% endfor %}
+
+<!-- Active Requests -->
+{% if active_orders %}
 <div class="space-y-3">
-    {% for wo in work_orders %}
+    {% for wo in active_orders %}
     <a href="/portal/maintenance/{{ wo.id }}" class="block portal-card p-4 hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold text-gray-900 truncate mr-2">{{ wo.title }}</h3>
@@ -22,10 +34,6 @@
             <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 flex-shrink-0">Assigned</span>
             {% elif wo.status.value == 'in_progress' %}
             <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 flex-shrink-0">In Progress</span>
-            {% elif wo.status.value == 'completed' %}
-            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 flex-shrink-0">Completed</span>
-            {% elif wo.status.value == 'closed' %}
-            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 flex-shrink-0">Closed</span>
             {% endif %}
         </div>
         <div class="flex items-center gap-3 text-xs text-gray-500">
@@ -40,6 +48,37 @@
     </a>
     {% endfor %}
 </div>
+{% elif done_orders %}
+<p class="text-sm text-gray-500 mb-4">No active requests. All caught up!</p>
+{% endif %}
+
+<!-- Completed Requests -->
+{% if done_orders %}
+<h2 class="text-sm font-semibold text-gray-500 mt-8 mb-3">Completed Requests</h2>
+<div class="space-y-3">
+    {% for wo in done_orders %}
+    <a href="/portal/maintenance/{{ wo.id }}" class="block rounded-xl border border-gray-200 bg-gray-50 p-4 opacity-75 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-600 truncate mr-2">{{ wo.title }}</h3>
+            {% if wo.status.value == 'completed' %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 flex-shrink-0">Completed</span>
+            {% elif wo.status.value == 'closed' %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 flex-shrink-0">Closed</span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3 text-xs text-gray-400">
+            <span>{{ wo.category.value.replace('_', ' ').title() if wo.category else '' }}</span>
+            <span>&middot;</span>
+            <span>{{ wo.created_at.strftime('%b %d, %Y') }}</span>
+            {% if wo.photos %}
+            <span>&middot;</span>
+            <span>📷 {{ wo.photos|length }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
 {% else %}
 <div class="portal-card p-8 text-center">
     <span class="text-3xl">🔧</span>
