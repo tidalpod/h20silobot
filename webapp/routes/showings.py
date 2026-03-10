@@ -78,7 +78,7 @@ async def _notify_vendor_showing_sms(vendor_id: int, showing, session):
             prop_addr = prop.address if prop else ""
 
         date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "TBD"
-        time_str = showing.scheduled_time or "TBD"
+        time_str = _fmt_time_12h(showing.scheduled_time) or "TBD"
 
         msg = (
             f"Blue Deer - New Showing Assigned\n\n"
@@ -141,7 +141,7 @@ async def _notify_renter_showing_sms(showing, session):
             prop_addr = prop.address if prop else ""
 
         date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "TBD"
-        time_str = showing.scheduled_time or "TBD"
+        time_str = _fmt_time_12h(showing.scheduled_time) or "TBD"
 
         msg = (
             f"Blue Deer Property Management\n\n"
@@ -577,7 +577,7 @@ async def mark_no_show(request: Request, showing_id: int):
             if phone:
                 prop_addr = showing.property_ref.address if showing.property_ref else "the property"
                 date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "today"
-                time_str = showing.scheduled_time or ""
+                time_str = _fmt_time_12h(showing.scheduled_time) or ""
 
                 msg = (
                     f"Blue Deer Property Management\n\n"
@@ -679,7 +679,7 @@ async def reschedule_showing(request: Request, showing_id: int):
         showing.updated_at = datetime.utcnow()
 
         new_date_str = showing.scheduled_date.strftime('%b %d, %Y')
-        new_time_str = showing.scheduled_time or "TBD"
+        new_time_str = _fmt_time_12h(showing.scheduled_time) or "TBD"
 
         # Notify vendor if assigned
         if showing.vendor_id and form.get("notify_vendor"):

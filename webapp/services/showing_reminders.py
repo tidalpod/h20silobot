@@ -13,6 +13,20 @@ from database.models import Showing, ShowingStatus, Vendor, Property
 logger = logging.getLogger(__name__)
 
 
+def _fmt_time_12h(value):
+    """Convert '15:00' or '09:30' to '3:00 PM' or '9:30 AM'"""
+    if not value:
+        return value
+    try:
+        parts = value.split(":")
+        h, m = int(parts[0]), parts[1]
+        ampm = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m} {ampm}"
+    except Exception:
+        return value
+
+
 def _normalize_phone(phone):
     """Normalize phone number to E.164 format"""
     if not phone:
@@ -35,7 +49,7 @@ async def _send_reminder(showing, vendor, prop_addr):
     from database.models import SMSMessage, MessageDirection
 
     date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "TBD"
-    time_str = showing.scheduled_time or "TBD"
+    time_str = _fmt_time_12h(showing.scheduled_time) or "TBD"
 
     sent_count = 0
 
