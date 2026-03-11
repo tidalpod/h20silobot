@@ -30,6 +30,67 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # Public Routes (no auth)
 # =============================================================================
 
+@router.get("/apply", response_class=HTMLResponse)
+async def apply_standalone(request: Request):
+    """Standalone application page with property selector dropdown."""
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property)
+            .where(Property.is_active == True)
+            .options(selectinload(Property.photos), selectinload(Property.tenants))
+            .order_by(Property.is_vacant.desc(), Property.address)
+        )
+        properties = result.scalars().all()
+
+        listings = []
+        for prop in properties:
+            active_tenants = [t for t in prop.tenants if t.is_active]
+            is_available = len(active_tenants) == 0
+
+            rent = None
+            if prop.monthly_rent:
+                rent = float(prop.monthly_rent)
+
+            primary_photo = None
+            if prop.featured_photo_url:
+                primary_photo = prop.featured_photo_url
+            elif prop.photos:
+                primary = next((p for p in prop.photos if p.is_primary), None)
+                primary_photo = primary.url if primary else prop.photos[0].url if prop.photos else None
+
+            listings.append({
+                "id": prop.id,
+                "address": prop.address,
+                "city": prop.city or "",
+                "state": prop.state or "MI",
+                "zip": prop.zip_code or "",
+                "description": (prop.description or "")[:60],
+                "property_type": prop.property_type or "",
+                "bedrooms": prop.bedrooms,
+                "bathrooms": prop.bathrooms,
+                "rent": rent,
+                "photo": primary_photo,
+                "is_available": is_available,
+            })
+
+    return templates.TemplateResponse("public/applications.html", {
+        "request": request,
+        "properties_json": json.dumps(listings),
+    })
+
+
+@router.post("/apply", response_class=HTMLResponse)
+async def apply_standalone_submit(request: Request):
+    """Process application from standalone page (redirects to property-specific handler)."""
+    form = await request.form()
+    property_id = form.get("property_id")
+    if not property_id:
+        raise HTTPException(status_code=400, detail="Please select a property")
+
+    # Forward to the existing property-specific submit handler
+    return await apply_submit(request, int(property_id))
+
+
 @router.get("/apply/{property_id}", response_class=HTMLResponse)
 async def apply_form(request: Request, property_id: int):
     """Render the rental application form for a property."""

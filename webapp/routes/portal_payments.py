@@ -1,4 +1,4 @@
-"""Tenant Portal — Payment routes (Plaid ACH)"""
+"""Tenant Portal — Payment routes (Plaid ACH + Stripe Checkout)"""
 
 from datetime import datetime, date
 from decimal import Decimal
@@ -14,9 +14,12 @@ from database.connection import get_session
 from database.models import (
     Tenant, TenantBankAccount, RentPayment, TenantAutopay,
     PaymentStatus, AutopayStatus,
+    StripePayment, StripePaymentType, WaterBill, BillStatus,
 )
 from webapp.auth.tenant_auth import get_current_tenant
 from webapp.services import plaid_service, payment_service
+from webapp.services import stripe_service
+from webapp.config import web_config
 
 router = APIRouter(tags=["portal-payments"])
 
@@ -65,6 +68,11 @@ async def pay_rent_page(request: Request):
         )
         recent_payment = recent_result.scalar_one_or_none()
 
+    # Stripe fee preview
+    stripe_fee = None
+    if web_config.has_stripe and not balance.get("paid") and balance.get("total_due", 0) > 0:
+        stripe_fee = stripe_service.calculate_convenience_fee(balance["total_due"])
+
     return templates.TemplateResponse(
         "portal/pay.html",
         {
@@ -73,6 +81,8 @@ async def pay_rent_page(request: Request):
             "balance": balance,
             "bank_accounts": bank_accounts,
             "recent_payment": recent_payment,
+            "has_stripe": web_config.has_stripe,
+            "stripe_fee": stripe_fee,
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error"),
         },
@@ -116,24 +126,342 @@ async def submit_payment(request: Request):
 
 @router.get("/pay/history", response_class=HTMLResponse)
 async def payment_history(request: Request):
-    """Payment history page."""
+    """Payment history page — merges ACH and Stripe payments."""
     tenant, redirect = await _get_tenant_or_redirect(request)
     if redirect:
         return redirect
 
     async with get_session() as session:
-        result = await session.execute(
+        # ACH payments
+        ach_result = await session.execute(
             select(RentPayment)
             .where(RentPayment.tenant_id == tenant["id"])
             .options(selectinload(RentPayment.property_ref))
             .order_by(desc(RentPayment.initiated_at))
         )
-        payments = result.scalars().all()
+        ach_payments = ach_result.scalars().all()
+
+        # Stripe payments
+        stripe_result = await session.execute(
+            select(StripePayment)
+            .where(StripePayment.tenant_id == tenant["id"])
+            .order_by(desc(StripePayment.initiated_at))
+        )
+        stripe_payments = stripe_result.scalars().all()
+
+    # Merge and sort by date
+    all_payments = []
+    for p in ach_payments:
+        all_payments.append({
+            "type": "ach",
+            "total_amount": p.total_amount,
+            "amount": p.amount,
+            "late_fee": p.late_fee,
+            "payment_month": p.payment_month,
+            "status": p.status,
+            "initiated_at": p.initiated_at,
+            "is_autopay": p.is_autopay,
+            "failure_reason": p.failure_reason,
+            "description": f"Rent - {p.payment_month.strftime('%B %Y')}" if p.payment_month else "Rent",
+        })
+    for p in stripe_payments:
+        all_payments.append({
+            "type": "card",
+            "total_amount": p.total_amount,
+            "amount": p.base_amount,
+            "late_fee": p.late_fee,
+            "convenience_fee": p.convenience_fee,
+            "payment_month": p.payment_month,
+            "status": p.status,
+            "initiated_at": p.initiated_at,
+            "is_autopay": False,
+            "failure_reason": p.failure_reason,
+            "description": p.description,
+        })
+    all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
 
     return templates.TemplateResponse(
         "portal/pay_history.html",
-        {"request": request, "tenant": tenant, "payments": payments},
+        {"request": request, "tenant": tenant, "payments": all_payments},
     )
+
+
+# =============================================================================
+# Stripe Checkout
+# =============================================================================
+
+@router.post("/pay/stripe")
+async def stripe_pay_rent(request: Request):
+    """Create Stripe Checkout session for rent payment."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    if not web_config.has_stripe:
+        return RedirectResponse(url="/portal/pay?error=stripe_not_configured", status_code=303)
+
+    balance = await payment_service.calculate_balance_due(tenant["id"])
+    if balance.get("paid"):
+        return RedirectResponse(url="/portal/pay?error=already_paid", status_code=303)
+
+    base_amount = balance["total_due"]
+    fee_info = stripe_service.calculate_convenience_fee(base_amount)
+    description = f"Rent - {balance['payment_month'].strftime('%B %Y')}"
+
+    # Create StripePayment record
+    async with get_session() as session:
+        sp = StripePayment(
+            tenant_id=tenant["id"],
+            property_id=tenant["property_id"],
+            payment_type=StripePaymentType.RENT,
+            description=description,
+            base_amount=fee_info["base_amount"],
+            convenience_fee=fee_info["convenience_fee"],
+            total_amount=fee_info["total_amount"],
+            late_fee=balance.get("late_fee", 0),
+            status=PaymentStatus.PENDING,
+            payment_month=balance["payment_month"],
+        )
+        session.add(sp)
+        await session.flush()
+        sp_id = sp.id
+
+    # Create Checkout Session
+    base_url = web_config.site_url.rstrip("/")
+    result = stripe_service.create_checkout_session(
+        base_amount=fee_info["base_amount"],
+        convenience_fee=fee_info["convenience_fee"],
+        description=description,
+        success_url=f"{base_url}/portal/pay/stripe/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base_url}/portal/pay?error=cancelled",
+        metadata={
+            "tenant_id": str(tenant["id"]),
+            "payment_type": "rent",
+            "stripe_payment_id": str(sp_id),
+            "payment_month": balance["payment_month"].isoformat(),
+        },
+    )
+
+    if "error" in result:
+        return RedirectResponse(url=f"/portal/pay?error={result['error']}", status_code=303)
+
+    # Save session ID
+    async with get_session() as session:
+        sp_result = await session.execute(
+            select(StripePayment).where(StripePayment.id == sp_id)
+        )
+        sp = sp_result.scalar_one()
+        sp.stripe_checkout_session_id = result["session_id"]
+
+    return RedirectResponse(url=result["url"], status_code=303)
+
+
+@router.get("/pay/stripe/success", response_class=HTMLResponse)
+async def stripe_success(request: Request):
+    """Success landing page after Stripe Checkout redirect."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    session_id = request.query_params.get("session_id")
+    payment_info = None
+    if session_id:
+        payment_info = stripe_service.retrieve_session(session_id)
+
+    return templates.TemplateResponse(
+        "portal/pay_stripe_success.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "payment_info": payment_info,
+            "session_id": session_id,
+        },
+    )
+
+
+@router.post("/bills/pay")
+async def stripe_pay_bill(request: Request):
+    """Create Stripe Checkout session for a water bill."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    if not web_config.has_stripe:
+        return RedirectResponse(url="/portal/bills?error=stripe_not_configured", status_code=303)
+
+    form = await request.form()
+    bill_id = int(form.get("bill_id", 0))
+    if not bill_id:
+        return RedirectResponse(url="/portal/bills?error=no_bill", status_code=303)
+
+    # Fetch the bill
+    async with get_session() as session:
+        bill_result = await session.execute(
+            select(WaterBill).where(
+                WaterBill.id == bill_id,
+                WaterBill.property_id == tenant["property_id"],
+            )
+        )
+        bill = bill_result.scalar_one_or_none()
+
+    if not bill or not bill.amount_due or bill.amount_due <= 0:
+        return RedirectResponse(url="/portal/bills?error=invalid_bill", status_code=303)
+
+    base_amount = Decimal(str(bill.amount_due))
+    fee_info = stripe_service.calculate_convenience_fee(base_amount)
+    month_label = bill.statement_date.strftime("%b %Y") if bill.statement_date else "Water Bill"
+    description = f"Water Bill - {month_label}"
+
+    # Create StripePayment record
+    async with get_session() as session:
+        sp = StripePayment(
+            tenant_id=tenant["id"],
+            property_id=tenant["property_id"],
+            payment_type=StripePaymentType.WATER_BILL,
+            reference_id=bill_id,
+            description=description,
+            base_amount=fee_info["base_amount"],
+            convenience_fee=fee_info["convenience_fee"],
+            total_amount=fee_info["total_amount"],
+            status=PaymentStatus.PENDING,
+        )
+        session.add(sp)
+        await session.flush()
+        sp_id = sp.id
+
+    base_url = web_config.site_url.rstrip("/")
+    result = stripe_service.create_checkout_session(
+        base_amount=fee_info["base_amount"],
+        convenience_fee=fee_info["convenience_fee"],
+        description=description,
+        success_url=f"{base_url}/portal/pay/stripe/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base_url}/portal/bills",
+        metadata={
+            "tenant_id": str(tenant["id"]),
+            "payment_type": "water_bill",
+            "stripe_payment_id": str(sp_id),
+            "bill_id": str(bill_id),
+        },
+    )
+
+    if "error" in result:
+        return RedirectResponse(url=f"/portal/bills?error={result['error']}", status_code=303)
+
+    async with get_session() as session:
+        sp_result = await session.execute(
+            select(StripePayment).where(StripePayment.id == sp_id)
+        )
+        sp = sp_result.scalar_one()
+        sp.stripe_checkout_session_id = result["session_id"]
+
+    return RedirectResponse(url=result["url"], status_code=303)
+
+
+@router.get("/pay/deposit", response_class=HTMLResponse)
+async def pay_deposit_page(request: Request):
+    """Security deposit payment page."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    if not web_config.has_stripe:
+        return RedirectResponse(url="/portal", status_code=303)
+
+    return templates.TemplateResponse(
+        "portal/pay_deposit.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "error": request.query_params.get("error"),
+        },
+    )
+
+
+@router.post("/pay/deposit")
+async def stripe_pay_deposit(request: Request):
+    """Create Stripe Checkout session for security deposit."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    if not web_config.has_stripe:
+        return RedirectResponse(url="/portal?error=stripe_not_configured", status_code=303)
+
+    form = await request.form()
+    try:
+        amount = Decimal(form.get("amount", "0"))
+    except Exception:
+        return RedirectResponse(url="/portal/pay/deposit?error=invalid_amount", status_code=303)
+
+    if amount <= 0:
+        return RedirectResponse(url="/portal/pay/deposit?error=invalid_amount", status_code=303)
+
+    fee_info = stripe_service.calculate_convenience_fee(amount)
+    description = "Security Deposit"
+
+    async with get_session() as session:
+        sp = StripePayment(
+            tenant_id=tenant["id"],
+            property_id=tenant["property_id"],
+            payment_type=StripePaymentType.SECURITY_DEPOSIT,
+            description=description,
+            base_amount=fee_info["base_amount"],
+            convenience_fee=fee_info["convenience_fee"],
+            total_amount=fee_info["total_amount"],
+            status=PaymentStatus.PENDING,
+        )
+        session.add(sp)
+        await session.flush()
+        sp_id = sp.id
+
+    base_url = web_config.site_url.rstrip("/")
+    result = stripe_service.create_checkout_session(
+        base_amount=fee_info["base_amount"],
+        convenience_fee=fee_info["convenience_fee"],
+        description=description,
+        success_url=f"{base_url}/portal/pay/stripe/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base_url}/portal/pay/deposit?error=cancelled",
+        metadata={
+            "tenant_id": str(tenant["id"]),
+            "payment_type": "security_deposit",
+            "stripe_payment_id": str(sp_id),
+        },
+    )
+
+    if "error" in result:
+        return RedirectResponse(url=f"/portal/pay/deposit?error={result['error']}", status_code=303)
+
+    async with get_session() as session:
+        sp_result = await session.execute(
+            select(StripePayment).where(StripePayment.id == sp_id)
+        )
+        sp = sp_result.scalar_one()
+        sp.stripe_checkout_session_id = result["session_id"]
+
+    return RedirectResponse(url=result["url"], status_code=303)
+
+
+@router.get("/pay/stripe/fee-preview")
+async def stripe_fee_preview(request: Request):
+    """JSON endpoint for JS fee calculation."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    try:
+        amount = Decimal(request.query_params.get("amount", "0"))
+    except Exception:
+        return JSONResponse({"error": "Invalid amount"}, status_code=400)
+
+    if amount <= 0:
+        return JSONResponse({"error": "Amount must be positive"}, status_code=400)
+
+    fee_info = stripe_service.calculate_convenience_fee(amount)
+    return JSONResponse({
+        "base_amount": str(fee_info["base_amount"]),
+        "convenience_fee": str(fee_info["convenience_fee"]),
+        "total_amount": str(fee_info["total_amount"]),
+    })
 
 
 # =============================================================================

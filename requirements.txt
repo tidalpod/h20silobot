@@ -64,3 +64,6 @@ pypdf>=3.0.0
 
 # Cloudflare R2 / S3-compatible object storage
 boto3>=1.34.0
+
+# Stripe Payments
+stripe>=8.0.0

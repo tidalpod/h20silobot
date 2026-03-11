@@ -52,6 +52,14 @@
             {% endif %}
         </div>
         {% endif %}
+        {% if has_stripe and bill.amount_due and bill.amount_due > 0 %}
+        <form method="POST" action="/portal/bills/pay" class="mt-3 pt-3 border-t border-gray-100">
+            <input type="hidden" name="bill_id" value="{{ bill.id }}">
+            <button type="submit" class="w-full py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 transition-colors">
+                Pay ${{ "{:,.2f}".format(bill.amount_due) }} with Card
+            </button>
+        </form>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

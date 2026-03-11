@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply | Blue Deer Rentals</title>
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+        }
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            transition: width 0.4s ease;
+        }
+        .step { display: none; }
+        .step.active { display: block; }
+        .radio-group label {
+            cursor: pointer;
+        }
+        .radio-group input[type="radio"]:checked + span {
+            font-weight: 600;
+        }
+        .btn-next {
+            background: #1e3a5f;
+            transition: background 0.2s;
+        }
+        .btn-next:hover {
+            background: #2d4a73;
+        }
+        /* Property selector */
+        .property-search-wrapper {
+            position: relative;
+        }
+        .property-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .property-dropdown.open {
+            display: block;
+        }
+        .property-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s;
+        }
+        .property-option:hover {
+            background: #f8fafc;
+        }
+        .property-option:last-child {
+            border-bottom: none;
+        }
+        .property-option.selected {
+            background: #eff6ff;
+        }
+        .property-option-photo {
+            width: 56px;
+            height: 42px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: #f1f5f9;
+        }
+        .no-results {
+            padding: 24px 16px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body class="bg-blue-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 py-4">
+        <div class="max-w-3xl mx-auto px-4 flex items-center justify-center">
+            <a href="/listings" class="flex items-center gap-2">
+                <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
+                <span class="text-xl font-bold text-gray-900">Blue Deer</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Progress Bar (hidden on step 1) -->
+    <div id="progress-section" class="bg-white border-b border-gray-200 py-3 hidden">
+        <div class="max-w-3xl mx-auto px-4 flex items-center gap-4">
+            <button type="button" onclick="prevStep()" class="text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center gap-1">
+                &larr; BACK
+            </button>
+            <div class="flex-1 progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-2xl mx-auto px-4 py-8">
+        <form method="POST" action="/apply" id="application-form">
+            <input type="hidden" name="property_id" id="selected-property-id" value="">
+
+            <!-- ============ STEP 1: Select Property + Start ============ -->
+            <div class="step active" data-step="1">
+                <!-- Property Selector -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Select a Property</label>
+                    <div class="property-search-wrapper">
+                        <div class="relative">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <input type="text" id="property-search" placeholder="Search by address, city, or zip..."
+                                   class="w-full rounded-xl border border-gray-300 pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   autocomplete="off"
+                                   onfocus="openDropdown()"
+                                   oninput="filterProperties()">
+                        </div>
+                        <div class="property-dropdown" id="property-dropdown"></div>
+                    </div>
+
+                    <!-- Selected property card (hidden until selection) -->
+                    <div id="selected-property-card" class="hidden mt-4">
+                        <div class="flex gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div id="selected-photo-wrapper" class="w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden hidden">
+                                <img id="selected-photo" src="" alt="" class="w-full h-full object-cover">
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p id="selected-type" class="text-xs font-semibold text-blue-700 uppercase tracking-wide"></p>
+                                <p id="selected-description" class="font-bold text-gray-900 text-sm mt-0.5 truncate"></p>
+                                <p id="selected-address" class="text-sm text-gray-600 mt-0.5"></p>
+                                <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                    <span id="selected-rent" class="font-semibold text-gray-900"></span>
+                                    <span id="selected-beds"></span>
+                                    <span id="selected-baths"></span>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearSelection()" class="text-gray-400 hover:text-gray-600 self-start p-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <hr class="mb-6 border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Start My Application</h2>
+                    <div class="space-y-2 mb-6">
+                        <p class="flex items-center gap-2 text-sm text-gray-700">
+                            <span class="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"><svg class="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></span>
+                            Takes less than 11 minutes
+                        </p>
+                        <p class="flex items-center gap-2 text-sm text-gray-700">
+                            <span class="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"><svg class="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></span>
+                            Will never impact your credit score
+                        </p>
+                    </div>
+
+                    <div class="mb-5">
+                        <p class="text-sm font-semibold text-gray-700 mb-2">What are you applying as?</p>
+                        <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+                            <label class="px-5 py-2 text-sm cursor-pointer transition-colors" id="type-tenant-label">
+                                <input type="radio" name="applicant_type" value="tenant" checked class="sr-only" onchange="updateTypeToggle()"> Tenant
+                            </label>
+                            <label class="px-5 py-2 text-sm cursor-pointer border-l border-gray-300 transition-colors" id="type-cosigner-label">
+                                <input type="radio" name="applicant_type" value="cosigner" class="sr-only" onchange="updateTypeToggle()"> Co-Signer
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">First Name</label>
+                            <input type="text" name="first_name" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name</label>
+                            <input type="text" name="last_name" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                        <input type="email" name="email" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" name="phone" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Date of Birth</label>
+                        <input type="date" name="dob" class="w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <p class="text-xs text-gray-500 mb-5">
+                        By clicking the button below you are agreeing to our
+                        <a href="/terms" class="text-blue-600 hover:underline">Terms of Use</a> &
+                        <a href="/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.
+                    </p>
+
+                    <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                </div>
+            </div>
+
+            <!-- ============ STEP 2: Application Info ============ -->
+            <div class="step" data-step="2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Application Info</h2>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Desired Move-In Date</label>
+                        <input type="date" name="move_in_date" class="w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">Will there be other people living with you?</p>
+                        <p class="text-xs text-gray-500 mb-2">List everyone besides yourself, including adults and minors.</p>
+                        <div class="radio-group flex items-center gap-6">
+                            <label class="flex items-center gap-2"><input type="radio" name="has_other_occupants" value="yes" class="text-blue-600" onchange="toggleSection('occupants-section', true)"><span class="text-sm">Yes</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="has_other_occupants" value="no" checked class="text-blue-600" onchange="toggleSection('occupants-section', false)"><span class="text-sm">No</span></label>
+                        </div>
+                        <div id="occupants-section" class="hidden mt-3">
+                            <div id="occupants-list"></div>
+                            <button type="button" onclick="addOccupant()" class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 mt-2">+ Add Occupant</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">Will you have any co-signers?</p>
+                        <div class="radio-group flex items-center gap-6">
+                            <label class="flex items-center gap-2"><input type="radio" name="has_cosigners" value="yes" class="text-blue-600" onchange="toggleSection('cosigners-section', true)"><span class="text-sm">Yes</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="has_cosigners" value="no" checked class="text-blue-600" onchange="toggleSection('cosigners-section', false)"><span class="text-sm">No</span></label>
+                        </div>
+                        <div id="cosigners-section" class="hidden mt-3">
+                            <div id="cosigners-list"></div>
+                            <button type="button" onclick="addCosigner()" class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 mt-2">+ Add Co-Signer</button>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                </div>
+            </div>
+
+            <!-- ============ STEP 3: Residential History ============ -->
+            <div class="step" data-step="3">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-1">Residential History</h2>
+                    <p class="text-sm text-gray-500 mb-6">Strengthen your application by providing at least <strong>3 years</strong> of rental history.</p>
+
+                    <h3 class="text-base font-bold text-gray-900 mb-3">Current Address</h3>
+                    <div class="space-y-3 mb-6 p-4 bg-gray-50 rounded-lg">
+                        <input type="text" name="current_address" placeholder="Street Address" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        <div class="grid grid-cols-3 gap-3">
+                            <input type="text" name="current_city" placeholder="City" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <input type="text" name="current_state" placeholder="State" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <input type="text" name="current_zip" placeholder="Zip" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Move-in Date</label>
+                                <input type="date" name="current_addr_since" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Monthly Rent</label>
+                                <input type="text" name="current_rent" placeholder="$0" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            </div>
+                        </div>
+                        <input type="text" name="current_landlord_name" placeholder="Landlord Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        <input type="tel" name="current_landlord_phone" placeholder="Landlord Phone" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        <input type="text" name="current_reason_leaving" placeholder="Reason for Leaving" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                    </div>
+
+                    <hr class="my-6 border-gray-200">
+
+                    <h3 class="text-base font-bold text-gray-900 mb-2">Past Addresses</h3>
+                    <label class="flex items-center gap-2 mb-3 cursor-pointer">
+                        <input type="checkbox" name="no_past_addresses" class="rounded text-blue-600" onchange="toggleSection('past-addresses-section', !this.checked)">
+                        <span class="text-sm text-gray-700">Not applicable</span>
+                    </label>
+                    <div id="past-addresses-section">
+                        <div id="past-addresses-list"></div>
+                        <button type="button" onclick="addPastAddress()" class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 mt-2">+ Add Past Address</button>
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 4: Employment ============ -->
+            <div class="step" data-step="4">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-1">Employment</h2>
+                    <p class="text-sm text-gray-500 mb-6">Show the landlord that you can afford this rental.</p>
+
+                    <h3 class="text-base font-bold text-gray-900 mb-3">Current Employer</h3>
+                    <label class="flex items-center gap-2 mb-3 cursor-pointer">
+                        <input type="checkbox" name="is_unemployed" class="rounded text-blue-600" onchange="toggleSection('employer-section', !this.checked)">
+                        <span class="text-sm text-gray-700">I'm currently unemployed</span>
+                    </label>
+                    <div id="employer-section">
+                        <div class="space-y-3 p-4 bg-gray-50 rounded-lg">
+                            <input type="text" name="employer" placeholder="Company Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <input type="text" name="position" placeholder="Position / Title" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Monthly Income</label>
+                                    <input type="text" name="income" placeholder="$0" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Start Date</label>
+                                    <input type="date" name="employer_start_date" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                                </div>
+                            </div>
+                            <input type="text" name="supervisor_name" placeholder="Supervisor Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <input type="tel" name="supervisor_phone" placeholder="Supervisor Phone" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        </div>
+                    </div>
+
+                    <hr class="my-6 border-gray-200">
+
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Past Employers</h3>
+                    <p class="text-xs text-gray-500 mb-3">Landlords like to see around 5 years of employment history.</p>
+                    <label class="flex items-center gap-2 mb-3 cursor-pointer">
+                        <input type="checkbox" name="no_past_employers" class="rounded text-blue-600" onchange="toggleSection('past-employers-section', !this.checked)">
+                        <span class="text-sm text-gray-700">Not applicable</span>
+                    </label>
+                    <div id="past-employers-section">
+                        <div id="past-employers-list"></div>
+                        <button type="button" onclick="addPastEmployer()" class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 mt-2">+ Add Past Employer</button>
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 5: Other Income ============ -->
+            <div class="step" data-step="5">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Other Income</h2>
+
+                    <div class="mb-6">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">Are there other sources of income you would like to include?</p>
+                        <p class="text-xs text-gray-500 mb-3">For example, social security, parental assistance, scholarships, etc.</p>
+                        <div class="radio-group flex items-center gap-6">
+                            <label class="flex items-center gap-2"><input type="radio" name="has_other_income" value="yes" class="text-blue-600" onchange="toggleSection('other-income-section', true)"><span class="text-sm">Yes</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="has_other_income" value="no" checked class="text-blue-600" onchange="toggleSection('other-income-section', false)"><span class="text-sm">No</span></label>
+                        </div>
+                        <div id="other-income-section" class="hidden mt-3 space-y-3 p-4 bg-gray-50 rounded-lg">
+                            <input type="text" name="other_income_source" placeholder="Source (e.g., Social Security)" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <input type="text" name="other_income_amount" placeholder="Monthly Amount ($)" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        </div>
+                    </div>
+
+                    <hr class="my-6 border-gray-200">
+
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" name="has_section8_voucher" class="rounded text-blue-600 mt-0.5" onchange="toggleSection('voucher-fields', this.checked)">
+                        <div>
+                            <span class="text-sm font-semibold text-gray-700">Housing Choice Voucher Program/Assistance</span>
+                            <span class="text-sm text-gray-500">: I will utilize financial aid from HUD or a non-profit.</span>
+                        </div>
+                    </label>
+                    <div id="voucher-fields" class="hidden mt-3 ml-8">
+                        <label class="block text-xs text-gray-500 mb-1">Voucher Amount (monthly)</label>
+                        <input type="text" name="voucher_amount" placeholder="$0" class="w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 6: General Information ============ -->
+            <div class="step" data-step="6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">General Information</h2>
+
+                    <div class="space-y-6">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700 mb-2">Will you have an animal living with you at this property?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="has_animals" value="yes" class="text-blue-600" onchange="toggleSection('animal-details', true)"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="has_animals" value="no" checked class="text-blue-600" onchange="toggleSection('animal-details', false)"><span class="text-sm">No</span></label>
+                            </div>
+                            <div id="animal-details" class="hidden mt-3 space-y-3 p-4 bg-gray-50 rounded-lg">
+                                <input type="text" name="animal_type" placeholder="Type & Breed (e.g., Dog - Labrador)" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                                <input type="text" name="animal_weight" placeholder="Weight (lbs)" class="w-32 rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700 mb-2">Will you have a vehicle at this property?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="has_vehicle" value="yes" class="text-blue-600" onchange="toggleSection('vehicle-details', true)"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="has_vehicle" value="no" checked class="text-blue-600" onchange="toggleSection('vehicle-details', false)"><span class="text-sm">No</span></label>
+                            </div>
+                            <div id="vehicle-details" class="hidden mt-3 space-y-3 p-4 bg-gray-50 rounded-lg">
+                                <input type="text" name="vehicle_info" placeholder="Year, Make, Model (e.g., 2020 Honda Civic)" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                                <input type="text" name="vehicle_plate" placeholder="License Plate" class="w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700 mb-2">Do you smoke?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="smoker" value="yes" class="text-blue-600"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="smoker" value="outdoors" class="text-blue-600"><span class="text-sm">Outdoors Only</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="smoker" value="no" checked class="text-blue-600"><span class="text-sm">No</span></label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700 mb-2">Do you have any special requests or requirements we should be aware of?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="has_special_requests" value="yes" class="text-blue-600" onchange="toggleSection('special-requests-detail', true)"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="has_special_requests" value="no" checked class="text-blue-600" onchange="toggleSection('special-requests-detail', false)"><span class="text-sm">No</span></label>
+                            </div>
+                            <div id="special-requests-detail" class="hidden mt-3">
+                                <textarea name="special_requests" rows="2" placeholder="Describe your requests..." class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 7: Background ============ -->
+            <div class="step" data-step="7">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Background</h2>
+
+                    <div class="space-y-6">
+                        <div>
+                            <p class="text-sm text-gray-700 mb-2">Have you (or any person you have named on this application) ever been evicted from a tenancy or left owing money?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_eviction" value="yes" class="text-blue-600"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_eviction" value="no" class="text-blue-600"><span class="text-sm">No</span></label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-700 mb-2">Have you or any member of your household ever been convicted of (or pled guilty or no contest to) any criminal offense(s) other than a minor infraction(s) that were disposed of by means other than acquittal or a finding of "not guilty"?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_criminal" value="yes" class="text-blue-600"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_criminal" value="no" class="text-blue-600"><span class="text-sm">No</span></label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-700 mb-2">Have you (or any person you have named on this application) ever filed for or been involved in a bankruptcy, been foreclosed on, or been a defendant in a civil suit?</p>
+                            <div class="radio-group flex items-center gap-6">
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_bankruptcy" value="yes" class="text-blue-600"><span class="text-sm">Yes</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" name="prior_bankruptcy" value="no" class="text-blue-600"><span class="text-sm">No</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="button" onclick="nextStep()" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 8: Other Information + Submit ============ -->
+            <div class="step" data-step="8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-1">Other Information</h2>
+                    <p class="text-sm text-gray-500 mb-6">Almost there - a few more questions!</p>
+
+                    <h3 class="text-base font-bold text-gray-900 mb-3">Emergency Contact</h3>
+                    <div class="space-y-3 mb-6">
+                        <input type="text" name="emergency_contact_name" placeholder="Full Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        <input type="text" name="emergency_contact_relationship" placeholder="Relationship" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                        <input type="tel" name="emergency_contact_phone" placeholder="Phone Number" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                    </div>
+
+                    <hr class="my-6 border-gray-200">
+
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Additional Comments <span class="font-normal text-gray-400">(Optional)</span></h3>
+                    <p class="text-xs text-gray-500 mb-3">Use this field to explain or comment on any aspect of your rental application.</p>
+                    <textarea name="notes" rows="4" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm mb-6"></textarea>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">How did you find this property?</label>
+                        <select name="referral_source" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                            <option value="">Select...</option>
+                            <option value="zillow">Zillow</option>
+                            <option value="trulia">Trulia</option>
+                            <option value="apartments_com">Apartments.com</option>
+                            <option value="craigslist">Craigslist</option>
+                            <option value="facebook">Facebook Marketplace</option>
+                            <option value="drive_by">Drove/Walked By</option>
+                            <option value="referral">Friend/Family Referral</option>
+                            <option value="bluedeer">Blue Deer Website</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <hr class="my-6 border-gray-200">
+
+                    <!-- Application & Screening Fee -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl mt-0.5">🔒</span>
+                            <div class="flex-1">
+                                <h3 class="text-base font-bold text-gray-900 mb-1">Application & Screening Fee</h3>
+                                <p class="text-sm text-gray-600 mb-3">
+                                    A non-refundable <strong>$35.00</strong> fee is required to process your application and run a background/credit check.
+                                </p>
+                                <a href="https://buy.stripe.com/00w28tfdM9K18ey2F00kE00" target="_blank"
+                                   class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                    Pay $35.00 Screening Fee
+                                </a>
+                                <p class="text-xs text-gray-500 mt-2">Secure payment via Stripe. You can pay before or after submitting.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">SUBMIT APPLICATION</button>
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-8 mt-8">
+        <div class="max-w-3xl mx-auto px-4 text-center">
+            <div class="flex items-center justify-center gap-4 text-sm text-gray-500 mb-2">
+                <a href="/terms" class="hover:text-gray-700">Terms of Use</a>
+                <span>&</span>
+                <a href="/privacy" class="hover:text-gray-700">Privacy Policy</a>
+            </div>
+            <p class="text-xs text-gray-400">Blue Deer Property Management &copy; 2025</p>
+        </div>
+    </footer>
+
+    <script>
+    // Property data from server
+    const properties = {{ properties_json | safe }};
+
+    // ===== Property Selector =====
+    let selectedPropertyId = null;
+
+    function renderDropdown(filtered) {
+        const dd = document.getElementById('property-dropdown');
+        if (filtered.length === 0) {
+            dd.innerHTML = '<div class="no-results">No properties found</div>';
+            return;
+        }
+        dd.innerHTML = filtered.map(p => {
+            const photoHtml = p.photo
+                ? `<img src="${p.photo}" class="property-option-photo" alt="">`
+                : `<div class="property-option-photo flex items-center justify-center text-gray-300"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4"/></svg></div>`;
+            const rent = p.rent ? `$${Number(p.rent).toLocaleString()}/mo` : '';
+            const beds = p.bedrooms ? `${p.bedrooms} Beds` : '';
+            const baths = p.bathrooms ? `${p.bathrooms} Baths` : '';
+            const details = [rent, beds, baths].filter(Boolean).join(' · ');
+            const selectedClass = p.id === selectedPropertyId ? ' selected' : '';
+            return `<div class="property-option${selectedClass}" onclick="selectProperty(${p.id})">
+                ${photoHtml}
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-900 truncate">${p.address}</p>
+                    <p class="text-xs text-gray-500">${p.city || ''}, ${p.state || 'MI'} ${p.zip || ''}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${details}</p>
+                </div>
+                ${!p.is_available ? '<span class="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex-shrink-0">Occupied</span>' : '<span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex-shrink-0">Available</span>'}
+            </div>`;
+        }).join('');
+    }
+
+    function openDropdown() {
+        const dd = document.getElementById('property-dropdown');
+        dd.classList.add('open');
+        renderDropdown(properties);
+    }
+
+    function closeDropdown() {
+        setTimeout(() => {
+            document.getElementById('property-dropdown').classList.remove('open');
+        }, 200);
+    }
+
+    document.getElementById('property-search').addEventListener('blur', closeDropdown);
+
+    function filterProperties() {
+        const q = document.getElementById('property-search').value.toLowerCase().trim();
+        const dd = document.getElementById('property-dropdown');
+        dd.classList.add('open');
+        if (!q) {
+            renderDropdown(properties);
+            return;
+        }
+        const filtered = properties.filter(p => {
+            const searchStr = `${p.address} ${p.city || ''} ${p.state || ''} ${p.zip || ''} ${p.description || ''}`.toLowerCase();
+            return searchStr.includes(q);
+        });
+        renderDropdown(filtered);
+    }
+
+    function selectProperty(id) {
+        const p = properties.find(x => x.id === id);
+        if (!p) return;
+
+        selectedPropertyId = id;
+        document.getElementById('selected-property-id').value = id;
+        document.getElementById('property-search').value = p.address;
+        document.getElementById('property-dropdown').classList.remove('open');
+
+        // Update card
+        const card = document.getElementById('selected-property-card');
+        card.classList.remove('hidden');
+
+        const photoWrapper = document.getElementById('selected-photo-wrapper');
+        if (p.photo) {
+            document.getElementById('selected-photo').src = p.photo;
+            photoWrapper.classList.remove('hidden');
+        } else {
+            photoWrapper.classList.add('hidden');
+        }
+
+        document.getElementById('selected-type').textContent = p.property_type || '';
+        document.getElementById('selected-description').textContent = p.description || '';
+        document.getElementById('selected-address').textContent = `${p.address}, ${p.city || ''}, ${p.state || 'MI'} ${p.zip || ''}`;
+        document.getElementById('selected-rent').textContent = p.rent ? `$${Number(p.rent).toLocaleString()}/mo` : '';
+        document.getElementById('selected-beds').textContent = p.bedrooms ? `${p.bedrooms} Beds` : '';
+        document.getElementById('selected-baths').textContent = p.bathrooms ? `${p.bathrooms} Baths` : '';
+    }
+
+    function clearSelection() {
+        selectedPropertyId = null;
+        document.getElementById('selected-property-id').value = '';
+        document.getElementById('property-search').value = '';
+        document.getElementById('selected-property-card').classList.add('hidden');
+    }
+
+    // ===== Multi-step form =====
+    const TOTAL_STEPS = 8;
+    let currentStep = 1;
+
+    function showStep(n) {
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.querySelector(`[data-step="${n}"]`).classList.add('active');
+        const ps = document.getElementById('progress-section');
+        ps.classList.toggle('hidden', n === 1);
+        const pct = ((n - 1) / (TOTAL_STEPS - 1)) * 100;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function nextStep() {
+        // Validate property selection on step 1
+        if (currentStep === 1 && !selectedPropertyId) {
+            document.getElementById('property-search').focus();
+            document.getElementById('property-search').classList.add('ring-2', 'ring-red-400', 'border-red-400');
+            setTimeout(() => {
+                document.getElementById('property-search').classList.remove('ring-2', 'ring-red-400', 'border-red-400');
+            }, 2000);
+            return;
+        }
+        if (currentStep < TOTAL_STEPS) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    }
+
+    function toggleSection(id, show) {
+        document.getElementById(id).classList.toggle('hidden', !show);
+    }
+
+    function updateTypeToggle() {
+        const tenant = document.querySelector('input[name="applicant_type"][value="tenant"]').checked;
+        document.getElementById('type-tenant-label').className = tenant
+            ? 'px-5 py-2 text-sm cursor-pointer transition-colors bg-gray-900 text-white rounded-l-lg'
+            : 'px-5 py-2 text-sm cursor-pointer transition-colors text-gray-600';
+        document.getElementById('type-cosigner-label').className = !tenant
+            ? 'px-5 py-2 text-sm cursor-pointer border-l border-gray-300 transition-colors bg-gray-900 text-white rounded-r-lg'
+            : 'px-5 py-2 text-sm cursor-pointer border-l border-gray-300 transition-colors text-gray-600';
+    }
+    updateTypeToggle();
+
+    let occupantCount = 0;
+    function addOccupant() {
+        occupantCount++;
+        const html = `<div class="flex gap-2 mb-2 items-center">
+            <input type="text" name="occupant_name_${occupantCount}" placeholder="Full Name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="text" name="occupant_relationship_${occupantCount}" placeholder="Relationship" class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="number" name="occupant_age_${occupantCount}" placeholder="Age" class="w-16 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-1">&times;</button>
+        </div>`;
+        document.getElementById('occupants-list').insertAdjacentHTML('beforeend', html);
+    }
+
+    let cosignerCount = 0;
+    function addCosigner() {
+        cosignerCount++;
+        const html = `<div class="flex gap-2 mb-2 items-center">
+            <input type="text" name="cosigner_name_${cosignerCount}" placeholder="Full Name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <input type="tel" name="cosigner_phone_${cosignerCount}" placeholder="Phone" class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-1">&times;</button>
+        </div>`;
+        document.getElementById('cosigners-list').insertAdjacentHTML('beforeend', html);
+    }
+
+    let pastAddrCount = 0;
+    function addPastAddress() {
+        pastAddrCount++;
+        const n = pastAddrCount;
+        const html = `<div class="space-y-3 mb-4 p-4 bg-gray-50 rounded-lg relative">
+            <button type="button" onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600">&times;</button>
+            <input type="text" name="past_address_${n}" placeholder="Street Address" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <div class="grid grid-cols-3 gap-3">
+                <input type="text" name="past_city_${n}" placeholder="City" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                <input type="text" name="past_state_${n}" placeholder="State" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                <input type="text" name="past_zip_${n}" placeholder="Zip" class="rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">From</label><input type="date" name="past_addr_from_${n}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">To</label><input type="date" name="past_addr_to_${n}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+            </div>
+            <input type="text" name="past_landlord_name_${n}" placeholder="Landlord Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <input type="tel" name="past_landlord_phone_${n}" placeholder="Landlord Phone" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <input type="text" name="past_reason_leaving_${n}" placeholder="Reason for Leaving" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+        </div>`;
+        document.getElementById('past-addresses-list').insertAdjacentHTML('beforeend', html);
+    }
+
+    let pastEmpCount = 0;
+    function addPastEmployer() {
+        pastEmpCount++;
+        const n = pastEmpCount;
+        const html = `<div class="space-y-3 mb-4 p-4 bg-gray-50 rounded-lg relative">
+            <button type="button" onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600">&times;</button>
+            <input type="text" name="past_employer_name_${n}" placeholder="Company Name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <input type="text" name="past_employer_position_${n}" placeholder="Position" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">From</label><input type="date" name="past_employer_from_${n}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">To</label><input type="date" name="past_employer_to_${n}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+            </div>
+        </div>`;
+        document.getElementById('past-employers-list').insertAdjacentHTML('beforeend', html);
+    }
+
+    // Pre-select property if passed via URL param
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselect = urlParams.get('property');
+    if (preselect) {
+        const pid = parseInt(preselect);
+        if (pid && properties.find(p => p.id === pid)) {
+            selectProperty(pid);
+        }
+    }
+    </script>
+</body>
+</html>

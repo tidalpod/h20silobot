@@ -49,6 +49,11 @@ class WebConfig:
     plaid_env: str = os.getenv("PLAID_ENV", "sandbox")
     plaid_webhook_url: str = os.getenv("PLAID_WEBHOOK_URL", "")
 
+    # Stripe Payments
+    stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
+    stripe_publishable_key: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+    stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
     # TenantReportX Screening
     tenantreportx_api_url: str = os.getenv("TENANTREPORTX_API_URL", "https://api.tenantreportx.com")
     tenantreportx_api_key: str = os.getenv("TENANTREPORTX_API_KEY", "")
@@ -79,6 +84,11 @@ class WebConfig:
     def has_plaid(self) -> bool:
         """Check if Plaid is configured"""
         return bool(self.plaid_client_id and self.plaid_secret)
+
+    @property
+    def has_stripe(self) -> bool:
+        """Check if Stripe is configured"""
+        return bool(self.stripe_secret_key and self.stripe_publishable_key)
 
     @property
     def has_twilio(self) -> bool:

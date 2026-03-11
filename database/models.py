@@ -81,6 +81,13 @@ class PaymentStatus(PyEnum):
     CANCELLED = "cancelled"
 
 
+class StripePaymentType(PyEnum):
+    RENT = "rent"
+    WATER_BILL = "water_bill"
+    SECURITY_DEPOSIT = "security_deposit"
+    OTHER = "other"
+
+
 class AutopayStatus(PyEnum):
     ACTIVE = "active"
     PAUSED = "paused"
@@ -1587,3 +1594,52 @@ class TenantApplication(Base):
 
     def __repr__(self):
         return f"<TenantApplication {self.id}: {self.applicant_first_name} {self.applicant_last_name}>"
+
+
+# =============================================================================
+# Stripe Payment Models
+# =============================================================================
+
+class StripePayment(Base):
+    """Stripe Checkout payment records (rent, water bills, deposits, etc.)"""
+    __tablename__ = "stripe_payments"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    # Payment type and reference
+    payment_type = Column(Enum(StripePaymentType), nullable=False)
+    reference_id = Column(Integer, nullable=True)  # e.g. water_bill.id
+    description = Column(String(255), nullable=False)  # e.g. "Rent - March 2026"
+
+    # Amounts
+    base_amount = Column(Numeric(10, 2), nullable=False)
+    convenience_fee = Column(Numeric(10, 2), nullable=False, default=0)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    late_fee = Column(Numeric(10, 2), default=0)
+
+    # Stripe identifiers
+    stripe_checkout_session_id = Column(String(255), unique=True, nullable=True)
+    stripe_payment_intent_id = Column(String(255), unique=True, nullable=True)
+
+    # Status
+    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    payment_month = Column(Date, nullable=True)  # For rent payments
+
+    # Timestamps
+    initiated_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+
+    # Relationships
+    tenant_ref = relationship("Tenant")
+    property_ref = relationship("Property")
+
+    __table_args__ = (
+        Index("ix_stripe_payments_tenant", "tenant_id"),
+        Index("ix_stripe_payments_session", "stripe_checkout_session_id"),
+        Index("ix_stripe_payments_status", "status"),
+        Index("ix_stripe_payments_type", "payment_type"),
+    )

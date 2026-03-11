@@ -20,6 +20,7 @@ from webapp.auth.tenant_auth import get_current_tenant, login_tenant, logout_ten
 from webapp.services.verification_service import send_verification_code, verify_code
 from webapp.services.telegram_service import telegram_service
 from webapp.services.storage_service import storage
+from webapp.config import web_config
 
 import logging
 logger = logging.getLogger(__name__)
@@ -183,6 +184,7 @@ async def portal_dashboard(request: Request):
         "active_lease": active_lease,
         "latest_bill": latest_bill,
         "rent_due": rent_due,
+        "has_stripe": web_config.has_stripe,
     })
 
 
@@ -438,6 +440,7 @@ async def portal_bills(request: Request):
         "request": request,
         "tenant": tenant,
         "bills": bills,
+        "has_stripe": web_config.has_stripe,
     })
 
 

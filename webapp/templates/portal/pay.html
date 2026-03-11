@@ -108,6 +108,36 @@
 </form>
 {% endif %}
 
+<!-- Pay with Card (Stripe) -->
+{% if has_stripe and not balance.paid and balance.total_due > 0 and stripe_fee %}
+<div class="portal-card p-5 mb-4">
+    <div class="flex items-center gap-2 mb-3">
+        <span class="text-lg">&#128179;</span>
+        <h3 class="text-sm font-semibold text-gray-900">Or Pay with Card</h3>
+    </div>
+    <div class="space-y-2 mb-4">
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-500">Rent Amount</span>
+            <span class="text-gray-900">${{ "{:,.2f}".format(stripe_fee.base_amount) }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-500">Card Processing Fee</span>
+            <span class="text-gray-900">${{ "{:,.2f}".format(stripe_fee.convenience_fee) }}</span>
+        </div>
+        <div class="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
+            <span>Total</span>
+            <span>${{ "{:,.2f}".format(stripe_fee.total_amount) }}</span>
+        </div>
+    </div>
+    <form method="POST" action="/portal/pay/stripe">
+        <button type="submit" class="w-full py-3 rounded-xl bg-purple-600 text-white font-medium text-center hover:bg-purple-500 transition-colors">
+            Pay ${{ "{:,.2f}".format(stripe_fee.total_amount) }} with Card
+        </button>
+    </form>
+    <p class="text-xs text-gray-400 mt-2 text-center">You'll be redirected to Stripe's secure checkout</p>
+</div>
+{% endif %}
+
 <!-- Recent Payment -->
 {% if recent_payment %}
 <div class="portal-card p-4 mb-4">

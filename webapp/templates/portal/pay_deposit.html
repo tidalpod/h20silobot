@@ -1,0 +1,95 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Pay Security Deposit{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center gap-2 mb-1">
+        <a href="/portal" class="text-blue-600 text-sm">&larr; Back</a>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900">Pay Security Deposit</h1>
+    <p class="text-sm text-gray-500 mt-1">Pay your security deposit by card</p>
+</div>
+
+{% if error %}
+<div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200">
+    <div class="flex items-center gap-2">
+        <span class="text-red-600 text-lg">&#10007;</span>
+        <p class="text-sm font-medium text-red-800">
+            {% if error == 'invalid_amount' %}Please enter a valid amount.
+            {% elif error == 'cancelled' %}Payment was cancelled.
+            {% else %}{{ error }}{% endif %}
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<form method="POST" action="/portal/pay/deposit" class="space-y-4">
+    <div class="portal-card p-5">
+        <label for="amount" class="text-sm font-medium text-gray-700 mb-2 block">Deposit Amount</label>
+        <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
+            <input type="number" id="amount" name="amount" step="0.01" min="1" required
+                class="w-full pl-8 pr-4 py-3 rounded-lg border border-gray-300 text-lg font-medium focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="0.00"
+                oninput="updateFeePreview()">
+        </div>
+    </div>
+
+    <!-- Fee Preview -->
+    <div id="fee-preview" class="portal-card p-5 hidden">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Payment Summary</h3>
+        <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">Deposit Amount</span>
+                <span id="preview-base" class="text-gray-900">$0.00</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">Card Processing Fee</span>
+                <span id="preview-fee" class="text-gray-900">$0.00</span>
+            </div>
+            <div class="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
+                <span>Total</span>
+                <span id="preview-total">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" id="submit-btn" class="w-full py-3 rounded-xl bg-purple-600 text-white font-medium text-center hover:bg-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+        Pay with Card
+    </button>
+    <p class="text-xs text-gray-400 text-center">You'll be redirected to Stripe's secure checkout</p>
+</form>
+
+<script>
+let debounceTimer;
+function updateFeePreview() {
+    clearTimeout(debounceTimer);
+    const amount = parseFloat(document.getElementById('amount').value);
+    const preview = document.getElementById('fee-preview');
+    const btn = document.getElementById('submit-btn');
+
+    if (!amount || amount <= 0) {
+        preview.classList.add('hidden');
+        btn.disabled = true;
+        btn.textContent = 'Pay with Card';
+        return;
+    }
+
+    debounceTimer = setTimeout(async () => {
+        try {
+            const resp = await fetch(`/portal/pay/stripe/fee-preview?amount=${amount}`);
+            const data = await resp.json();
+            if (data.error) return;
+
+            document.getElementById('preview-base').textContent = '$' + parseFloat(data.base_amount).toFixed(2);
+            document.getElementById('preview-fee').textContent = '$' + parseFloat(data.convenience_fee).toFixed(2);
+            document.getElementById('preview-total').textContent = '$' + parseFloat(data.total_amount).toFixed(2);
+            preview.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Pay $' + parseFloat(data.total_amount).toFixed(2) + ' with Card';
+        } catch (e) {}
+    }, 300);
+}
+</script>
+{% endblock %}

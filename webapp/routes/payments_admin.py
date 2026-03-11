@@ -1,5 +1,7 @@
-"""Admin Payment routes — view all payments, detail, Plaid webhook"""
+"""Admin Payment routes — view all payments, detail, Plaid webhook, Stripe webhook"""
 
+import logging
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -9,9 +11,15 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import RentPayment, PaymentStatus, Property, Tenant
+from database.models import (
+    RentPayment, PaymentStatus, Property, Tenant,
+    StripePayment, WaterBill, BillStatus,
+)
 from webapp.auth.dependencies import get_current_user
 from webapp.services import payment_service
+from webapp.services import stripe_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["payments-admin"])
 
@@ -133,3 +141,61 @@ async def plaid_webhook(request: Request):
 
     result = await payment_service.process_webhook(data)
     return JSONResponse(result)
+
+
+@router.post("/stripe-webhook")
+async def stripe_webhook(request: Request):
+    """Stripe webhook endpoint (public, no auth, signature-verified)."""
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+
+    event = stripe_service.verify_webhook_signature(payload, sig_header)
+    if not event:
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
+
+    event_type = event.get("type", "")
+    data_object = event.get("data", {}).get("object", {})
+
+    if event_type == "checkout.session.completed":
+        session_id = data_object.get("id")
+        payment_intent = data_object.get("payment_intent")
+        metadata = data_object.get("metadata", {})
+
+        async with get_session() as session:
+            result = await session.execute(
+                select(StripePayment)
+                .where(StripePayment.stripe_checkout_session_id == session_id)
+            )
+            sp = result.scalar_one_or_none()
+            if sp:
+                sp.status = PaymentStatus.COMPLETED
+                sp.stripe_payment_intent_id = payment_intent
+                sp.completed_at = datetime.utcnow()
+
+                # If water bill payment, mark the bill as paid
+                if sp.payment_type.value == "water_bill" and sp.reference_id:
+                    bill_result = await session.execute(
+                        select(WaterBill).where(WaterBill.id == sp.reference_id)
+                    )
+                    bill = bill_result.scalar_one_or_none()
+                    if bill:
+                        bill.amount_due = 0
+                        bill.status = BillStatus.PAID
+
+                logger.info(f"Stripe payment {sp.id} completed (session={session_id})")
+
+    elif event_type == "checkout.session.expired":
+        session_id = data_object.get("id")
+        async with get_session() as session:
+            result = await session.execute(
+                select(StripePayment)
+                .where(StripePayment.stripe_checkout_session_id == session_id)
+            )
+            sp = result.scalar_one_or_none()
+            if sp:
+                sp.status = PaymentStatus.CANCELLED
+                sp.failed_at = datetime.utcnow()
+                sp.failure_reason = "Checkout session expired"
+                logger.info(f"Stripe payment {sp.id} expired (session={session_id})")
+
+    return JSONResponse({"received": True})

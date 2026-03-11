@@ -17,10 +17,17 @@
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-sm font-semibold text-gray-900">${{ "{:,.2f}".format(payment.total_amount) }}</p>
-                <p class="text-xs text-gray-500">{{ payment.payment_month.strftime('%B %Y') }}</p>
-                {% if payment.is_autopay %}
-                <span class="inline-flex items-center mt-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">Autopay</span>
-                {% endif %}
+                <p class="text-xs text-gray-500">{{ payment.description }}</p>
+                <div class="flex gap-1 mt-1">
+                    {% if payment.type == 'card' %}
+                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">Card</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">ACH</span>
+                    {% endif %}
+                    {% if payment.is_autopay %}
+                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">Autopay</span>
+                    {% endif %}
+                </div>
             </div>
             <div class="text-right">
                 {% if payment.status.value == 'completed' %}
@@ -41,7 +48,12 @@
         </div>
         {% if payment.late_fee and payment.late_fee > 0 %}
         <div class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
-            Rent: ${{ "{:,.2f}".format(payment.amount) }} + Late Fee: ${{ "{:,.2f}".format(payment.late_fee) }}
+            Base: ${{ "{:,.2f}".format(payment.amount) }} + Late Fee: ${{ "{:,.2f}".format(payment.late_fee) }}
+        </div>
+        {% endif %}
+        {% if payment.convenience_fee and payment.convenience_fee > 0 %}
+        <div class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+            Base: ${{ "{:,.2f}".format(payment.amount) }} + Processing Fee: ${{ "{:,.2f}".format(payment.convenience_fee) }}
         </div>
         {% endif %}
         {% if payment.failure_reason %}
