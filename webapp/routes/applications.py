@@ -67,7 +67,7 @@ async def apply_standalone(request: Request):
                 "description": (prop.description or "")[:60],
                 "property_type": prop.property_type or "",
                 "bedrooms": prop.bedrooms,
-                "bathrooms": prop.bathrooms,
+                "bathrooms": float(prop.bathrooms) if prop.bathrooms else None,
                 "rent": rent,
                 "photo": primary_photo,
                 "is_available": is_available,
