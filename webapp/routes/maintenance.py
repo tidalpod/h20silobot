@@ -1,7 +1,6 @@
 """Maintenance / Work Order routes"""
 
 import logging
-import os
 import uuid
 from datetime import datetime, date
 from pathlib import Path
@@ -21,6 +20,7 @@ from database.models import (
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
 from webapp.services.telegram_service import telegram_service
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["maintenance"])
 
@@ -28,14 +28,6 @@ logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Upload directory for work order photos
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _normalize_phone(phone):
@@ -721,11 +713,9 @@ async def mark_work_order_paid(request: Request, wo_id: int):
         if receipt_file.content_type in allowed:
             ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
             filename = f"receipt_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
-            receipt_path = UPLOAD_DIR / filename
+            key = f"work_orders/{filename}"
             content = await receipt_file.read()
-            with open(receipt_path, "wb") as f:
-                f.write(content)
-            receipt_url = f"/uploads/work_orders/{filename}"
+            receipt_url = storage.upload(key, content, receipt_file.content_type)
 
     async with get_session() as session:
         result = await session.execute(
@@ -837,14 +827,12 @@ async def upload_work_order_photo(
 
         ext = Path(photo.filename).suffix.lower() or ".jpg"
         filename = f"wo_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = UPLOAD_DIR / filename
-
-        with open(filepath, "wb") as f:
-            f.write(contents)
+        key = f"work_orders/{filename}"
+        url = storage.upload(key, contents, photo.content_type)
 
         photo_record = WorkOrderPhoto(
             work_order_id=wo_id,
-            url=f"/uploads/work_orders/{filename}",
+            url=url,
         )
         session.add(photo_record)
         await session.flush()
@@ -873,12 +861,10 @@ async def delete_work_order(request: Request, wo_id: int):
         if not wo:
             return RedirectResponse(url="/maintenance", status_code=303)
 
-        # Delete photo files from disk
+        # Delete photo files
         for photo in wo.photos:
             if photo.url:
-                filepath = Path(UPLOAD_BASE) / photo.url.removeprefix("/uploads/")
-                if filepath.exists():
-                    filepath.unlink()
+                storage.delete(photo.url)
             await session.delete(photo)
 
         await session.delete(wo)
@@ -904,11 +890,9 @@ async def delete_work_order_photo(request: Request, wo_id: int, photo_id: int):
         if not photo:
             return JSONResponse({"error": "Photo not found"}, status_code=404)
 
-        # Delete file from disk
+        # Delete file
         if photo.url:
-            filepath = Path(UPLOAD_BASE) / photo.url.removeprefix("/uploads/")
-            if filepath.exists():
-                filepath.unlink()
+            storage.delete(photo.url)
 
         await session.delete(photo)
 

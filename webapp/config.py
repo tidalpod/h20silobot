@@ -56,6 +56,20 @@ class WebConfig:
     tenantreportx_webhook_secret: str = os.getenv("TENANTREPORTX_WEBHOOK_SECRET", "")
     tenantreportx_applicant_fee: str = os.getenv("TENANTREPORTX_APPLICANT_FEE", "25.00")
 
+    # Cloudflare R2 Object Storage
+    r2_account_id: str = os.getenv("R2_ACCOUNT_ID", "")
+    r2_access_key_id: str = os.getenv("R2_ACCESS_KEY_ID", "")
+    r2_access_key_secret: str = os.getenv("R2_ACCESS_KEY_SECRET", "")
+    r2_bucket_name: str = os.getenv("R2_BUCKET_NAME", "")
+    r2_public_url: str = os.getenv("R2_PUBLIC_URL", "")
+
+    @property
+    def has_r2(self) -> bool:
+        """Check if Cloudflare R2 is configured"""
+        return bool(self.r2_account_id and self.r2_access_key_id
+                     and self.r2_access_key_secret and self.r2_bucket_name
+                     and self.r2_public_url)
+
     @property
     def has_tenantreportx(self) -> bool:
         """Check if TenantReportX is configured"""

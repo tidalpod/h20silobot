@@ -1,7 +1,6 @@
 """PM-side Project (Rehab) tracking routes"""
 
 import logging
-import os
 import uuid
 from datetime import datetime, date
 from pathlib import Path
@@ -19,6 +18,7 @@ from database.models import (
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["projects"])
 
@@ -26,14 +26,6 @@ logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Upload directory for project documents
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-UPLOAD_DIR = Path(UPLOAD_BASE) / "projects"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_TYPES = {
     "application/pdf": ".pdf",
@@ -500,12 +492,8 @@ async def project_document_upload(request: Request, project_id: int):
 
     ext = ALLOWED_TYPES.get(file.content_type, ".pdf")
     filename = f"proj_{project_id}_{uuid.uuid4().hex[:12]}{ext}"
-    filepath = UPLOAD_DIR / filename
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    file_url = f"/uploads/projects/{filename}"
+    key = f"projects/{filename}"
+    file_url = storage.upload(key, contents, file.content_type)
 
     async with get_session() as session:
         doc = ProjectDocument(
@@ -537,11 +525,7 @@ async def project_document_delete(request: Request, project_id: int, doc_id: int
         )
         doc = result.scalar_one_or_none()
         if doc:
-            # Delete file from disk
-            relative_path = doc.file_url.removeprefix("/uploads/")
-            filepath = Path(UPLOAD_BASE) / relative_path
-            if filepath.exists():
-                filepath.unlink()
+            storage.delete(doc.file_url)
             await session.delete(doc)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
@@ -581,12 +565,9 @@ async def add_project_draw(request: Request, project_id: int):
         if receipt_file.content_type in allowed:
             ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
             filename = f"draw_{project_id}_{uuid.uuid4().hex[:8]}{ext}"
-            draw_dir = Path(UPLOAD_BASE) / "projects" / "draws"
-            draw_dir.mkdir(parents=True, exist_ok=True)
+            key = f"projects/draws/{filename}"
             content = await receipt_file.read()
-            with open(draw_dir / filename, "wb") as f:
-                f.write(content)
-            receipt_url = f"/uploads/projects/draws/{filename}"
+            receipt_url = storage.upload(key, content, receipt_file.content_type)
 
     async with get_session() as session:
         draw = ProjectDraw(
@@ -619,10 +600,7 @@ async def delete_project_draw(request: Request, project_id: int, draw_id: int):
         draw = result.scalar_one_or_none()
         if draw:
             if draw.receipt_url:
-                relative_path = draw.receipt_url.removeprefix("/uploads/")
-                filepath = Path(UPLOAD_BASE) / relative_path
-                if filepath.exists():
-                    filepath.unlink()
+                storage.delete(draw.receipt_url)
             await session.delete(draw)
 
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

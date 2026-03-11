@@ -1,6 +1,5 @@
 """Vendor Portal routes"""
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +20,7 @@ from webapp.auth.vendor_auth import get_current_vendor, login_vendor, logout_ven
 from webapp.services.vendor_verification_service import (
     send_vendor_verification_code, verify_vendor_code,
 )
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["vendor-portal"])
 
@@ -43,16 +43,6 @@ def _fmt_time_12h(value):
 
 
 templates.env.filters["time12"] = _fmt_time_12h
-
-# Upload directories
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-WO_UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
-WO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-INVOICE_UPLOAD_DIR = Path(UPLOAD_BASE) / "invoices"
-INVOICE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # =============================================================================
@@ -398,14 +388,12 @@ async def vendor_photo_upload(request: Request, wo_id: int, photo: UploadFile = 
 
         ext = Path(photo.filename).suffix.lower() or ".jpg"
         filename = f"wo_{wo_id}_vendor_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = WO_UPLOAD_DIR / filename
-
-        with open(filepath, "wb") as f:
-            f.write(contents)
+        key = f"work_orders/{filename}"
+        url = storage.upload(key, contents, photo.content_type)
 
         photo_record = WorkOrderPhoto(
             work_order_id=wo_id,
-            url=f"/uploads/work_orders/{filename}",
+            url=url,
             uploaded_by_tenant=False,
         )
         session.add(photo_record)
@@ -537,12 +525,8 @@ async def vendor_invoice_submit(request: Request):
 
         ext = allowed_types.get(file.content_type, ".pdf")
         filename = f"invoice_{uuid.uuid4().hex[:12]}{ext}"
-        filepath = INVOICE_UPLOAD_DIR / filename
-
-        with open(filepath, "wb") as f:
-            f.write(contents)
-
-        file_url = f"/uploads/invoices/{filename}"
+        key = f"invoices/{filename}"
+        file_url = storage.upload(key, contents, file.content_type)
 
     async with get_session() as session:
         # Verify property belongs to vendor's scope

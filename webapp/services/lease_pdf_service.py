@@ -8,6 +8,7 @@ Michigan lease format with numbered sections and tables.
 import json
 import logging
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -22,16 +23,11 @@ from webapp.services.lease_templates import (
     MICHIGAN_LEAD_PAINT_DISCLOSURE,
     ordinal,
 )
+from webapp.services.storage_service import storage
 
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-LEASE_PDF_DIR = Path(UPLOAD_BASE) / "leases"
-LEASE_PDF_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _format_date(date_str: str) -> str:
@@ -205,12 +201,22 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
     if signatures:
         for key, sig in signatures.items():
             try:
-                with open(sig["image_path"], "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode()
-                sig_images[key] = {
-                    **sig,
-                    "image_data_uri": f"data:image/png;base64,{b64}",
-                }
+                # Try reading via storage (handles both local and R2)
+                img_data = storage.download(sig["image_path"])
+                if img_data is None:
+                    # Fallback: try reading as a direct file path
+                    sig_path = Path(sig["image_path"])
+                    if sig_path.exists():
+                        img_data = sig_path.read_bytes()
+                if img_data:
+                    b64 = base64.b64encode(img_data).decode()
+                    sig_images[key] = {
+                        **sig,
+                        "image_data_uri": f"data:image/png;base64,{b64}",
+                    }
+                else:
+                    logger.warning(f"Could not read signature image {sig.get('image_path')}")
+                    sig_images[key] = sig
             except Exception as e:
                 logger.warning(f"Could not read signature image {sig.get('image_path')}: {e}")
                 sig_images[key] = sig
@@ -246,7 +252,7 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
 
 
 def generate_lease_pdf(data: dict, property_info: dict, tenant_info: dict, landlord_info: dict) -> dict:
-    """Generate lease PDF and save to disk. Returns file info."""
+    """Generate lease PDF and upload to storage. Returns file info."""
     try:
         from weasyprint import HTML
     except ImportError:
@@ -256,20 +262,30 @@ def generate_lease_pdf(data: dict, property_info: dict, tenant_info: dict, landl
     html = generate_lease_html(data, property_info, tenant_info, landlord_info)
 
     filename = f"lease_{uuid.uuid4().hex[:12]}.pdf"
-    filepath = LEASE_PDF_DIR / filename
+    key = f"leases/{filename}"
+
+    # Write to temp file first (WeasyPrint needs a path)
+    fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
 
     try:
-        HTML(string=html).write_pdf(str(filepath))
+        HTML(string=html).write_pdf(tmp_path)
+        file_size = Path(tmp_path).stat().st_size
+        file_url = storage.upload_from_path(key, tmp_path, "application/pdf")
     except Exception as e:
         logger.error(f"PDF generation failed: {e}")
         return {"error": f"PDF generation failed: {str(e)}"}
+    finally:
+        # Clean up temp file if storage copied it (not if it IS the local file)
+        if storage.using_r2:
+            Path(tmp_path).unlink(missing_ok=True)
 
-    file_size = filepath.stat().st_size
-    file_url = f"/uploads/leases/{filename}"
+    # For local storage, resolve the actual path
+    local_path = storage.resolve_local_path(file_url)
 
     return {
         "file_url": file_url,
-        "file_path": str(filepath),
+        "file_path": str(local_path) if local_path else tmp_path,
         "file_name": filename,
         "file_size": file_size,
     }
@@ -286,24 +302,28 @@ def generate_signed_lease_pdf(data: dict, property_info: dict, tenant_info: dict
 
     html = generate_lease_html(data, property_info, tenant_info, landlord_info, signatures=signatures)
 
-    signed_dir = LEASE_PDF_DIR / "signed"
-    signed_dir.mkdir(parents=True, exist_ok=True)
-
     filename = f"signed_{uuid.uuid4().hex[:12]}.pdf"
-    filepath = signed_dir / filename
+    key = f"leases/signed/{filename}"
+
+    fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
 
     try:
-        HTML(string=html).write_pdf(str(filepath))
+        HTML(string=html).write_pdf(tmp_path)
+        file_size = Path(tmp_path).stat().st_size
+        file_url = storage.upload_from_path(key, tmp_path, "application/pdf")
     except Exception as e:
         logger.error(f"Signed PDF generation failed: {e}")
         return {"error": f"Signed PDF generation failed: {str(e)}"}
+    finally:
+        if storage.using_r2:
+            Path(tmp_path).unlink(missing_ok=True)
 
-    file_size = filepath.stat().st_size
-    file_url = f"/uploads/leases/signed/{filename}"
+    local_path = storage.resolve_local_path(file_url)
 
     return {
         "file_url": file_url,
-        "file_path": str(filepath),
+        "file_path": str(local_path) if local_path else tmp_path,
         "file_name": filename,
         "file_size": file_size,
     }

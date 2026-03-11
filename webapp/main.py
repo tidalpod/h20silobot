@@ -77,37 +77,42 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Showing reminder migration skipped: {e}")
 
     # Auto-cleanup orphaned photo records (files lost between deploys)
+    # Skip when using R2 — files persist independently of deploys
     if db_success:
         try:
-            from sqlalchemy import select
-            from database.connection import get_session
-            from database.models import PropertyPhoto, Property
+            from webapp.services.storage_service import storage
+            if storage.using_r2:
+                logger.info("[CLEANUP] Skipping orphan cleanup — using R2 storage")
+            else:
+                from sqlalchemy import select
+                from database.connection import get_session
+                from database.models import PropertyPhoto, Property
 
-            props_dir = UPLOAD_DIR / "properties"
-            async with get_session() as session:
-                result = await session.execute(select(PropertyPhoto))
-                all_photos = result.scalars().all()
-                deleted = 0
-                affected_props = set()
-                for photo in all_photos:
-                    filename = photo.url.split("/")[-1]
-                    filepath = props_dir / filename
-                    if not filepath.exists():
-                        affected_props.add(photo.property_id)
-                        await session.delete(photo)
-                        deleted += 1
-                # Clear featured_photo_url for affected properties
-                for prop_id in affected_props:
-                    res = await session.execute(
-                        select(Property).where(Property.id == prop_id)
-                    )
-                    prop = res.scalar_one_or_none()
-                    if prop and prop.featured_photo_url:
-                        fname = prop.featured_photo_url.split("/")[-1]
-                        if not (props_dir / fname).exists():
-                            prop.featured_photo_url = None
-                if deleted:
-                    logger.info(f"[CLEANUP] Removed {deleted} orphaned photo records from {len(affected_props)} properties")
+                props_dir = UPLOAD_DIR / "properties"
+                async with get_session() as session:
+                    result = await session.execute(select(PropertyPhoto))
+                    all_photos = result.scalars().all()
+                    deleted = 0
+                    affected_props = set()
+                    for photo in all_photos:
+                        filename = photo.url.split("/")[-1]
+                        filepath = props_dir / filename
+                        if not filepath.exists():
+                            affected_props.add(photo.property_id)
+                            await session.delete(photo)
+                            deleted += 1
+                    # Clear featured_photo_url for affected properties
+                    for prop_id in affected_props:
+                        res = await session.execute(
+                            select(Property).where(Property.id == prop_id)
+                        )
+                        prop = res.scalar_one_or_none()
+                        if prop and prop.featured_photo_url:
+                            fname = prop.featured_photo_url.split("/")[-1]
+                            if not (props_dir / fname).exists():
+                                prop.featured_photo_url = None
+                    if deleted:
+                        logger.info(f"[CLEANUP] Removed {deleted} orphaned photo records from {len(affected_props)} properties")
         except Exception as e:
             logger.warning(f"Photo cleanup skipped: {e}")
 

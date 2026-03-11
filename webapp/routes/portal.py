@@ -1,6 +1,5 @@
 """Tenant Portal routes"""
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +19,7 @@ from database.models import (
 from webapp.auth.tenant_auth import get_current_tenant, login_tenant, logout_tenant
 from webapp.services.verification_service import send_verification_code, verify_code
 from webapp.services.telegram_service import telegram_service
+from webapp.services.storage_service import storage
 
 import logging
 logger = logging.getLogger(__name__)
@@ -28,14 +28,6 @@ router = APIRouter(tags=["portal"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Upload directory for tenant-submitted photos
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-UPLOAD_DIR = Path(UPLOAD_BASE) / "work_orders"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # =============================================================================
@@ -346,14 +338,12 @@ async def portal_photo_upload(request: Request, wo_id: int, photo: UploadFile = 
 
         ext = Path(photo.filename).suffix.lower() or ".jpg"
         filename = f"wo_{wo_id}_tenant_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = UPLOAD_DIR / filename
-
-        with open(filepath, "wb") as f:
-            f.write(contents)
+        key = f"work_orders/{filename}"
+        url = storage.upload(key, contents, photo.content_type)
 
         photo_record = WorkOrderPhoto(
             work_order_id=wo_id,
-            url=f"/uploads/work_orders/{filename}",
+            url=url,
             uploaded_by_tenant=True,
         )
         session.add(photo_record)
@@ -409,18 +399,17 @@ async def portal_lease_download(request: Request, lease_id: int):
         if not lease:
             return RedirectResponse(url="/portal/lease", status_code=303)
 
-        upload_base = os.environ.get("UPLOAD_PATH") or (
-            "/app/uploads" if Path("/app/uploads").exists()
-            else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-        )
-        relative_path = lease.file_url.removeprefix("/uploads/")
-        filepath = Path(upload_base) / relative_path
+        # R2 URLs → redirect; local files → FileResponse
+        if storage.is_remote_url(lease.file_url):
+            from fastapi.responses import RedirectResponse as Redir
+            return Redir(url=lease.file_url, status_code=302)
 
-        if not filepath.exists():
+        local_path = storage.resolve_local_path(lease.file_url)
+        if not local_path:
             return RedirectResponse(url="/portal/lease", status_code=303)
 
         return FileResponse(
-            path=str(filepath),
+            path=str(local_path),
             filename=f"{lease.title}.{lease.file_type}",
             media_type="application/octet-stream",
         )

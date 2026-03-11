@@ -1,6 +1,5 @@
 """PM-side Invoice management routes"""
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -16,18 +15,12 @@ from database.models import (
     Invoice, InvoiceStatus, Vendor, Property, WorkOrder, Project,
 )
 from webapp.auth.dependencies import get_current_user
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["invoices"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-INVOICE_UPLOAD_DIR = Path(UPLOAD_BASE) / "invoices"
-INVOICE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -154,10 +147,8 @@ async def invoice_create(request: Request):
             if len(contents) <= 20 * 1024 * 1024:
                 ext = allowed_types.get(file.content_type, ".pdf")
                 filename = f"invoice_{uuid.uuid4().hex[:12]}{ext}"
-                filepath = INVOICE_UPLOAD_DIR / filename
-                with open(filepath, "wb") as f:
-                    f.write(contents)
-                file_url = f"/uploads/invoices/{filename}"
+                key = f"invoices/{filename}"
+                file_url = storage.upload(key, contents, file.content_type)
 
     async with get_session() as session:
         invoice = Invoice(

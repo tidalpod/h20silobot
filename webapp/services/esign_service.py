@@ -8,6 +8,7 @@ import base64
 import json
 import logging
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -16,16 +17,11 @@ from typing import Optional
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from webapp.config import web_config
+from webapp.services.storage_service import storage, UPLOAD_BASE
 
 logger = logging.getLogger(__name__)
 
-# Upload paths
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-SIGNATURES_DIR = Path(UPLOAD_BASE) / "leases" / "signatures"
-SIGNATURES_DIR.mkdir(parents=True, exist_ok=True)
+# Local dirs still needed for temp WeasyPrint operations
 SIGNED_DIR = Path(UPLOAD_BASE) / "leases" / "signed"
 SIGNED_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -258,19 +254,15 @@ async def submit_signature(signer_id: int, signature_data_base64: str,
 
         # Save signature PNG
         sig_filename = f"sig_{uuid.uuid4().hex[:12]}.png"
-        sig_path = SIGNATURES_DIR / sig_filename
         try:
-            # Handle data URL prefix if present
             if "," in signature_data_base64:
                 signature_data_base64 = signature_data_base64.split(",", 1)[1]
             sig_bytes = base64.b64decode(signature_data_base64)
-            with open(sig_path, "wb") as f:
-                f.write(sig_bytes)
+            key = f"leases/signatures/{sig_filename}"
+            sig_url = storage.upload(key, sig_bytes, "image/png")
         except Exception as e:
             logger.error(f"Failed to save signature: {e}")
             return {"error": "Invalid signature data"}
-
-        sig_url = f"/uploads/leases/signatures/{sig_filename}"
 
         # Update signer
         signer.status = "signed"
@@ -440,13 +432,14 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
         signatures = {}
         for signer in envelope.signer_records:
             if signer.status == "signed" and signer.signature_file_url:
-                sig_path = str(Path(UPLOAD_BASE) / signer.signature_file_url.removeprefix("/uploads/"))
-                logger.info(f"[ESIGN] Signer {signer.name} sig path: {sig_path}, exists: {Path(sig_path).exists()}")
+                # image_path stores the URL/path for downstream use
+                sig_ref = signer.signature_file_url
+                logger.info(f"[ESIGN] Signer {signer.name} sig ref: {sig_ref}")
                 signatures[f"{signer.role}_{signer.id}"] = {
                     "name": signer.name,
                     "email": signer.email,
                     "role": signer.role,
-                    "image_path": sig_path,
+                    "image_path": sig_ref,
                     "signed_at": signer.signed_at.strftime("%B %d, %Y at %I:%M %p") if signer.signed_at else "",
                     "ip_address": signer.ip_address or "",
                 }
@@ -585,40 +578,46 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
 </body>
 </html>"""
 
-    # Render signature page to PDF
-    sig_page_path = SIGNED_DIR / f"sigpage_{uuid.uuid4().hex[:8]}.pdf"
+    # Render signature page to temp PDF
+    fd_sig, sig_page_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd_sig)
     try:
-        HTML(string=html_content).write_pdf(str(sig_page_path))
+        HTML(string=html_content).write_pdf(sig_page_path)
     except Exception as e:
         logger.error(f"Signature page PDF generation failed: {e}")
+        Path(sig_page_path).unlink(missing_ok=True)
         return {"error": f"Signature page generation failed: {e}"}
 
-    # Append to original PDF
-    original_path = str(Path(UPLOAD_BASE) / lease.file_url.removeprefix("/uploads/"))
+    # Download original PDF (may be in R2 or local)
+    original_tmp = storage.download_to_temp(lease.file_url, suffix=".pdf")
+    if not original_tmp:
+        # Fallback: try direct local path
+        local = Path(UPLOAD_BASE) / lease.file_url.removeprefix("/uploads/")
+        if local.exists():
+            original_tmp = str(local)
+        else:
+            Path(sig_page_path).unlink(missing_ok=True)
+            return {"error": "Original PDF not found"}
+
     output_filename = f"signed_{uuid.uuid4().hex[:12]}.pdf"
-    output_path = SIGNED_DIR / output_filename
-    logger.info(f"[ESIGN] Original PDF path: {original_path}, exists: {Path(original_path).exists()}")
-    logger.info(f"[ESIGN] Output path: {output_path}")
+    fd_out, output_tmp_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd_out)
+    logger.info(f"[ESIGN] Original PDF source: {lease.file_url}")
 
     try:
         from pypdf import PdfReader, PdfWriter
         writer = PdfWriter()
 
-        # Add all pages from original
-        reader = PdfReader(original_path)
+        reader = PdfReader(original_tmp)
         for page in reader.pages:
             writer.add_page(page)
 
-        # Add signature page
-        sig_reader = PdfReader(str(sig_page_path))
+        sig_reader = PdfReader(sig_page_path)
         for page in sig_reader.pages:
             writer.add_page(page)
 
-        with open(output_path, "wb") as f:
+        with open(output_tmp_path, "wb") as f:
             writer.write(f)
-
-        # Clean up temp signature page
-        sig_page_path.unlink(missing_ok=True)
 
     except ImportError:
         logger.error("pypdf not installed — cannot append signature page")
@@ -626,12 +625,25 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
     except Exception as e:
         logger.error(f"PDF merge failed: {e}")
         return {"error": f"PDF merge failed: {e}"}
+    finally:
+        Path(sig_page_path).unlink(missing_ok=True)
+        # Clean up downloaded original if it was a temp file
+        if original_tmp != str(Path(UPLOAD_BASE) / lease.file_url.removeprefix("/uploads/")):
+            Path(original_tmp).unlink(missing_ok=True)
 
-    file_url = f"/uploads/leases/signed/{output_filename}"
+    # Upload merged PDF to storage
+    key = f"leases/signed/{output_filename}"
+    file_size = Path(output_tmp_path).stat().st_size
+    file_url = storage.upload_from_path(key, output_tmp_path, "application/pdf")
+
+    # Resolve local path for audit trail append
+    local_path = storage.resolve_local_path(file_url)
+    final_path = str(local_path) if local_path else output_tmp_path
+
     return {
         "file_url": file_url,
-        "file_path": str(output_path),
-        "file_size": output_path.stat().st_size,
+        "file_path": final_path,
+        "file_size": file_size,
     }
 
 
@@ -792,7 +804,11 @@ def _audit_description(action: str, name: str, email: str, details: dict) -> str
 
 
 def _append_audit_trail(signed_pdf_path: str, lease, envelope, audit_logs):
-    """Generate audit trail PDF and append to the signed PDF."""
+    """Generate audit trail PDF and append to the signed PDF.
+
+    signed_pdf_path may be a local path.  After appending, if using R2 we
+    re-upload the modified file.
+    """
     try:
         from weasyprint import HTML
         from pypdf import PdfReader, PdfWriter
@@ -803,8 +819,9 @@ def _append_audit_trail(signed_pdf_path: str, lease, envelope, audit_logs):
     html = _build_audit_trail_html(lease, envelope, audit_logs)
 
     # Render audit trail to temp PDF
-    trail_path = SIGNED_DIR / f"trail_{uuid.uuid4().hex[:8]}.pdf"
-    HTML(string=html).write_pdf(str(trail_path))
+    fd, trail_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
+    HTML(string=html).write_pdf(trail_path)
 
     # Append to signed PDF
     writer = PdfWriter()
@@ -812,15 +829,20 @@ def _append_audit_trail(signed_pdf_path: str, lease, envelope, audit_logs):
     for page in reader.pages:
         writer.add_page(page)
 
-    trail_reader = PdfReader(str(trail_path))
+    trail_reader = PdfReader(trail_path)
     for page in trail_reader.pages:
         writer.add_page(page)
 
     with open(signed_pdf_path, "wb") as f:
         writer.write(f)
 
-    # Clean up temp file
-    trail_path.unlink(missing_ok=True)
+    Path(trail_path).unlink(missing_ok=True)
+
+    # If using R2, re-upload the modified file
+    if storage.using_r2 and envelope.signed_file_url:
+        key = storage._extract_key(envelope.signed_file_url)
+        if key:
+            storage.upload_from_path(key, signed_pdf_path, "application/pdf")
 
 
 # =============================================================================

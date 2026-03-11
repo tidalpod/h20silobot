@@ -1,7 +1,6 @@
 """Lease management routes"""
 
 import json
-import os
 import uuid
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -16,19 +15,12 @@ from database.connection import get_session
 from database.models import LeaseDocument, LeaseStatus, Property, Tenant, ESignEnvelope, ESignSigner, ESignStatus
 from webapp.auth.dependencies import get_current_user
 from webapp.services import esign_service
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["leases"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Upload directory for lease documents
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists()
-    else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-UPLOAD_DIR = Path(UPLOAD_BASE) / "leases"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_TYPES = {
     "application/pdf": ".pdf",
@@ -157,17 +149,15 @@ async def create_lease(request: Request):
 
     ext = ALLOWED_TYPES.get(file.content_type, ".pdf")
     filename = f"lease_{uuid.uuid4().hex[:12]}{ext}"
-    filepath = UPLOAD_DIR / filename
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
+    key = f"leases/{filename}"
+    file_url = storage.upload(key, contents, file.content_type)
 
     async with get_session() as session:
         lease = LeaseDocument(
             property_id=int(form["property_id"]),
             tenant_id=int(form["tenant_id"]) if form.get("tenant_id") else None,
             title=form.get("title", file.filename),
-            file_url=f"/uploads/leases/{filename}",
+            file_url=file_url,
             file_type=ext.lstrip("."),
             file_size=len(contents),
             lease_start=datetime.strptime(form["lease_start"], "%Y-%m-%d").date() if form.get("lease_start") else None,
@@ -342,15 +332,16 @@ async def download_lease(request: Request, lease_id: int):
         if not lease:
             return RedirectResponse(url="/leases", status_code=303)
 
-        # Convert URL path to file path
-        relative_path = lease.file_url.removeprefix("/uploads/")
-        filepath = Path(UPLOAD_BASE) / relative_path
+        # R2 URLs → redirect; local files → FileResponse
+        if storage.is_remote_url(lease.file_url):
+            return RedirectResponse(url=lease.file_url, status_code=302)
 
-        if not filepath.exists():
+        local_path = storage.resolve_local_path(lease.file_url)
+        if not local_path:
             return RedirectResponse(url=f"/leases/{lease_id}?error=file_missing", status_code=303)
 
         return FileResponse(
-            path=str(filepath),
+            path=str(local_path),
             filename=f"{lease.title}.{lease.file_type}",
             media_type="application/octet-stream",
         )

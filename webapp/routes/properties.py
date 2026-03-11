@@ -1,6 +1,5 @@
 """Property management routes"""
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -15,14 +14,7 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation
 from webapp.auth.dependencies import get_current_user
-
-# Upload directory - use UPLOAD_PATH env var for Railway volume, fallback to local
-# Try env var first, then Railway volume at /app/uploads, then local fallback
-UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
-    "/app/uploads" if Path("/app/uploads").exists() else str(Path(__file__).resolve().parent.parent / "static" / "uploads")
-)
-UPLOAD_DIR = Path(UPLOAD_BASE) / "properties"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+from webapp.services.storage_service import storage
 
 router = APIRouter(tags=["properties"])
 
@@ -726,11 +718,8 @@ async def upload_photo(
         # Generate unique filename
         ext = Path(photo.filename).suffix.lower() or ".jpg"
         filename = f"{property_id}_{uuid.uuid4().hex[:8]}{ext}"
-        filepath = UPLOAD_DIR / filename
-
-        # Save file
-        with open(filepath, "wb") as f:
-            f.write(contents)
+        key = f"properties/{filename}"
+        url = storage.upload(key, contents, photo.content_type)
 
         # Get current photo count to determine if this is primary
         result = await session.execute(
@@ -742,7 +731,7 @@ async def upload_photo(
         # Create database record
         photo_record = PropertyPhoto(
             property_id=property_id,
-            url=f"/uploads/properties/{filename}",
+            url=url,
             is_primary=is_primary,
             display_order=len(existing_photos)
         )
@@ -750,7 +739,7 @@ async def upload_photo(
 
         # Update featured photo if this is primary
         if is_primary:
-            prop.featured_photo_url = f"/uploads/properties/{filename}"
+            prop.featured_photo_url = url
 
         await session.commit()
 
@@ -775,18 +764,18 @@ async def clear_orphaned_photos_page(request: Request):
         )
         all_photos = result.scalars().all()
 
-        # Check which files exist
+        # Check which files exist (only meaningful for local storage)
         orphaned = []
-        for photo in all_photos:
-            filename = photo.url.split("/")[-1]
-            filepath = UPLOAD_DIR / filename
-            if not filepath.exists():
-                orphaned.append({
-                    "id": photo.id,
-                    "property_id": photo.property_id,
-                    "url": photo.url,
-                    "property_address": photo.property.address if photo.property else "Unknown"
-                })
+        if not storage.using_r2:
+            for photo in all_photos:
+                local_path = storage.resolve_local_path(photo.url)
+                if not local_path:
+                    orphaned.append({
+                        "id": photo.id,
+                        "property_id": photo.property_id,
+                        "url": photo.url,
+                        "property_address": photo.property.address if photo.property else "Unknown"
+                    })
 
         return JSONResponse({
             "total_photos": len(all_photos),
@@ -810,26 +799,25 @@ async def clear_orphaned_photos(request: Request):
         deleted_count = 0
         affected_properties = set()
 
-        for photo in all_photos:
-            filename = photo.url.split("/")[-1]
-            filepath = UPLOAD_DIR / filename
-            if not filepath.exists():
-                affected_properties.add(photo.property_id)
-                await session.delete(photo)
-                deleted_count += 1
+        if storage.using_r2:
+            # Skip orphan cleanup when using R2
+            pass
+        else:
+            for photo in all_photos:
+                local_path = storage.resolve_local_path(photo.url)
+                if not local_path:
+                    affected_properties.add(photo.property_id)
+                    await session.delete(photo)
+                    deleted_count += 1
 
-        # Clear featured_photo_url for affected properties
-        for prop_id in affected_properties:
-            result = await session.execute(
-                select(Property).where(Property.id == prop_id)
-            )
-            prop = result.scalar_one_or_none()
-            if prop:
-                # Check if featured photo still exists
-                if prop.featured_photo_url:
-                    filename = prop.featured_photo_url.split("/")[-1]
-                    filepath = UPLOAD_DIR / filename
-                    if not filepath.exists():
+            # Clear featured_photo_url for affected properties
+            for prop_id in affected_properties:
+                result = await session.execute(
+                    select(Property).where(Property.id == prop_id)
+                )
+                prop = result.scalar_one_or_none()
+                if prop and prop.featured_photo_url:
+                    if not storage.resolve_local_path(prop.featured_photo_url):
                         prop.featured_photo_url = None
 
         await session.commit()
@@ -857,14 +845,10 @@ async def clear_all_photos(request: Request, property_id: int):
             photos = result.scalars().all()
             print(f"[CLEAR-ALL] Found {len(photos)} photos for property {property_id}")
 
-            # Delete files from disk (if they exist)
+            # Delete files
             for photo in photos:
-                filename = photo.url.split("/")[-1]
-                filepath = UPLOAD_DIR / filename
-                if filepath.exists():
-                    filepath.unlink()
-                    print(f"[CLEAR-ALL] Deleted file: {filepath}")
-                # Delete each photo record individually
+                storage.delete(photo.url)
+                print(f"[CLEAR-ALL] Deleted: {photo.url}")
                 await session.delete(photo)
 
             # Clear featured photo on property
@@ -904,11 +888,8 @@ async def delete_photo(request: Request, property_id: int, photo_id: int):
         if not photo:
             raise HTTPException(status_code=404, detail="Photo not found")
 
-        # Delete file from disk
-        filename = photo.url.split("/")[-1]
-        filepath = UPLOAD_DIR / filename
-        if filepath.exists():
-            filepath.unlink()
+        # Delete file
+        storage.delete(photo.url)
 
         was_primary = photo.is_primary
 
@@ -1013,8 +994,6 @@ async def toggle_star_photo(request: Request, property_id: int, photo_id: int):
 # Inspection Violations
 # =============================================================================
 
-VIOLATION_UPLOAD_DIR = Path(UPLOAD_BASE) / "violations"
-VIOLATION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/{property_id}/violations/upload")
@@ -1073,19 +1052,15 @@ async def upload_violation(
         saved_pdf_url = None
         original_name = None
         if pdf_contents and pdf_filename:
-            filepath = VIOLATION_UPLOAD_DIR / pdf_filename
-            with open(filepath, "wb") as f:
-                f.write(pdf_contents)
-            saved_pdf_url = f"/uploads/violations/{pdf_filename}"
+            key = f"violations/{pdf_filename}"
+            saved_pdf_url = storage.upload(key, pdf_contents, "application/pdf")
             original_name = violation_file.filename
 
         # Save image file if provided
         saved_image_url = None
         if image_contents and image_filename:
-            img_filepath = VIOLATION_UPLOAD_DIR / image_filename
-            with open(img_filepath, "wb") as f:
-                f.write(image_contents)
-            saved_image_url = f"/uploads/violations/{image_filename}"
+            key = f"violations/{image_filename}"
+            saved_image_url = storage.upload(key, image_contents, violation_image.content_type)
 
         # Parse date
         parsed_date = None
@@ -1128,19 +1103,11 @@ async def delete_violation(request: Request, property_id: int, violation_id: int
         if not violation:
             raise HTTPException(status_code=404, detail="Violation not found")
 
-        # Delete PDF file from disk
+        # Delete files
         if violation.file_url:
-            filename = violation.file_url.split("/")[-1]
-            filepath = VIOLATION_UPLOAD_DIR / filename
-            if filepath.exists():
-                filepath.unlink()
-
-        # Delete image file from disk
+            storage.delete(violation.file_url)
         if violation.image_url:
-            img_filename = violation.image_url.split("/")[-1]
-            img_filepath = VIOLATION_UPLOAD_DIR / img_filename
-            if img_filepath.exists():
-                img_filepath.unlink()
+            storage.delete(violation.image_url)
 
         # Delete from database
         await session.delete(violation)
