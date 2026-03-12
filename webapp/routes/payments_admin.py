@@ -33,14 +33,16 @@ async def payments_list(
     status: str = None,
     property_id: int = None,
     month: str = None,
+    method: str = None,
 ):
-    """All payments list with filters."""
+    """All payments list with filters (ACH + Stripe)."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
     async with get_session() as session:
-        query = (
+        # --- ACH payments ---
+        ach_query = (
             select(RentPayment)
             .options(
                 selectinload(RentPayment.tenant_ref),
@@ -48,36 +50,95 @@ async def payments_list(
                 selectinload(RentPayment.bank_account_ref),
             )
         )
-
         if status:
-            query = query.where(RentPayment.status == PaymentStatus(status))
+            ach_query = ach_query.where(RentPayment.status == PaymentStatus(status))
         if property_id:
-            query = query.where(RentPayment.property_id == property_id)
+            ach_query = ach_query.where(RentPayment.property_id == property_id)
+        ach_query = ach_query.order_by(desc(RentPayment.initiated_at))
 
-        query = query.order_by(desc(RentPayment.initiated_at))
-        result = await session.execute(query)
-        payments = result.scalars().all()
+        # --- Stripe payments ---
+        stripe_query = (
+            select(StripePayment)
+            .options(
+                selectinload(StripePayment.tenant_ref),
+                selectinload(StripePayment.property_ref),
+            )
+        )
+        if status:
+            stripe_query = stripe_query.where(StripePayment.status == PaymentStatus(status))
+        if property_id:
+            stripe_query = stripe_query.where(StripePayment.property_id == property_id)
+        stripe_query = stripe_query.order_by(desc(StripePayment.initiated_at))
+
+        # Execute both (skip one if method filter applied)
+        ach_payments = []
+        stripe_payments = []
+        if method != "card":
+            ach_result = await session.execute(ach_query)
+            ach_payments = ach_result.scalars().all()
+        if method != "ach":
+            stripe_result = await session.execute(stripe_query)
+            stripe_payments = stripe_result.scalars().all()
+
+        # Merge into unified dicts
+        all_payments = []
+        for p in ach_payments:
+            all_payments.append({
+                "id": p.id,
+                "method": "ach",
+                "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
+                "property_address": p.property_ref.address if p.property_ref else "—",
+                "entity": p.property_ref.entity if p.property_ref and p.property_ref.entity else "Unassigned",
+                "description": f"Rent - {p.payment_month.strftime('%b %Y')}" if p.payment_month else "Rent",
+                "payment_month": p.payment_month,
+                "total_amount": float(p.total_amount or 0),
+                "late_fee": float(p.late_fee or 0),
+                "convenience_fee": 0,
+                "status": p.status,
+                "initiated_at": p.initiated_at,
+                "is_autopay": p.is_autopay,
+                "detail_url": f"/payments/{p.id}",
+            })
+        for p in stripe_payments:
+            all_payments.append({
+                "id": p.id,
+                "method": "card",
+                "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
+                "property_address": p.property_ref.address if p.property_ref else "—",
+                "entity": p.property_ref.entity if p.property_ref and p.property_ref.entity else "Unassigned",
+                "description": p.description,
+                "payment_month": p.payment_month,
+                "total_amount": float(p.total_amount or 0),
+                "late_fee": float(p.late_fee or 0),
+                "convenience_fee": float(p.convenience_fee or 0),
+                "status": p.status,
+                "initiated_at": p.initiated_at,
+                "is_autopay": False,
+                "detail_url": None,
+            })
+
+        # Sort merged list by date desc
+        all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
 
         # Totals
-        total_amount = sum(float(p.total_amount or 0) for p in payments)
+        total_amount = sum(p["total_amount"] for p in all_payments)
         completed_amount = sum(
-            float(p.total_amount or 0) for p in payments
-            if p.status == PaymentStatus.COMPLETED
+            p["total_amount"] for p in all_payments
+            if p["status"] == PaymentStatus.COMPLETED
         )
-        pending_count = sum(1 for p in payments if p.status in (PaymentStatus.PENDING, PaymentStatus.PROCESSING))
+        pending_count = sum(1 for p in all_payments if p["status"] in (PaymentStatus.PENDING, PaymentStatus.PROCESSING))
 
-        # Entity breakdown — group completed payments by property.entity
+        # Entity breakdown
         entity_summary = {}
-        for p in payments:
-            entity_name = (p.property_ref.entity if p.property_ref and p.property_ref.entity else "Unassigned")
+        for p in all_payments:
+            entity_name = p["entity"]
             if entity_name not in entity_summary:
                 entity_summary[entity_name] = {"collected": 0.0, "pending": 0.0, "count": 0}
-            if p.status == PaymentStatus.COMPLETED:
-                entity_summary[entity_name]["collected"] += float(p.total_amount or 0)
-            elif p.status in (PaymentStatus.PENDING, PaymentStatus.PROCESSING):
-                entity_summary[entity_name]["pending"] += float(p.total_amount or 0)
+            if p["status"] == PaymentStatus.COMPLETED:
+                entity_summary[entity_name]["collected"] += p["total_amount"]
+            elif p["status"] in (PaymentStatus.PENDING, PaymentStatus.PROCESSING):
+                entity_summary[entity_name]["pending"] += p["total_amount"]
             entity_summary[entity_name]["count"] += 1
-        # Sort by collected desc
         entity_summary = dict(sorted(entity_summary.items(), key=lambda x: x[1]["collected"], reverse=True))
 
         # Properties for filter dropdown
@@ -91,7 +152,7 @@ async def payments_list(
         {
             "request": request,
             "user": user,
-            "payments": payments,
+            "payments": all_payments,
             "properties": properties,
             "total_amount": total_amount,
             "completed_amount": completed_amount,
@@ -99,6 +160,7 @@ async def payments_list(
             "entity_summary": entity_summary,
             "filter_status": status,
             "filter_property_id": property_id,
+            "filter_method": method,
             "statuses": PaymentStatus,
         },
     )
