@@ -11,6 +11,7 @@ from database.connection import get_session
 from database.models import (
     Tenant, TenantBankAccount, RentPayment, TenantAutopay,
     PaymentStatus, AutopayStatus, EntityConfig, EntityBankAccount,
+    StripePayment, StripePaymentType,
 )
 from webapp.services import plaid_service
 
@@ -58,13 +59,38 @@ async def calculate_balance_due(tenant_id: int) -> dict:
         if tenant.is_section8 and tenant.tenant_portion is not None:
             rent_amount = Decimal(str(tenant.tenant_portion))
 
-        # Check if already paid this month
+        # No rent configured — nothing owed
+        if rent_amount <= 0:
+            return {
+                "rent_amount": Decimal("0.00"),
+                "late_fee": Decimal("0.00"),
+                "total_due": Decimal("0.00"),
+                "payment_month": current_month,
+                "paid": True,
+            }
+
+        # Check if already paid this month (ACH)
         paid_this_month = False
         for payment in tenant.rent_payments:
             if (payment.payment_month == current_month and
                     payment.status in (PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.COMPLETED)):
                 paid_this_month = True
                 break
+
+        # Check Stripe rent payments too
+        if not paid_this_month:
+            stripe_result = await session.execute(
+                select(StripePayment).where(
+                    StripePayment.tenant_id == tenant_id,
+                    StripePayment.payment_type == StripePaymentType.RENT,
+                    StripePayment.payment_month == current_month,
+                    StripePayment.status.in_([
+                        PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.COMPLETED
+                    ]),
+                )
+            )
+            if stripe_result.scalar_one_or_none():
+                paid_this_month = True
 
         if paid_this_month:
             return {
