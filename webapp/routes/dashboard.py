@@ -207,14 +207,14 @@ async def dashboard(request: Request):
         for prop in properties:
             # CO Inspections
             co_inspections = [
-                ("Mechanical", "⚙️", prop.co_mechanical_date),
-                ("Electrical", "⚡", prop.co_electrical_date),
-                ("Plumbing", "🔧", prop.co_plumbing_date),
-                ("Zoning", "📐", prop.co_zoning_date),
-                ("Building", "🏢", prop.co_building_date),
+                ("Mechanical", "⚙️", prop.co_mechanical_date, prop.co_mechanical_time),
+                ("Electrical", "⚡", prop.co_electrical_date, prop.co_electrical_time),
+                ("Plumbing", "🔧", prop.co_plumbing_date, prop.co_plumbing_time),
+                ("Zoning", "📐", prop.co_zoning_date, prop.co_zoning_time),
+                ("Building", "🏢", prop.co_building_date, prop.co_building_time),
             ]
 
-            for insp_name, icon, insp_date in co_inspections:
+            for insp_name, icon, insp_date, insp_time in co_inspections:
                 if insp_date and insp_date >= today:
                     days_until = (insp_date - today).days
                     if days_until <= 30:  # Show inspections within 30 days
@@ -223,6 +223,7 @@ async def dashboard(request: Request):
                             "type": f"CO {insp_name}",
                             "icon": icon,
                             "date": insp_date,
+                            "time": insp_time,
                             "days_until": days_until
                         })
 
@@ -235,6 +236,7 @@ async def dashboard(request: Request):
                         "type": "Rental Inspection",
                         "icon": "🏠",
                         "date": prop.rental_inspection_date,
+                        "time": prop.rental_inspection_time,
                         "days_until": days_until
                     })
 
@@ -248,6 +250,7 @@ async def dashboard(request: Request):
                             "type": "Section 8 Inspection",
                             "icon": "🔍",
                             "date": prop.section8_inspection_date,
+                            "time": prop.section8_inspection_time,
                             "days_until": days_until
                         })
 

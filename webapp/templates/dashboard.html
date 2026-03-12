@@ -192,6 +192,9 @@
                         <p class="text-sm font-medium {% if item.days_until <= 1 %}text-red-600{% elif item.days_until <= 7 %}text-amber-600{% else %}text-gray-600{% endif %}">
                             {{ item.date.strftime('%b %d') }}
                         </p>
+                        {% if item.time %}
+                        <p class="text-xs text-gray-500">{{ item.time }}</p>
+                        {% endif %}
                         <p class="text-xs {% if item.days_until <= 1 %}text-red-500{% elif item.days_until <= 7 %}text-amber-500{% else %}text-gray-400{% endif %}">
                             {% if item.days_until == 0 %}Today{% elif item.days_until == 1 %}Tomorrow{% else %}{{ item.days_until }}d{% endif %}
                         </p>

@@ -635,7 +635,7 @@
                         {% if property.section8_inspection_date %}
                         <div>
                             <dt class="text-xs font-medium text-gray-500">Inspection Date</dt>
-                            <dd class="mt-1 text-sm text-gray-900">{{ property.section8_inspection_date.strftime('%b %d, %Y') }}</dd>
+                            <dd class="mt-1 text-sm text-gray-900">{{ property.section8_inspection_date.strftime('%b %d, %Y') }}{% if property.section8_inspection_time %} at {{ property.section8_inspection_time }}{% endif %}</dd>
                         </div>
                         {% endif %}
                         {% if property.section8_inspection_notes %}
@@ -740,7 +740,7 @@
                         <div>
                             <dt class="text-xs font-medium text-gray-500">📅 Inspection Date</dt>
                             <dd class="mt-1 text-sm {% if property.rental_inspection_date < today %}text-green-600{% elif (property.rental_inspection_date - today).days <= 1 %}text-orange-600 font-semibold{% else %}text-gray-900{% endif %}">
-                                {{ property.rental_inspection_date.strftime('%b %d, %Y') }}
+                                {{ property.rental_inspection_date.strftime('%b %d, %Y') }}{% if property.rental_inspection_time %} at {{ property.rental_inspection_time }}{% endif %}
                                 {% if property.rental_inspection_date < today %}
                                 <span class="text-xs text-green-600">(Completed)</span>
                                 {% elif (property.rental_inspection_date - today).days == 0 %}

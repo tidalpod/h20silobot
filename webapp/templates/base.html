@@ -145,9 +145,6 @@
         .bd-btn-press { transition: transform 0.1s ease; }
         .bd-btn-press:active { transform: scale(0.97); }
 
-        /* Page transition */
-        body { transition: opacity 0.15s ease; }
-        body.bd-navigating { opacity: 0; }
 
         /* ── Visual Polish ── */
         .bd-glass {
@@ -1043,18 +1040,6 @@
         requestAnimationFrame(step);
     });
 
-    // Page transition fade-out
-    document.addEventListener('click', e => {
-        const a = e.target.closest('a[href]');
-        if (!a || a.target === '_blank' || a.href.startsWith('#') ||
-            a.href.startsWith('javascript:') || a.hostname !== location.hostname ||
-            e.ctrlKey || e.metaKey) return;
-        e.preventDefault();
-        document.body.classList.add('bd-navigating');
-        setTimeout(() => { window.location = a.href; }, 150);
-    });
-    // Remove fade-out on back navigation
-    window.addEventListener('pageshow', () => document.body.classList.remove('bd-navigating'));
     </script>
 </body>
 </html>
