@@ -1,17 +1,21 @@
 """Tenant management routes"""
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Tenant, Property, PHA
+from database.models import (
+    Tenant, Property, PHA, RentPayment, StripePayment,
+    WorkOrder, WorkOrderStatus, LeaseDocument, LeaseStatus,
+    WaterBill, TenantBankAccount, TenantAutopay, PaymentStatus,
+)
 from webapp.auth.dependencies import get_current_user
 from decimal import Decimal
 
@@ -196,6 +200,143 @@ async def create_tenant(
         await session.commit()
 
         return RedirectResponse(url=f"/properties/{property_id}", status_code=303)
+
+
+@router.get("/{tenant_id}", response_class=HTMLResponse)
+async def tenant_detail(request: Request, tenant_id: int):
+    """Tenant detail page with payment history and property info"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        # Tenant + property
+        result = await session.execute(
+            select(Tenant)
+            .where(Tenant.id == tenant_id)
+            .options(
+                selectinload(Tenant.property_ref),
+                selectinload(Tenant.pha),
+                selectinload(Tenant.autopay),
+            )
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            return RedirectResponse(url="/tenants", status_code=303)
+
+        # ACH payments
+        ach_result = await session.execute(
+            select(RentPayment)
+            .where(RentPayment.tenant_id == tenant_id)
+            .options(selectinload(RentPayment.property_ref))
+            .order_by(desc(RentPayment.initiated_at))
+        )
+        ach_payments = ach_result.scalars().all()
+
+        # Stripe payments
+        stripe_result = await session.execute(
+            select(StripePayment)
+            .where(StripePayment.tenant_id == tenant_id)
+            .order_by(desc(StripePayment.initiated_at))
+        )
+        stripe_payments = stripe_result.scalars().all()
+
+        # Merge payments
+        all_payments = []
+        for p in ach_payments:
+            all_payments.append({
+                "method": "ach",
+                "description": f"Rent - {p.payment_month.strftime('%b %Y')}" if p.payment_month else "Rent",
+                "total_amount": float(p.total_amount or 0),
+                "late_fee": float(p.late_fee or 0),
+                "convenience_fee": 0,
+                "status": p.status,
+                "initiated_at": p.initiated_at,
+                "is_autopay": p.is_autopay,
+            })
+        for p in stripe_payments:
+            all_payments.append({
+                "method": "card",
+                "description": p.description,
+                "total_amount": float(p.total_amount or 0),
+                "late_fee": float(p.late_fee or 0),
+                "convenience_fee": float(p.convenience_fee or 0),
+                "status": p.status,
+                "initiated_at": p.initiated_at,
+                "is_autopay": False,
+            })
+        all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
+
+        # Payment stats
+        total_paid = sum(p["total_amount"] for p in all_payments if p["status"] == PaymentStatus.COMPLETED)
+        pending_amount = sum(p["total_amount"] for p in all_payments if p["status"] in (PaymentStatus.PENDING, PaymentStatus.PROCESSING))
+
+        # Work orders
+        wo_result = await session.execute(
+            select(WorkOrder)
+            .where(WorkOrder.tenant_id == tenant_id)
+            .options(selectinload(WorkOrder.property_ref))
+            .order_by(desc(WorkOrder.created_at))
+        )
+        work_orders = wo_result.scalars().all()
+        open_wo_count = sum(1 for wo in work_orders if wo.status in (
+            WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS
+        ))
+
+        # Active lease
+        lease_result = await session.execute(
+            select(LeaseDocument)
+            .where(
+                LeaseDocument.property_id == tenant.property_id,
+                LeaseDocument.status != LeaseStatus.TERMINATED,
+            )
+            .order_by(desc(LeaseDocument.created_at))
+            .limit(1)
+        )
+        active_lease = lease_result.scalar_one_or_none()
+
+        # Water bills
+        bill_result = await session.execute(
+            select(WaterBill)
+            .where(WaterBill.property_id == tenant.property_id)
+            .order_by(desc(WaterBill.statement_date))
+            .limit(6)
+        )
+        water_bills = bill_result.scalars().all()
+
+        # Bank accounts
+        bank_result = await session.execute(
+            select(TenantBankAccount)
+            .where(TenantBankAccount.tenant_id == tenant_id)
+            .order_by(desc(TenantBankAccount.linked_at))
+        )
+        bank_accounts = bank_result.scalars().all()
+
+    # Balance due
+    balance = None
+    try:
+        from webapp.services.payment_service import calculate_balance_due
+        balance = await calculate_balance_due(tenant_id)
+    except Exception:
+        pass
+
+    return templates.TemplateResponse(
+        "tenants/detail.html",
+        {
+            "request": request,
+            "user": user,
+            "tenant": tenant,
+            "payments": all_payments,
+            "total_paid": total_paid,
+            "pending_amount": pending_amount,
+            "work_orders": work_orders,
+            "open_wo_count": open_wo_count,
+            "active_lease": active_lease,
+            "water_bills": water_bills,
+            "bank_accounts": bank_accounts,
+            "balance": balance,
+        }
+    )
 
 
 @router.get("/{tenant_id}/edit", response_class=HTMLResponse)

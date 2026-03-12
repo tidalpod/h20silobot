@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tenant.name }} — Tenant{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/tenants" class="hover:text-gray-700">Tenants</a>
+            <span>/</span>
+            <span class="text-gray-900">{{ tenant.name }}</span>
+        </nav>
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900">{{ tenant.name }}</h1>
+                {% if tenant.is_primary %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Primary</span>
+                {% endif %}
+                {% if tenant.is_active %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Active</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
+                {% endif %}
+            </div>
+            <div class="flex gap-2">
+                <a href="/tenants/{{ tenant.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Edit</a>
+                <a href="/notifications/compose?tenant_id={{ tenant.id }}" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500">Notify</a>
+            </div>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Top Row: Info + Balance Due -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Tenant Info -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Contact</h2>
+        <div class="space-y-3">
+            {% if tenant.phone %}
+            <div class="flex items-center gap-3">
+                <span class="text-gray-400">&#128222;</span>
+                <a href="tel:{{ tenant.phone }}" class="text-sm text-blue-600 hover:text-blue-500">{{ tenant.phone }}</a>
+            </div>
+            {% endif %}
+            {% if tenant.email %}
+            <div class="flex items-center gap-3">
+                <span class="text-gray-400">&#9993;</span>
+                <a href="mailto:{{ tenant.email }}" class="text-sm text-blue-600 hover:text-blue-500">{{ tenant.email }}</a>
+            </div>
+            {% endif %}
+            <div class="flex items-center gap-3">
+                <span class="text-gray-400">&#127968;</span>
+                <a href="/properties/{{ tenant.property_ref.id }}" class="text-sm text-blue-600 hover:text-blue-500">{{ tenant.property_ref.address }}</a>
+            </div>
+            {% if tenant.move_in_date %}
+            <div class="flex items-center gap-3">
+                <span class="text-gray-400">&#128197;</span>
+                <span class="text-sm text-gray-600">Move-in: {{ tenant.move_in_date.strftime('%b %d, %Y') }}</span>
+            </div>
+            {% endif %}
+            {% if tenant.is_section8 %}
+            <div class="mt-3 pt-3 border-t border-gray-100">
+                <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700 mb-2">Section 8</span>
+                {% if tenant.pha %}
+                <p class="text-xs text-gray-500">PHA: {{ tenant.pha.name }}</p>
+                {% endif %}
+                {% if tenant.voucher_amount %}
+                <p class="text-xs text-gray-500">Voucher: ${{ "{:,.2f}".format(tenant.voucher_amount) }}</p>
+                {% endif %}
+                {% if tenant.tenant_portion %}
+                <p class="text-xs text-gray-500">Tenant Portion: ${{ "{:,.2f}".format(tenant.tenant_portion) }}</p>
+                {% endif %}
+            </div>
+            {% elif tenant.current_rent %}
+            <div class="mt-3 pt-3 border-t border-gray-100">
+                <p class="text-xs text-gray-500">Monthly Rent: <span class="font-medium text-gray-900">${{ "{:,.2f}".format(tenant.current_rent) }}</span></p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Balance Due -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Current Balance</h2>
+        {% if balance and not balance.get('error') %}
+        <div class="text-center">
+            {% if balance.get('paid') %}
+            <p class="text-3xl font-bold text-green-600">$0.00</p>
+            <span class="inline-flex items-center mt-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">Paid for {{ balance.payment_month.strftime('%B %Y') }}</span>
+            {% else %}
+            <p class="text-3xl font-bold {% if balance.total_due > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ "{:,.2f}".format(balance.total_due) }}</p>
+            <p class="text-sm text-gray-500 mt-1">Due for {{ balance.payment_month.strftime('%B %Y') }}</p>
+            {% if balance.late_fee > 0 %}
+            <p class="text-xs text-red-500 mt-1">Includes ${{ "{:,.2f}".format(balance.late_fee) }} late fee</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">Monthly Rent</span>
+                <span class="font-medium">${{ "{:,.2f}".format(balance.rent_amount) }}</span>
+            </div>
+            {% if balance.late_fee > 0 %}
+            <div class="flex justify-between text-sm">
+                <span class="text-red-500">Late Fee</span>
+                <span class="font-medium text-red-600">${{ "{:,.2f}".format(balance.late_fee) }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400 text-center">No rent info available</p>
+        {% endif %}
+    </div>
+
+    <!-- Payment Stats -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Payment Summary</h2>
+        <div class="space-y-4">
+            <div>
+                <p class="text-sm text-gray-500">Total Collected</p>
+                <p class="text-2xl font-bold text-green-600">${{ "{:,.2f}".format(total_paid) }}</p>
+            </div>
+            {% if pending_amount > 0 %}
+            <div>
+                <p class="text-sm text-gray-500">Pending</p>
+                <p class="text-xl font-bold text-yellow-600">${{ "{:,.2f}".format(pending_amount) }}</p>
+            </div>
+            {% endif %}
+            <div>
+                <p class="text-sm text-gray-500">Total Payments</p>
+                <p class="text-xl font-bold text-gray-900">{{ payments|length }}</p>
+            </div>
+            {% if bank_accounts %}
+            <div class="pt-3 border-t border-gray-100">
+                <p class="text-xs text-gray-500 mb-1">Linked Bank</p>
+                {% for ba in bank_accounts %}
+                {% if ba.is_active %}
+                <p class="text-sm text-gray-900">{{ ba.institution_name or 'Bank' }} ...{{ ba.account_mask }}</p>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if tenant.autopay and tenant.autopay.status.value == 'active' %}
+            <div class="pt-3 border-t border-gray-100">
+                <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">Autopay Active</span>
+                <p class="text-xs text-gray-500 mt-1">Day {{ tenant.autopay.pay_day }} of each month</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Lease Info -->
+{% if active_lease %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Lease</h2>
+    <div class="flex items-center justify-between">
+        <div>
+            <p class="text-sm font-medium text-gray-900">{{ active_lease.title or 'Lease Agreement' }}</p>
+            <p class="text-xs text-gray-500">
+                {% if active_lease.lease_start and active_lease.lease_end %}
+                {{ active_lease.lease_start.strftime('%b %d, %Y') }} - {{ active_lease.lease_end.strftime('%b %d, %Y') }}
+                {% endif %}
+            </p>
+        </div>
+        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">{{ active_lease.status.value.replace('_', ' ').title() }}</span>
+    </div>
+</div>
+{% endif %}
+
+<!-- Payment History -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment History</h2>
+    </div>
+    {% if payments %}
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for p in payments %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-3 text-sm text-gray-900">
+                    {{ p.description }}
+                    {% if p.is_autopay %}
+                    <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">Auto</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-3 text-sm text-gray-900 font-medium text-right">
+                    ${{ "{:,.2f}".format(p.total_amount) }}
+                    {% if p.convenience_fee and p.convenience_fee > 0 %}
+                    <span class="block text-xs text-gray-400">incl. ${{ "{:,.2f}".format(p.convenience_fee) }} fee</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-3">
+                    {% if p.method == 'card' %}
+                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">Card</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">ACH</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-3">
+                    {% if p.status.value == 'completed' %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
+                    {% elif p.status.value == 'processing' %}
+                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Processing</span>
+                    {% elif p.status.value == 'pending' %}
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>
+                    {% elif p.status.value == 'failed' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Failed</span>
+                    {% elif p.status.value == 'returned' %}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Returned</span>
+                    {% elif p.status.value == 'cancelled' %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cancelled</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-3 text-sm text-gray-500">{{ p.initiated_at.strftime('%b %d, %Y') if p.initiated_at else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="p-8 text-center">
+        <p class="text-sm text-gray-500">No payments recorded yet</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Water Bills + Work Orders side by side -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Water Bills -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Water Bills</h2>
+            <a href="/properties/{{ tenant.property_ref.id }}" class="text-xs text-blue-600 hover:text-blue-500">View Property</a>
+        </div>
+        {% if water_bills %}
+        <div class="divide-y divide-gray-100">
+            {% for bill in water_bills %}
+            <div class="px-6 py-3 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">{{ bill.statement_date.strftime('%b %Y') if bill.statement_date else 'Bill' }}</p>
+                    {% if bill.due_date %}
+                    <p class="text-xs text-gray-500">Due {{ bill.due_date.strftime('%b %d') }}</p>
+                    {% endif %}
+                </div>
+                <p class="text-sm font-medium {% if bill.amount_due and bill.amount_due > 0 %}text-blue-600{% else %}text-green-600{% endif %}">
+                    ${{ "{:,.2f}".format(bill.amount_due) if bill.amount_due else '0.00' }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-6 text-center">
+            <p class="text-sm text-gray-500">No water bills</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Work Orders -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Work Orders</h2>
+            {% if open_wo_count > 0 %}
+            <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">{{ open_wo_count }} open</span>
+            {% endif %}
+        </div>
+        {% if work_orders %}
+        <div class="divide-y divide-gray-100">
+            {% for wo in work_orders[:8] %}
+            <a href="/maintenance/{{ wo.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-gray-50 block">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">{{ wo.title }}</p>
+                    <p class="text-xs text-gray-500">{{ wo.category.value.replace('_', ' ').title() if wo.category else '' }} &middot; {{ wo.created_at.strftime('%b %d, %Y') if wo.created_at else '' }}</p>
+                </div>
+                {% if wo.status.value == 'completed' or wo.status.value == 'closed' %}
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">{{ wo.status.value.replace('_', ' ').title() }}</span>
+                {% elif wo.status.value == 'in_progress' %}
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">In Progress</span>
+                {% elif wo.status.value == 'assigned' %}
+                <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Assigned</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{{ wo.status.value.replace('_', ' ').title() }}</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-6 text-center">
+            <p class="text-sm text-gray-500">No work orders</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if tenant.notes %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">Notes</h2>
+    <p class="text-sm text-gray-600 whitespace-pre-line">{{ tenant.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}
