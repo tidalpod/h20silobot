@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap');
         @page {
             size: letter;
             margin: 1in 1in 1.2in 1in;
@@ -762,7 +762,7 @@
             <tr>
                 <td style="border: none; width: 45pt;">Sign:</td>
                 <td style="border: none; border-bottom: 1px solid #333;">
-                    <span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>
+                    {% if sig.role == 'landlord' %}<span style="font-family: 'Great Vibes', 'Brush Script MT', cursive; font-size: 24pt; color: #1b5e20;">{{ sig.name }}</span>{% else %}<span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>{% endif %}
                 </td>
             </tr>
         </table>
@@ -899,7 +899,7 @@
             <tr>
                 <td style="border: none; width: 45pt;">Sign:</td>
                 <td style="border: none; border-bottom: 1px solid #333;">
-                    <span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>
+                    {% if sig.role == 'landlord' %}<span style="font-family: 'Great Vibes', 'Brush Script MT', cursive; font-size: 24pt; color: #1b5e20;">{{ sig.name }}</span>{% else %}<span style="font-family: 'Dancing Script', 'Brush Script MT', cursive; font-size: 22pt; color: #1a237e;">{{ sig.name }}</span>{% endif %}
                 </td>
             </tr>
         </table>

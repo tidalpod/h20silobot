@@ -541,12 +541,17 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
     sig_rows = ""
     for key, sig in signatures.items():
         signed_date = sig['signed_at'].split(' at ')[0] if ' at ' in sig['signed_at'] else sig['signed_at']
+        is_landlord = sig['role'] == 'landlord'
+        sig_font = "'Great Vibes', cursive" if is_landlord else "'Dancing Script', cursive"
+        sig_color = "#1b5e20" if is_landlord else "#1a237e"
+        sig_size = "30pt" if is_landlord else "28pt"
+        date_size = "15pt" if is_landlord else "14pt"
         sig_rows += f"""
         <div style="margin-bottom: 30pt; page-break-inside: avoid;">
             <h3 style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">
                 {sig['role'].upper()}:
             </h3>
-            <p style="font-family: 'Dancing Script', cursive; font-size: 28pt; color: #1a237e;
+            <p style="font-family: {sig_font}; font-size: {sig_size}; color: {sig_color};
                       margin: 0; line-height: 1.2; border-bottom: 1px solid #333;
                       display: inline-block; padding-bottom: 2pt; min-width: 300pt;">
                 {sig['name']}
@@ -555,7 +560,7 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
                 {sig['name']} ({sig.get('email', '')}) — Electronically signed on {sig['signed_at']}
                 {(' — IP: ' + sig['ip_address']) if sig['ip_address'] else ''}
             </p>
-            <p style="margin-top: 6pt;">Date: <span style="font-family: 'Dancing Script', cursive; font-size: 14pt; color: #1a237e;">{signed_date}</span></p>
+            <p style="margin-top: 6pt;">Date: <span style="font-family: {sig_font}; font-size: {date_size}; color: {sig_color};">{signed_date}</span></p>
         </div>
         """
 
@@ -564,7 +569,7 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
 <head>
     <meta charset="utf-8">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap');
         @page {{ size: letter; margin: 1in; }}
         body {{ font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.5; }}
         h2 {{ font-size: 13pt; border-bottom: 1px solid #999; padding-bottom: 3pt; }}
