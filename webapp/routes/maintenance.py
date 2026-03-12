@@ -111,6 +111,72 @@ async def _notify_vendor_sms(vendor_id: int, wo, session):
         return False
 
 
+async def _notify_tenant_sms(tenant_id: int, wo, session):
+    """Send SMS to tenant about a work order created for their property"""
+    try:
+        result = await session.execute(
+            select(Tenant).where(Tenant.id == tenant_id)
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant or not tenant.phone:
+            return False
+
+        prop_addr = ""
+        if wo.property_id:
+            prop_result = await session.execute(
+                select(Property).where(Property.id == wo.property_id)
+            )
+            prop = prop_result.scalar_one_or_none()
+            prop_addr = prop.address if prop else ""
+
+        priority_label = wo.priority.value.title() if wo.priority else "Normal"
+        scheduled = wo.scheduled_date.strftime('%b %d, %Y') if wo.scheduled_date else "TBD"
+
+        msg = (
+            f"Blue Deer - Maintenance Update\n\n"
+            f"A work order has been created for your property.\n\n"
+            f"Title: {wo.title}\n"
+            f"Property: {prop_addr}\n"
+            f"Priority: {priority_label}\n"
+            f"Scheduled: {scheduled}\n"
+        )
+        if wo.description:
+            desc_short = wo.description[:100] + ("..." if len(wo.description) > 100 else "")
+            msg += f"Details: {desc_short}\n"
+        msg += f"\nView in portal: https://bluedeer.space/portal/maintenance/{wo.id}"
+
+        sms_result = await twilio_service.send_sms(tenant.phone, msg)
+        if sms_result.success:
+            logger.info(f"Tenant SMS sent to {tenant.name} for WO #{wo.id}")
+        else:
+            logger.error(f"Failed to SMS tenant {tenant.name}: {sms_result.error_message}")
+
+        # Store outbound message in DB
+        try:
+            from_number = _normalize_phone(twilio_service.from_number) if twilio_service.from_number else "unknown"
+            to_number = _normalize_phone(tenant.phone)
+            sms_message = SMSMessage(
+                tenant_id=tenant_id,
+                property_id=wo.property_id,
+                from_number=from_number,
+                to_number=to_number,
+                body=msg,
+                direction=MessageDirection.OUTBOUND,
+                twilio_sid=sms_result.message_sid if sms_result.success else None,
+                status="sent" if sms_result.success else "failed",
+                created_at=datetime.utcnow()
+            )
+            session.add(sms_message)
+            await session.flush()
+        except Exception as db_err:
+            logger.error(f"Failed to store tenant SMS in DB: {db_err}")
+
+        return sms_result.success
+    except Exception as e:
+        logger.error(f"Error sending tenant SMS: {e}")
+        return False
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_work_orders(
     request: Request,
@@ -421,6 +487,10 @@ async def create_work_order(request: Request):
         if wo.vendor_id and form.get("notify_vendor"):
             await _notify_vendor_sms(wo.vendor_id, wo, session)
 
+        # Send SMS to tenant if assigned and checkbox checked
+        if wo.tenant_id and form.get("notify_tenant"):
+            await _notify_tenant_sms(wo.tenant_id, wo, session)
+
         # Send Telegram notification via Blue Deer bot
         try:
             # Load property address for the message
@@ -575,6 +645,7 @@ async def update_work_order(request: Request, wo_id: int):
             return RedirectResponse(url="/maintenance", status_code=303)
 
         old_vendor_id = wo.vendor_id
+        old_tenant_id = wo.tenant_id
         tenant_str = form.get("tenant_id", "").strip()
         vendor_str = form.get("vendor_id", "").strip()
         sched_str = form.get("scheduled_date", "").strip()
@@ -606,6 +677,11 @@ async def update_work_order(request: Request, wo_id: int):
         # Notify vendor if newly assigned or reassigned and checkbox checked
         if new_vendor_id and form.get("notify_vendor") and new_vendor_id != old_vendor_id:
             await _notify_vendor_sms(new_vendor_id, wo, session)
+
+        # Notify tenant if newly assigned or reassigned and checkbox checked
+        new_tenant_id = int(tenant_str) if tenant_str else None
+        if new_tenant_id and form.get("notify_tenant") and new_tenant_id != old_tenant_id:
+            await _notify_tenant_sms(new_tenant_id, wo, session)
 
     return RedirectResponse(url=f"/maintenance/{wo_id}", status_code=303)
 

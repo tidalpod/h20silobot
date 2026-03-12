@@ -99,6 +99,15 @@
                 </label>
             </div>
 
+            <!-- Notify Tenant -->
+            <div id="notify-tenant-row" class="hidden">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="notify_tenant" value="1" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm font-medium text-gray-700">📱 Send SMS notification to tenant</span>
+                    <span class="text-xs text-gray-400" id="notify-tenant-phone"></span>
+                </label>
+            </div>
+
             <!-- Description -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -275,12 +284,34 @@
         { id: "{{ t.id }}", label: "{{ t.name|replace('"', '\\"') }}" },
         {% endfor %}
     ];
+
+    const tenantPhones = {
+        {% for t in tenants %}
+        {{ t.id }}: "{{ t.phone or '' }}",
+        {% endfor %}
+    };
+
+    const notifyTenantRow = document.getElementById('notify-tenant-row');
+    const notifyTenantPhone = document.getElementById('notify-tenant-phone');
+
+    function updateTenantNotifyRow() {
+        const tid = document.getElementById('tenant-id-input').value;
+        if (tid && tenantPhones[tid]) {
+            notifyTenantRow.classList.remove('hidden');
+            notifyTenantPhone.textContent = '(' + tenantPhones[tid] + ')';
+        } else {
+            notifyTenantRow.classList.add('hidden');
+        }
+    }
+
     initSearchable({
         searchId: 'tenant-search',
         hiddenId: 'tenant-id-input',
         dropdownId: 'tenant-dropdown',
         items: tenants,
+        onSelect: updateTenantNotifyRow,
     });
+    updateTenantNotifyRow();
 
     // --- Vendor notify ---
     const vendorSelect = document.querySelector('select[name="vendor_id"]');
