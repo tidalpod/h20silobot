@@ -62,6 +62,8 @@ async def run_migrations(engine):
         ("tenant_applications", "applicant_dob", "DATE"),
         ("tenant_applications", "applicant_type", "VARCHAR(20) DEFAULT 'tenant'"),
         ("tenant_applications", "application_data", "TEXT"),
+        # Stripe payment for application fee
+        ("tenant_applications", "stripe_checkout_session_id", "VARCHAR(255)"),
     ]
 
     async with engine.begin() as conn:
@@ -80,6 +82,14 @@ async def run_migrations(engine):
                     ADD COLUMN {column} {col_type}
                 """))
                 print(f"[DB] Column '{column}' added successfully")
+
+        # Add 'pending_payment' to applicationstatus enum if not present
+        try:
+            await conn.execute(text(
+                "ALTER TYPE applicationstatus ADD VALUE IF NOT EXISTS 'pending_payment' BEFORE 'pending'"
+            ))
+        except Exception:
+            pass  # Value already exists or enum doesn't exist yet
 
         # Create indexes for new columns (idempotent)
         await conn.execute(text(

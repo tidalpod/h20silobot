@@ -14,6 +14,7 @@ from database.connection import get_session
 from database.models import (
     RentPayment, PaymentStatus, Property, Tenant,
     StripePayment, WaterBill, BillStatus,
+    TenantApplication, ApplicationStatus,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services import payment_service
@@ -245,6 +246,38 @@ async def stripe_webhook(request: Request):
                         bill.status = BillStatus.PAID
 
                 logger.info(f"Stripe payment {sp.id} completed (session={session_id})")
+
+        # --- Application fee payments ---
+        if metadata.get("type") == "application_fee":
+            app_id_str = metadata.get("application_id")
+            if app_id_str:
+                async with get_session() as session:
+                    result = await session.execute(
+                        select(TenantApplication)
+                        .where(TenantApplication.id == int(app_id_str))
+                        .options(selectinload(TenantApplication.property_ref))
+                    )
+                    application = result.scalar_one_or_none()
+                    if application and application.status == ApplicationStatus.PENDING_PAYMENT:
+                        application.status = ApplicationStatus.PENDING
+                        prop = application.property_ref
+                        logger.info(f"Application {app_id_str} activated via webhook (session={session_id})")
+
+                        # Submit screening if configured
+                        from webapp.config import web_config
+                        if web_config.has_tenantreportx:
+                            try:
+                                from webapp.services.screening_service import submit_screening
+                                await submit_screening(application.id)
+                            except Exception as e:
+                                logger.error(f"Screening submission failed (webhook): {e}")
+
+                        # Send Telegram notification
+                        try:
+                            from webapp.routes.applications import _send_application_telegram
+                            await _send_application_telegram(application, prop)
+                        except Exception as e:
+                            logger.error(f"Telegram notification failed (webhook): {e}")
 
     elif event_type == "checkout.session.expired":
         session_id = data_object.get("id")

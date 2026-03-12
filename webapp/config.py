@@ -59,7 +59,7 @@ class WebConfig:
     tenantreportx_api_key: str = os.getenv("TENANTREPORTX_API_KEY", "")
     tenantreportx_account_id: str = os.getenv("TENANTREPORTX_ACCOUNT_ID", "")
     tenantreportx_webhook_secret: str = os.getenv("TENANTREPORTX_WEBHOOK_SECRET", "")
-    tenantreportx_applicant_fee: str = os.getenv("TENANTREPORTX_APPLICANT_FEE", "25.00")
+    tenantreportx_applicant_fee: str = os.getenv("TENANTREPORTX_APPLICANT_FEE", "35.00")
 
     # Cloudflare R2 Object Storage
     r2_account_id: str = os.getenv("R2_ACCOUNT_ID", "")

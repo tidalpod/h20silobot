@@ -103,6 +103,7 @@ class LeaseBuilderStatus(PyEnum):
 
 
 class ApplicationStatus(PyEnum):
+    PENDING_PAYMENT = "pending_payment"
     PENDING = "pending"
     SCREENING = "screening"
     COMPLETED = "completed"
@@ -1562,6 +1563,9 @@ class TenantApplication(Base):
     applicant_type = Column(String(20), default="tenant")  # tenant or cosigner
     applicant_notes = Column(Text, nullable=True)
     application_data = Column(Text, nullable=True)  # JSON blob for extended TurboTenant-style fields
+
+    # Stripe payment
+    stripe_checkout_session_id = Column(String(255), nullable=True)
 
     # TenantReportX screening
     trx_order_id = Column(String(100), unique=True, nullable=True)

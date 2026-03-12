@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Required | Blue Deer Rentals</title>
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="apple-touch-icon" href="/static/images/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/listings" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
+                    <div>
+                        <h1 class="text-xl font-bold">Blue Deer Rentals</h1>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto px-4 py-16">
+        <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-3">Payment Required</h2>
+            {% if property %}
+            <p class="text-gray-500 mb-2">{{ property.address }}</p>
+            {% endif %}
+            <p class="text-gray-600 mb-8">
+                Your application has been saved, but a <strong>${{ screening_fee }}</strong> screening fee is required to process it.
+                Please complete the payment to submit your application.
+            </p>
+            <div class="space-y-4">
+                {% if app_id %}
+                <form method="POST" action="/apply/retry-payment">
+                    <input type="hidden" name="app_id" value="{{ app_id }}">
+                    <button type="submit"
+                       class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                        Complete Payment (${{ screening_fee }})
+                    </button>
+                </form>
+                {% endif %}
+                <p class="text-sm text-gray-400">
+                    Questions? Call <a href="tel:+12489638704" class="text-blue-600 hover:underline">(248) 963-8704</a>
+                    or email <a href="mailto:rentals@bluedeer.space" class="text-blue-600 hover:underline">rentals@bluedeer.space</a>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2">
+                    <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain opacity-50">
+                    <span class="font-medium text-white">Blue Deer</span>
+                </div>
+                <p class="text-sm">&copy; 2025 Blue Deer Property Management</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

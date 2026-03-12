@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi import APIRouter, Request, HTTPException
@@ -17,6 +18,7 @@ from database.connection import get_session
 from database.models import Property, TenantApplication, ApplicationStatus
 from webapp.auth.dependencies import get_current_user
 from webapp.config import web_config
+from webapp.services import stripe_service
 
 logger = logging.getLogger(__name__)
 
@@ -321,51 +323,33 @@ async def apply_submit(request: Request, property_id: int):
             voucher_amount=voucher_amount,
             applicant_notes=form.get("notes", "").strip(),
             application_data=json.dumps(app_data),
-            status=ApplicationStatus.PENDING,
+            status=ApplicationStatus.PENDING_PAYMENT,
         )
         session.add(application)
         await session.flush()
         app_id = application.id
 
-        # Submit screening if configured
-        if web_config.has_tenantreportx:
-            try:
-                from webapp.services.screening_service import submit_screening
-                await submit_screening(app_id)
-            except Exception as e:
-                logger.error(f"Screening submission failed: {e}")
+        # Create Stripe Checkout session for the application fee
+        base_url = web_config.site_url.rstrip("/")
+        fee_amount = Decimal(web_config.tenantreportx_applicant_fee)
+        fee_info = stripe_service.calculate_convenience_fee(fee_amount)
 
-        # Send Telegram notification
-        try:
-            from webapp.services.telegram_service import telegram_service
-            name = f"{application.applicant_first_name} {application.applicant_last_name}"
-            app_type = application.applicant_type or "tenant"
-            msg = (
-                f"\U0001f4dd *New Rental Application*\n\n"
-                f"*{name}*"
-            )
-            if app_type == "cosigner":
-                msg += " _(co-signer)_"
-            msg += (
-                f"\n  \U0001f3e0 {prop.address}\n"
-                f"  \U0001f4e7 {application.applicant_email}\n"
-            )
-            if application.applicant_phone:
-                msg += f"  \U0001f4f1 {application.applicant_phone}\n"
-            if has_voucher:
-                msg += f"  \U0001f3db Section 8 Voucher"
-                if voucher_amount:
-                    msg += f": ${voucher_amount:,.0f}"
-                msg += "\n"
-            if app_data.get("background", {}).get("prior_eviction"):
-                msg += "  \u26a0\ufe0f Prior eviction disclosed\n"
-            if app_data.get("background", {}).get("prior_criminal"):
-                msg += "  \u26a0\ufe0f Prior criminal record disclosed\n"
-            await telegram_service.send_message(msg)
-        except Exception as e:
-            logger.error(f"Telegram notification failed: {e}")
+        checkout = stripe_service.create_checkout_session(
+            base_amount=fee_info["base_amount"],
+            convenience_fee=fee_info["convenience_fee"],
+            description="Application & Screening Fee",
+            success_url=f"{base_url}/apply/{property_id}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base_url}/apply/{property_id}/payment-cancelled?app_id={app_id}",
+            metadata={"application_id": str(app_id), "type": "application_fee"},
+        )
 
-    return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
+        if "error" in checkout:
+            logger.error(f"Stripe checkout creation failed: {checkout['error']}")
+            raise HTTPException(status_code=500, detail="Payment setup failed. Please try again.")
+
+        application.stripe_checkout_session_id = checkout["session_id"]
+
+    return RedirectResponse(url=checkout["url"], status_code=303)
 
 
 @router.get("/apply/{property_id}/confirmation", response_class=HTMLResponse)
@@ -381,6 +365,147 @@ async def apply_confirmation(request: Request, property_id: int):
         "request": request,
         "property": prop,
     })
+
+
+@router.get("/apply/{property_id}/payment-success", response_class=HTMLResponse)
+async def apply_payment_success(request: Request, property_id: int, session_id: str = ""):
+    """Handle successful Stripe Checkout return — activate the application."""
+    if not session_id:
+        return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
+
+    # Verify payment with Stripe
+    checkout_data = stripe_service.retrieve_session(session_id)
+    if not checkout_data or checkout_data.get("payment_status") != "paid":
+        logger.warning(f"Payment verification failed for session {session_id}")
+        return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(TenantApplication)
+            .where(TenantApplication.stripe_checkout_session_id == session_id)
+            .options(selectinload(TenantApplication.property_ref))
+        )
+        application = result.scalar_one_or_none()
+
+        if not application:
+            logger.warning(f"No application found for checkout session {session_id}")
+            return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
+
+        # Only transition from PENDING_PAYMENT (idempotent — skip if already processed)
+        if application.status == ApplicationStatus.PENDING_PAYMENT:
+            application.status = ApplicationStatus.PENDING
+            prop = application.property_ref
+
+            # Submit screening if configured
+            if web_config.has_tenantreportx:
+                try:
+                    from webapp.services.screening_service import submit_screening
+                    await submit_screening(application.id)
+                except Exception as e:
+                    logger.error(f"Screening submission failed: {e}")
+
+            # Send Telegram notification
+            await _send_application_telegram(application, prop)
+
+    return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
+
+
+@router.get("/apply/{property_id}/payment-cancelled", response_class=HTMLResponse)
+async def apply_payment_cancelled(request: Request, property_id: int, app_id: int = 0):
+    """Show payment-required page when applicant cancels Stripe Checkout."""
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+
+    return templates.TemplateResponse("public/apply_payment_cancelled.html", {
+        "request": request,
+        "property": prop,
+        "app_id": app_id,
+        "screening_fee": web_config.tenantreportx_applicant_fee,
+    })
+
+
+@router.post("/apply/retry-payment")
+async def apply_retry_payment(request: Request):
+    """Create a new Stripe Checkout session for an unpaid application."""
+    form = await request.form()
+    app_id = form.get("app_id")
+    if not app_id:
+        raise HTTPException(status_code=400, detail="Missing application ID")
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(TenantApplication)
+            .where(TenantApplication.id == int(app_id))
+            .options(selectinload(TenantApplication.property_ref))
+        )
+        application = result.scalar_one_or_none()
+        if not application or application.status != ApplicationStatus.PENDING_PAYMENT:
+            raise HTTPException(status_code=404, detail="Application not found or already paid")
+
+        property_id = application.property_id
+        base_url = web_config.site_url.rstrip("/")
+        fee_amount = Decimal(web_config.tenantreportx_applicant_fee)
+        fee_info = stripe_service.calculate_convenience_fee(fee_amount)
+
+        checkout = stripe_service.create_checkout_session(
+            base_amount=fee_info["base_amount"],
+            convenience_fee=fee_info["convenience_fee"],
+            description="Application & Screening Fee",
+            success_url=f"{base_url}/apply/{property_id}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base_url}/apply/{property_id}/payment-cancelled?app_id={app_id}",
+            metadata={"application_id": str(app_id), "type": "application_fee"},
+        )
+
+        if "error" in checkout:
+            logger.error(f"Stripe retry checkout failed: {checkout['error']}")
+            raise HTTPException(status_code=500, detail="Payment setup failed. Please try again.")
+
+        application.stripe_checkout_session_id = checkout["session_id"]
+
+    return RedirectResponse(url=checkout["url"], status_code=303)
+
+
+async def _send_application_telegram(application, prop):
+    """Send Telegram notification for a new application."""
+    try:
+        from webapp.services.telegram_service import telegram_service
+        name = f"{application.applicant_first_name} {application.applicant_last_name}"
+        app_type = application.applicant_type or "tenant"
+        msg = (
+            f"\U0001f4dd *New Rental Application*\n\n"
+            f"*{name}*"
+        )
+        if app_type == "cosigner":
+            msg += " _(co-signer)_"
+        msg += (
+            f"\n  \U0001f3e0 {prop.address}\n"
+            f"  \U0001f4e7 {application.applicant_email}\n"
+        )
+        if application.applicant_phone:
+            msg += f"  \U0001f4f1 {application.applicant_phone}\n"
+        if application.has_section8_voucher:
+            msg += f"  \U0001f3db Section 8 Voucher"
+            if application.voucher_amount:
+                msg += f": ${float(application.voucher_amount):,.0f}"
+            msg += "\n"
+
+        # Check background disclosures from application_data
+        app_data = {}
+        if application.application_data:
+            try:
+                app_data = json.loads(application.application_data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if app_data.get("background", {}).get("prior_eviction"):
+            msg += "  \u26a0\ufe0f Prior eviction disclosed\n"
+        if app_data.get("background", {}).get("prior_criminal"):
+            msg += "  \u26a0\ufe0f Prior criminal record disclosed\n"
+        await telegram_service.send_message(msg)
+    except Exception as e:
+        logger.error(f"Telegram notification failed: {e}")
 
 
 # =============================================================================
@@ -446,6 +571,7 @@ async def applications_list(request: Request, status: str = None):
         all_apps = count_result.scalars().all()
         counts = {
             "all": len(all_apps),
+            "pending_payment": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING_PAYMENT),
             "pending": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING),
             "screening": sum(1 for a in all_apps if a.status == ApplicationStatus.SCREENING),
             "completed": sum(1 for a in all_apps if a.status == ApplicationStatus.COMPLETED),
