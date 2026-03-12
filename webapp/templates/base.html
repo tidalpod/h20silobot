@@ -76,11 +76,13 @@
 
         /* Card hover effect */
         .card-hover {
-            transition: all 0.2s ease;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
         }
         .card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -12px rgba(30,58,138,0.12), 0 8px 16px -8px rgba(59,130,246,0.08);
+            border-color: rgba(59,130,246,0.15);
         }
 
         /* Status pulse animation */
@@ -95,7 +97,10 @@
         /* Nav dropdown animation */
         .nav-dropdown {
             transform-origin: top;
-            transition: opacity 0.15s ease, transform 0.15s ease;
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            background: rgba(255,255,255,0.85);
         }
         .nav-dropdown.hidden {
             opacity: 0;
@@ -106,6 +111,8 @@
         /* Search modal */
         .search-backdrop {
             transition: opacity 0.15s ease;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
         .search-modal {
             transition: opacity 0.15s ease, transform 0.15s ease;
@@ -113,6 +120,76 @@
         .search-result-active {
             background-color: #f3f4f6;
         }
+
+        /* ── Animations ── */
+        @keyframes bd-fade-up {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .bd-fade-up {
+            opacity: 0;
+            animation: bd-fade-up 0.4s ease-out forwards;
+        }
+
+        @keyframes bd-shimmer {
+            0%   { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .bd-skeleton {
+            background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+            background-size: 200% 100%;
+            animation: bd-shimmer 1.5s infinite;
+            border-radius: 0.375rem;
+        }
+
+        .bd-btn-press { transition: transform 0.1s ease; }
+        .bd-btn-press:active { transform: scale(0.97); }
+
+        /* Page transition */
+        body { transition: opacity 0.15s ease; }
+        body.bd-navigating { opacity: 0; }
+
+        /* ── Visual Polish ── */
+        .bd-glass {
+            background: rgba(255,255,255,0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .bd-table-row {
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+            border-left: 3px solid transparent;
+        }
+        .bd-table-row:hover {
+            background-color: #eff6ff;
+            border-left-color: #3b82f6;
+        }
+
+        /* Status badges */
+        .bd-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; border-left: 3px solid transparent; }
+        .bd-badge-success { background: #ecfdf5; color: #065f46; border-left-color: #10b981; }
+        .bd-badge-warning { background: #fffbeb; color: #92400e; border-left-color: #f59e0b; }
+        .bd-badge-danger  { background: #fef2f2; color: #991b1b; border-left-color: #ef4444; }
+        .bd-badge-info    { background: #eff6ff; color: #1e40af; border-left-color: #3b82f6; }
+
+        /* ── Data Viz ── */
+        .bd-progress-bar { height: 0.5rem; background: #e5e7eb; border-radius: 9999px; overflow: hidden; }
+        .bd-progress-fill { height: 100%; border-radius: 9999px; transition: width 1s ease-out; background: #3b82f6; }
+        .bd-progress-fill.green { background: #10b981; }
+        .bd-progress-fill.yellow { background: #f59e0b; }
+        .bd-progress-fill.red { background: #ef4444; }
+
+        @keyframes bd-pulse-ring {
+            0%   { box-shadow: 0 0 0 0 currentColor; }
+            70%  { box-shadow: 0 0 0 4px transparent; }
+            100% { box-shadow: 0 0 0 0 transparent; }
+        }
+        .bd-status-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block; }
+        .bd-status-dot.active { animation: bd-pulse-ring 2s ease-out infinite; }
+
+        .bd-mini-chart { display: flex; align-items: flex-end; gap: 3px; height: 2rem; }
+        .bd-bar { width: 6px; border-radius: 2px 2px 0 0; background: #3b82f6; transition: height 0.8s ease-out; }
     </style>
 
     <!-- Tom Select (searchable dropdowns) -->
@@ -941,6 +1018,43 @@
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+    </script>
+
+    <script>
+    // Staggered card entrance
+    document.querySelectorAll('.bd-fade-up').forEach((el, i) => {
+        el.style.animationDelay = `${i * 0.06}s`;
+    });
+
+    // Count-up animation
+    document.querySelectorAll('[data-countup]').forEach(el => {
+        const target = parseFloat(el.textContent.replace(/[^0-9.]/g, ''));
+        if (isNaN(target)) return;
+        const prefix = el.textContent.match(/^[^0-9]*/)?.[0] || '';
+        const decimals = (el.textContent.split('.')[1] || '').length;
+        const duration = 800;
+        const start = performance.now();
+        function step(now) {
+            const progress = Math.min((now - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            el.textContent = prefix + (target * ease).toFixed(decimals);
+            if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    });
+
+    // Page transition fade-out
+    document.addEventListener('click', e => {
+        const a = e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.href.startsWith('#') ||
+            a.href.startsWith('javascript:') || a.hostname !== location.hostname ||
+            e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        document.body.classList.add('bd-navigating');
+        setTimeout(() => { window.location = a.href; }, 150);
+    });
+    // Remove fade-out on back navigation
+    window.addEventListener('pageshow', () => document.body.classList.remove('bd-navigating'));
     </script>
 </body>
 </html>
