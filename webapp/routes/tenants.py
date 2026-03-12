@@ -312,13 +312,8 @@ async def tenant_detail(request: Request, tenant_id: int):
         )
         bank_accounts = bank_result.scalars().all()
 
-    # Balance due
-    balance = None
-    try:
-        from webapp.services.payment_service import calculate_balance_due
-        balance = await calculate_balance_due(tenant_id)
-    except Exception:
-        pass
+    # Water bill balance (sum of unpaid bills)
+    water_balance = sum(float(b.amount_due or 0) for b in water_bills if b.amount_due and b.amount_due > 0)
 
     return templates.TemplateResponse(
         "tenants/detail.html",
@@ -334,7 +329,7 @@ async def tenant_detail(request: Request, tenant_id: int):
             "active_lease": active_lease,
             "water_bills": water_bills,
             "bank_accounts": bank_accounts,
-            "balance": balance,
+            "water_balance": water_balance,
         }
     )
 
