@@ -1577,7 +1577,7 @@ class TenantApplication(Base):
     screening_recommendation = Column(String(50), nullable=True)
 
     # Application status
-    status = Column(Enum(ApplicationStatus), default=ApplicationStatus.PENDING, nullable=False)
+    status = Column(String(30), default=ApplicationStatus.PENDING.value, nullable=False)
     landlord_notes = Column(Text, nullable=True)
 
     # Timestamps

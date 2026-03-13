@@ -97,21 +97,15 @@ async def run_migrations(engine):
             except Exception:
                 pass  # Column may already be nullable or table may not exist yet
 
-    # Add 'pending_payment' to applicationstatus enum (must run outside a transaction)
-    try:
-        from sqlalchemy.pool import NullPool
-        raw_url = os.getenv("DATABASE_URL", "")
-        if raw_url.startswith("postgresql://"):
-            raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        from sqlalchemy.ext.asyncio import create_async_engine as _cae
-        _tmp = _cae(raw_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
-        async with _tmp.connect() as conn:
+    # Convert tenant_applications.status from native enum to VARCHAR (allows adding new values without ALTER TYPE)
+    async with engine.begin() as conn:
+        try:
             await conn.execute(text(
-                "ALTER TYPE applicationstatus ADD VALUE IF NOT EXISTS 'pending_payment' BEFORE 'pending'"
+                "ALTER TABLE tenant_applications ALTER COLUMN status TYPE VARCHAR(30) USING status::text"
             ))
-        await _tmp.dispose()
-    except Exception:
-        pass  # Value already exists or enum doesn't exist yet
+            print("[DB] Converted tenant_applications.status from enum to VARCHAR(30)")
+        except Exception:
+            pass  # Already converted or column doesn't exist
 
     # Convert showings.status from native enum to VARCHAR (allows adding new values without ALTER TYPE)
     async with engine.begin() as conn:
