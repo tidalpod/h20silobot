@@ -1,14 +1,14 @@
-"""Background service: Send SMS reminders 1 hour before showings"""
+"""Background service: Send SMS reminders 2 hours before showings (tenant only)"""
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime
 
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Showing, ShowingStatus, Vendor, Property
+from database.models import Showing, ShowingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -43,65 +43,39 @@ def _normalize_phone(phone):
     return f"+{digits}"
 
 
-async def _send_reminder(showing, vendor, prop_addr):
-    """Send reminder SMS to vendor and prospective renter"""
+async def _send_reminder(showing, prop_addr):
+    """Send reminder SMS to prospective renter"""
     from webapp.services.twilio_service import twilio_service
-    from database.models import SMSMessage, MessageDirection
 
-    date_str = showing.scheduled_date.strftime('%b %d, %Y') if showing.scheduled_date else "TBD"
     time_str = _fmt_time_12h(showing.scheduled_time) or "TBD"
 
-    sent_count = 0
+    if not showing.contact_phone:
+        return 0
 
-    # Remind vendor
-    if vendor and vendor.phone:
-        phone = _normalize_phone(vendor.phone)
-        if phone:
-            msg = (
-                f"Blue Deer - Showing Reminder\n\n"
-                f"You have a showing in 1 hour:\n\n"
-                f"Title: {showing.title}\n"
-                f"Property: {prop_addr}\n"
-                f"Time: {time_str}\n"
-            )
-            if showing.contact_name:
-                msg += f"Prospective Renter: {showing.contact_name}"
-                if showing.contact_phone:
-                    msg += f" ({showing.contact_phone})"
-                msg += "\n"
+    phone = _normalize_phone(showing.contact_phone)
+    if not phone:
+        return 0
 
-            result = await twilio_service.send_sms(phone, msg)
-            if result.success:
-                sent_count += 1
-                logger.info(f"Reminder sent to vendor {vendor.name} for Showing #{showing.id}")
-            else:
-                logger.error(f"Failed to remind vendor {vendor.name}: {result.error_message}")
-
-    # Remind prospective renter
-    if showing.contact_phone:
-        phone = _normalize_phone(showing.contact_phone)
-        if phone:
-            first_name = showing.contact_name.split()[0] if showing.contact_name else ""
-            msg = (
-                f"Blue Deer Property Management\n\n"
-                f"Hi{' ' + first_name if first_name else ''}! "
-                f"Reminder: your showing is in 1 hour.\n\n"
-                f"Property: {prop_addr}\n"
-                f"Time: {time_str}\n"
-                f"\nPlease reply if you need to reschedule."
-            )
-            result = await twilio_service.send_sms(phone, msg)
-            if result.success:
-                sent_count += 1
-                logger.info(f"Reminder sent to renter {showing.contact_name} for Showing #{showing.id}")
-            else:
-                logger.error(f"Failed to remind renter {showing.contact_name}: {result.error_message}")
-
-    return sent_count
+    first_name = showing.contact_name.split()[0] if showing.contact_name else ""
+    msg = (
+        f"Blue Deer Property Management\n\n"
+        f"Hi{' ' + first_name if first_name else ''}! "
+        f"Reminder: your showing is in 2 hours.\n\n"
+        f"Property: {prop_addr}\n"
+        f"Time: {time_str}\n"
+        f"\nPlease reply if you need to reschedule."
+    )
+    result = await twilio_service.send_sms(phone, msg)
+    if result.success:
+        logger.info(f"Reminder sent to renter {showing.contact_name} for Showing #{showing.id}")
+        return 1
+    else:
+        logger.error(f"Failed to remind renter {showing.contact_name}: {result.error_message}")
+        return 0
 
 
 async def check_and_send_reminders():
-    """Check for showings in the next hour and send reminders"""
+    """Check for showings in the next 2 hours and send reminders to tenant"""
     try:
         now = datetime.utcnow()
         today = now.date()
@@ -111,7 +85,6 @@ async def check_and_send_reminders():
             result = await session.execute(
                 select(Showing)
                 .options(
-                    selectinload(Showing.vendor),
                     selectinload(Showing.property_ref),
                 )
                 .where(
@@ -130,12 +103,11 @@ async def check_and_send_reminders():
                 except (ValueError, AttributeError):
                     continue
 
-                # Check if showing is within the next 60-90 minutes
-                # (gives a 30-min window so we don't miss it between checks)
+                # Check if showing is within the next 2 hours
                 time_until = (showing_dt - now).total_seconds()
-                if 0 < time_until <= 5400:  # Between now and 90 minutes from now
+                if 0 < time_until <= 7200:  # Between now and 2 hours from now
                     prop_addr = showing.property_ref.address if showing.property_ref else "Unknown"
-                    sent = await _send_reminder(showing, showing.vendor, prop_addr)
+                    sent = await _send_reminder(showing, prop_addr)
                     if sent > 0:
                         showing.reminder_sent_at = now
                         logger.info(f"Showing #{showing.id}: sent {sent} reminder(s)")
