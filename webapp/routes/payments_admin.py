@@ -258,8 +258,8 @@ async def stripe_webhook(request: Request):
                         .options(selectinload(TenantApplication.property_ref))
                     )
                     application = result.scalar_one_or_none()
-                    if application and application.status == ApplicationStatus.PENDING_PAYMENT:
-                        application.status = ApplicationStatus.PENDING
+                    if application and application.status == ApplicationStatus.PENDING_PAYMENT.value:
+                        application.status = ApplicationStatus.PENDING.value
                         prop = application.property_ref
                         logger.info(f"Application {app_id_str} activated via webhook (session={session_id})")
 

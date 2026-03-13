@@ -323,7 +323,7 @@ async def apply_submit(request: Request, property_id: int):
             voucher_amount=voucher_amount,
             applicant_notes=form.get("notes", "").strip(),
             application_data=json.dumps(app_data),
-            status=ApplicationStatus.PENDING_PAYMENT,
+            status=ApplicationStatus.PENDING_PAYMENT.value,
         )
         session.add(application)
         await session.flush()
@@ -333,7 +333,7 @@ async def apply_submit(request: Request, property_id: int):
         if not web_config.has_stripe:
             # Stripe not configured — skip payment, go straight to pending
             logger.warning("Stripe not configured — accepting application without payment")
-            application.status = ApplicationStatus.PENDING
+            application.status = ApplicationStatus.PENDING.value
 
             # Submit screening if configured
             if web_config.has_tenantreportx:
@@ -409,8 +409,8 @@ async def apply_payment_success(request: Request, property_id: int, session_id: 
             return RedirectResponse(url=f"/apply/{property_id}/confirmation", status_code=303)
 
         # Only transition from PENDING_PAYMENT (idempotent — skip if already processed)
-        if application.status == ApplicationStatus.PENDING_PAYMENT:
-            application.status = ApplicationStatus.PENDING
+        if application.status == ApplicationStatus.PENDING_PAYMENT.value:
+            application.status = ApplicationStatus.PENDING.value
             prop = application.property_ref
 
             # Submit screening if configured
@@ -459,7 +459,7 @@ async def apply_retry_payment(request: Request):
             .options(selectinload(TenantApplication.property_ref))
         )
         application = result.scalar_one_or_none()
-        if not application or application.status != ApplicationStatus.PENDING_PAYMENT:
+        if not application or application.status != ApplicationStatus.PENDING_PAYMENT.value:
             raise HTTPException(status_code=404, detail="Application not found or already paid")
 
         property_id = application.property_id
@@ -575,8 +575,8 @@ async def applications_list(request: Request, status: str = None):
 
         if status and status != "all":
             try:
-                status_enum = ApplicationStatus(status)
-                query = query.where(TenantApplication.status == status_enum)
+                ApplicationStatus(status)  # validate it's a known status
+                query = query.where(TenantApplication.status == status)
             except ValueError:
                 pass
 
@@ -588,12 +588,12 @@ async def applications_list(request: Request, status: str = None):
         all_apps = count_result.scalars().all()
         counts = {
             "all": len(all_apps),
-            "pending_payment": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING_PAYMENT),
-            "pending": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING),
-            "screening": sum(1 for a in all_apps if a.status == ApplicationStatus.SCREENING),
-            "completed": sum(1 for a in all_apps if a.status == ApplicationStatus.COMPLETED),
-            "approved": sum(1 for a in all_apps if a.status == ApplicationStatus.APPROVED),
-            "denied": sum(1 for a in all_apps if a.status == ApplicationStatus.DENIED),
+            "pending_payment": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING_PAYMENT.value),
+            "pending": sum(1 for a in all_apps if a.status == ApplicationStatus.PENDING.value),
+            "screening": sum(1 for a in all_apps if a.status == ApplicationStatus.SCREENING.value),
+            "completed": sum(1 for a in all_apps if a.status == ApplicationStatus.COMPLETED.value),
+            "approved": sum(1 for a in all_apps if a.status == ApplicationStatus.APPROVED.value),
+            "denied": sum(1 for a in all_apps if a.status == ApplicationStatus.DENIED.value),
         }
 
     return templates.TemplateResponse("applications/list.html", {
@@ -660,7 +660,7 @@ async def application_decide(request: Request, application_id: int):
         if not application:
             raise HTTPException(status_code=404, detail="Application not found")
 
-        application.status = ApplicationStatus(decision)
+        application.status = decision
         application.landlord_notes = notes
         application.decided_at = datetime.utcnow()
 

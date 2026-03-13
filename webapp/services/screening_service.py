@@ -73,7 +73,7 @@ async def submit_screening(application_id: int) -> dict:
                     order_id = data.get("order_id") or data.get("id")
                     app.trx_order_id = str(order_id)
                     app.trx_status = "submitted"
-                    app.status = ApplicationStatus.SCREENING
+                    app.status = ApplicationStatus.SCREENING.value
 
                     return {"order_id": order_id}
         except Exception as e:
@@ -131,7 +131,7 @@ async def process_webhook(payload: dict) -> dict:
         app.eviction_records_found = payload.get("eviction_records_found", False)
         app.screening_recommendation = payload.get("recommendation", "")
         app.trx_report_url = payload.get("report_url", "")
-        app.status = ApplicationStatus.COMPLETED
+        app.status = ApplicationStatus.COMPLETED.value
         app.screened_at = datetime.utcnow()
 
         logger.info(f"Screening completed for application {app.id} (order {order_id})")
