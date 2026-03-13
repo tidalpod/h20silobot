@@ -199,16 +199,16 @@
 
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">First Name</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
                             <input type="text" name="first_name" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
                             <input type="text" name="last_name" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                     <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
                         <input type="email" name="email" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div class="mb-4">
@@ -669,16 +669,79 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    function validateCurrentStep() {
+        const stepEl = document.querySelector(`[data-step="${currentStep}"]`);
+        if (!stepEl) return true;
+
+        let valid = true;
+        let firstInvalid = null;
+
+        // Clear previous errors
+        stepEl.querySelectorAll('.field-error').forEach(e => e.remove());
+        stepEl.querySelectorAll('.border-red-400').forEach(e => {
+            e.classList.remove('border-red-400', 'ring-2', 'ring-red-400');
+        });
+
+        // Check required inputs
+        stepEl.querySelectorAll('input[required], select[required], textarea[required]').forEach(input => {
+            const val = input.value.trim();
+            let isInvalid = false;
+
+            if (!val) {
+                isInvalid = true;
+            } else if (input.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                isInvalid = true;
+            }
+
+            if (isInvalid) {
+                valid = false;
+                input.classList.add('border-red-400', 'ring-2', 'ring-red-400');
+                if (!firstInvalid) firstInvalid = input;
+
+                // Add error message below input
+                if (!input.parentElement.querySelector('.field-error')) {
+                    const msg = document.createElement('p');
+                    msg.className = 'field-error text-xs text-red-500 mt-1';
+                    msg.textContent = input.type === 'email' && val ? 'Please enter a valid email' : 'This field is required';
+                    input.parentElement.appendChild(msg);
+                }
+            }
+        });
+
+        if (firstInvalid) {
+            firstInvalid.focus();
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        return valid;
+    }
+
+    // Clear error styling on input
+    document.getElementById('application-form').addEventListener('input', function(e) {
+        if (e.target.classList.contains('border-red-400')) {
+            e.target.classList.remove('border-red-400', 'ring-2', 'ring-red-400');
+            const err = e.target.parentElement.querySelector('.field-error');
+            if (err) err.remove();
+        }
+    });
+
     function nextStep() {
         // Validate property selection on step 1
         if (currentStep === 1 && !selectedPropertyId) {
             document.getElementById('property-search').focus();
             document.getElementById('property-search').classList.add('ring-2', 'ring-red-400', 'border-red-400');
-            setTimeout(() => {
-                document.getElementById('property-search').classList.remove('ring-2', 'ring-red-400', 'border-red-400');
-            }, 2000);
+            const searchWrap = document.getElementById('property-search').parentElement;
+            if (!searchWrap.querySelector('.field-error')) {
+                const msg = document.createElement('p');
+                msg.className = 'field-error text-xs text-red-500 mt-1';
+                msg.textContent = 'Please select a property';
+                searchWrap.appendChild(msg);
+            }
             return;
         }
+        // Validate required fields on current step
+        if (!validateCurrentStep()) return;
+
         if (currentStep < TOTAL_STEPS) {
             currentStep++;
             showStep(currentStep);
