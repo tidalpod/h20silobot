@@ -330,26 +330,43 @@ async def apply_submit(request: Request, property_id: int):
         app_id = application.id
 
         # Create Stripe Checkout session for the application fee
-        base_url = web_config.site_url.rstrip("/")
-        fee_amount = Decimal(web_config.tenantreportx_applicant_fee)
-        fee_info = stripe_service.calculate_convenience_fee(fee_amount)
+        if not web_config.has_stripe:
+            # Stripe not configured — skip payment, go straight to pending
+            logger.warning("Stripe not configured — accepting application without payment")
+            application.status = ApplicationStatus.PENDING
 
-        checkout = stripe_service.create_checkout_session(
-            base_amount=fee_info["base_amount"],
-            convenience_fee=fee_info["convenience_fee"],
-            description="Application & Screening Fee",
-            success_url=f"{base_url}/apply/{property_id}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{base_url}/apply/{property_id}/payment-cancelled?app_id={app_id}",
-            metadata={"application_id": str(app_id), "type": "application_fee"},
-        )
+            # Submit screening if configured
+            if web_config.has_tenantreportx:
+                try:
+                    from webapp.services.screening_service import submit_screening
+                    await submit_screening(app_id)
+                except Exception as e:
+                    logger.error(f"Screening submission failed: {e}")
 
-        if "error" in checkout:
-            logger.error(f"Stripe checkout creation failed: {checkout['error']}")
-            raise HTTPException(status_code=500, detail="Payment setup failed. Please try again.")
+            await _send_application_telegram(application, prop)
+            checkout_url = f"/apply/{property_id}/confirmation"
+        else:
+            base_url = web_config.site_url.rstrip("/")
+            fee_amount = Decimal(web_config.tenantreportx_applicant_fee)
+            fee_info = stripe_service.calculate_convenience_fee(fee_amount)
 
-        application.stripe_checkout_session_id = checkout["session_id"]
+            checkout = stripe_service.create_checkout_session(
+                base_amount=fee_info["base_amount"],
+                convenience_fee=fee_info["convenience_fee"],
+                description="Application & Screening Fee",
+                success_url=f"{base_url}/apply/{property_id}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{base_url}/apply/{property_id}/payment-cancelled?app_id={app_id}",
+                metadata={"application_id": str(app_id), "type": "application_fee"},
+            )
 
-    return RedirectResponse(url=checkout["url"], status_code=303)
+            if "error" in checkout:
+                logger.error(f"Stripe checkout creation failed: {checkout['error']}")
+                raise HTTPException(status_code=500, detail="Payment setup failed. Please try again.")
+
+            application.stripe_checkout_session_id = checkout["session_id"]
+            checkout_url = checkout["url"]
+
+    return RedirectResponse(url=checkout_url, status_code=303)
 
 
 @router.get("/apply/{property_id}/confirmation", response_class=HTMLResponse)
