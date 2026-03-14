@@ -14,6 +14,7 @@ from database.connection import get_session
 from database.models import (
     Showing, ShowingType, ShowingStatus,
     Vendor, Property, SMSMessage, MessageDirection,
+    ShowingReminderSettings,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.twilio_service import twilio_service
@@ -255,6 +256,12 @@ async def list_showings(
         for s in ShowingStatus:
             setattr(s, '_count', status_counts.get(s.value, 0))
 
+        # Get showing reminder settings
+        rs_result = await session.execute(
+            select(ShowingReminderSettings).limit(1)
+        )
+        reminder_settings = rs_result.scalar_one_or_none()
+
     today = date.today()
     upcoming = [s for s in showings if s.scheduled_date >= today]
     past = [s for s in showings if s.scheduled_date < today]
@@ -280,8 +287,44 @@ async def list_showings(
             "filter_vendor_id": vendor_id,
             "filter_date_from": date_from,
             "filter_date_to": date_to,
+            "reminder_settings": reminder_settings,
         }
     )
+
+
+@router.post("/reminder-settings")
+async def save_reminder_settings(request: Request):
+    """Save showing reminder settings"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(ShowingReminderSettings).limit(1)
+        )
+        settings = result.scalar_one_or_none()
+
+        remind_tenant = form.get("remind_tenant") == "on"
+        remind_vendor = form.get("remind_vendor") == "on"
+        lead_time_minutes = int(form.get("lead_time_minutes", 120))
+
+        if settings:
+            settings.remind_tenant = remind_tenant
+            settings.remind_vendor = remind_vendor
+            settings.lead_time_minutes = lead_time_minutes
+            settings.updated_at = datetime.utcnow()
+        else:
+            settings = ShowingReminderSettings(
+                remind_tenant=remind_tenant,
+                remind_vendor=remind_vendor,
+                lead_time_minutes=lead_time_minutes,
+            )
+            session.add(settings)
+
+    return RedirectResponse(url="/showings", status_code=303)
 
 
 @router.get("/new", response_class=HTMLResponse)

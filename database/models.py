@@ -1378,6 +1378,20 @@ class LeaseDefaultTerms(Base):
         return f"<LeaseDefaultTerms {self.id}: {self.title}>"
 
 
+class ShowingReminderSettings(Base):
+    """Admin-configurable settings for showing reminder SMS alerts."""
+    __tablename__ = "showing_reminder_settings"
+
+    id = Column(Integer, primary_key=True)
+    remind_tenant = Column(Boolean, default=True, nullable=False)
+    remind_vendor = Column(Boolean, default=False, nullable=False)
+    lead_time_minutes = Column(Integer, default=120, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ShowingReminderSettings tenant={self.remind_tenant} vendor={self.remind_vendor} lead={self.lead_time_minutes}m>"
+
+
 class ESignEnvelope(Base):
     """E-signature envelope tracking (in-house or legacy DocuSign)."""
     __tablename__ = "esign_envelopes"

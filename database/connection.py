@@ -206,6 +206,20 @@ async def _seed_telegram_admins(engine):
                 print(f"[DB] Added Telegram admin user {telegram_id}")
 
 
+async def _seed_showing_reminder_settings(engine):
+    """Seed a default showing reminder settings row if the table is empty."""
+    async with engine.begin() as conn:
+        result = await conn.execute(text(
+            "SELECT id FROM showing_reminder_settings LIMIT 1"
+        ))
+        if not result.fetchone():
+            await conn.execute(text(
+                "INSERT INTO showing_reminder_settings (remind_tenant, remind_vendor, lead_time_minutes) "
+                "VALUES (true, false, 120)"
+            ))
+            print("[DB] Seeded default showing reminder settings")
+
+
 # Global variables
 engine = None
 AsyncSessionLocal = None
@@ -265,6 +279,9 @@ async def init_db():
 
         # Seed default lease addendum terms
         await _seed_lease_default_terms(engine)
+
+        # Seed default showing reminder settings
+        await _seed_showing_reminder_settings(engine)
 
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")
