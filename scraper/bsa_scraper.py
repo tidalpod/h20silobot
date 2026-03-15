@@ -127,7 +127,13 @@ class BSAScraper:
         url = self._build_url(self.UTILITY_SEARCH_URL)
         await self.page.goto(url, wait_until="networkidle")
         await asyncio.sleep(1)
-        logger.info(f"Navigated to utility billing search")
+
+        # Debug: log page title and check for forms
+        title = await self.page.title()
+        logger.info(f"Navigated to utility billing search (title: {title}, url: {self.page.url})")
+
+        # Check for security verification / CAPTCHA
+        await self._handle_security_verification()
 
     async def search_by_account(self, account_number: str) -> Optional[BillData]:
         """
@@ -139,16 +145,35 @@ class BSAScraper:
 
             # Find the Account Number form
             # Form action: /OnlinePayment/OnlinePaymentSearch?PaymentSearchCategory=Account%20Number&PaymentApplicationType=UtilityBilling
+            # Debug: list all forms on page
+            all_forms = await self.page.query_selector_all('form')
+            form_actions = []
+            for f in all_forms:
+                action = await f.get_attribute('action') or 'no-action'
+                form_actions.append(action)
+            logger.info(f"Forms on page: {form_actions}")
+
             account_form = await self.page.query_selector('form[action*="Account"]')
 
             if not account_form:
-                logger.error("Account Number form not found")
+                # Try alternate selectors
+                account_form = await self.page.query_selector('form[action*="account"]')
+            if not account_form:
+                logger.error(f"Account Number form not found. Page URL: {self.page.url}")
+                # Log first 500 chars of page text for debugging
+                body = await self.page.query_selector('body')
+                if body:
+                    text = await body.inner_text()
+                    logger.error(f"Page text preview: {text[:500]}")
                 return None
 
             # Fill account number
             account_input = await account_form.query_selector('input[name="AccountNumber"]')
             if not account_input:
-                logger.error("AccountNumber input not found")
+                # Try alternate input names
+                account_input = await account_form.query_selector('input[type="text"]')
+            if not account_input:
+                logger.error("AccountNumber input not found in form")
                 return None
 
             await account_input.fill(account_number)
@@ -183,13 +208,21 @@ class BSAScraper:
             address_form = await self.page.query_selector('form[action*="Address"]')
 
             if not address_form:
-                logger.error("Address form not found")
+                address_form = await self.page.query_selector('form[action*="address"]')
+            if not address_form:
+                logger.error(f"Address form not found. Page URL: {self.page.url}")
+                body = await self.page.query_selector('body')
+                if body:
+                    text = await body.inner_text()
+                    logger.error(f"Page text preview: {text[:500]}")
                 return None
 
             # Fill address
             address_input = await address_form.query_selector('input[name="Address"]')
             if not address_input:
-                logger.error("Address input not found")
+                address_input = await address_form.query_selector('input[type="text"]')
+            if not address_input:
+                logger.error("Address input not found in form")
                 return None
 
             await address_input.fill(address)
@@ -219,20 +252,34 @@ class BSAScraper:
         try:
             content = await self.page.content()
             current_url = self.page.url
+            logger.info(f"Search results URL: {current_url}")
+
+            # Get page text for debugging
+            body = await self.page.query_selector('body')
+            page_text = await body.inner_text() if body else ""
 
             # Check for "No records to display"
-            if "No records to display" in content:
+            if "No records to display" in content or "No records to display" in page_text:
                 logger.info(f"No records found for: {search_term}")
                 return None
 
             # Check if we're already on a detail/payment page (Step 3: Make Payment)
-            if "Step 3: Make Payment" in content or "Account:" in content:
-                logger.info("Already on detail page, parsing directly")
+            if "Step 3: Make Payment" in content or "Step 3: Make Payment" in page_text:
+                logger.info("On detail page (Step 3), parsing directly")
+                return await self._parse_detail_page_direct()
+
+            if "Account:" in page_text and "Amount to Pay" in page_text:
+                logger.info("On detail page (Account + Amount to Pay), parsing directly")
                 return await self._parse_detail_page_direct()
 
             # Otherwise, look for results table and click first result
-            # Table structure: Address | Reference # | Name | (action)
             rows = await self.page.query_selector_all("table tbody tr")
+            logger.info(f"Found {len(rows)} table rows on results page")
+
+            if len(rows) == 0:
+                # Try alternate table selectors
+                rows = await self.page.query_selector_all("table tr")
+                logger.info(f"Alternate selector found {len(rows)} rows")
 
             for row in rows:
                 cells = await row.query_selector_all("td")
@@ -246,6 +293,8 @@ class BSAScraper:
                     if "Search:" in address or "By:" in reference_num:
                         continue
 
+                    logger.info(f"Result row: {address.strip()} | {reference_num.strip()}")
+
                     # Check for detail link
                     detail_link = await row.query_selector('a[href*="Detail"], a[href*="Payment"]')
                     if detail_link:
@@ -254,6 +303,9 @@ class BSAScraper:
                         await asyncio.sleep(1)
                         return await self._parse_detail_page_direct()
 
+            # Nothing matched — log page content for debugging
+            logger.warning(f"Could not parse results for: {search_term}")
+            logger.warning(f"Page text (first 800 chars): {page_text[:800]}")
             return None
 
         except Exception as e:
