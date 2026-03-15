@@ -14,6 +14,7 @@ from typing import Optional, List
 from dataclasses import dataclass
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
+from playwright_stealth import stealth_async
 
 from config import config
 
@@ -97,17 +98,20 @@ class BSAScraper:
         await self.close()
 
     async def start(self):
-        """Start browser instance"""
+        """Start browser instance with stealth to bypass bot detection"""
         self._playwright = await async_playwright().start()
         self.browser = await self._playwright.chromium.launch(
-            headless=config.headless_browser
+            headless=config.headless_browser,
+            args=["--disable-blink-features=AutomationControlled"],
         )
         self.context = await self.browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720},
+            locale="en-US",
         )
         self.page = await self.context.new_page()
-        logger.info("Browser started")
+        await stealth_async(self.page)
+        logger.info("Browser started (stealth mode)")
 
     async def close(self):
         """Close browser instance"""
@@ -123,17 +127,25 @@ class BSAScraper:
         return f"{self.BASE_URL}{path}{separator}uid={self.municipality_uid}"
 
     async def navigate_to_utility_search(self):
-        """Navigate to the utility billing search page"""
+        """Navigate to the utility billing search page, handling security verification"""
         url = self._build_url(self.UTILITY_SEARCH_URL)
         await self.page.goto(url, wait_until="networkidle")
         await asyncio.sleep(1)
 
-        # Debug: log page title and check for forms
         title = await self.page.title()
         logger.info(f"Navigated to utility billing search (title: {title}, url: {self.page.url})")
 
-        # Check for security verification / CAPTCHA
+        # Handle security verification if present (reCAPTCHA v3)
         await self._handle_security_verification()
+
+        # After verification, check if we got redirected away from search page
+        # If so, navigate back to the search page
+        if "PaymentApplicationType" not in self.page.url:
+            logger.info("Redirected after verification, navigating back to search page")
+            await self.page.goto(url, wait_until="networkidle")
+            await asyncio.sleep(1)
+            title = await self.page.title()
+            logger.info(f"Re-navigated to search (title: {title}, url: {self.page.url})")
 
     async def search_by_account(self, account_number: str) -> Optional[BillData]:
         """
@@ -606,9 +618,18 @@ class BSAScraper:
         logger.info(f"Navigated to property tax search")
 
     async def _handle_security_verification(self):
-        """Click the security verification checkbox if present"""
+        """Handle BSA Online's reCAPTCHA v3 security verification"""
         try:
-            # Look for various checkbox selectors that might be the verification
+            # Check if page has security verification content
+            body = await self.page.query_selector('body')
+            page_text = await body.inner_text() if body else ""
+
+            if "verify you are a human" not in page_text.lower() and "security" not in page_text.lower():
+                return  # No verification needed
+
+            logger.info("Security verification page detected")
+
+            # Look for the verification checkbox
             selectors = [
                 'input[type="checkbox"]',
                 '.verification-checkbox',
@@ -622,18 +643,19 @@ class BSAScraper:
             for selector in selectors:
                 checkbox = await self.page.query_selector(selector)
                 if checkbox:
-                    # Check if it's visible and not already checked
                     is_visible = await checkbox.is_visible()
                     is_checked = await checkbox.is_checked()
 
                     if is_visible and not is_checked:
-                        logger.info(f"Found security checkbox, clicking it...")
+                        logger.info("Clicking security checkbox...")
                         await checkbox.click()
-                        await asyncio.sleep(1)
+                        # Wait for reCAPTCHA v3 to process (needs more time)
+                        await asyncio.sleep(3)
 
-                        # Look for a submit/verify button after checking the box
+                        # Look for verify/submit button
                         verify_btns = [
                             'button:has-text("Verify")',
+                            'a:has-text("Verify")',
                             'input[type="submit"][value*="Verify"]',
                             'button:has-text("Continue")',
                             'input[type="submit"]',
@@ -641,23 +663,29 @@ class BSAScraper:
                         for btn_selector in verify_btns:
                             btn = await self.page.query_selector(btn_selector)
                             if btn and await btn.is_visible():
+                                logger.info(f"Clicking verify button: {btn_selector}")
                                 await btn.click()
                                 await self.page.wait_for_load_state("networkidle")
-                                await asyncio.sleep(1)
+                                await asyncio.sleep(2)
                                 break
 
-                        logger.info("Security verification completed")
+                        # Check if verification succeeded
+                        new_url = self.page.url
+                        if "pendingCaptcha" in new_url or "ValidateUser" in new_url:
+                            logger.warning(f"Verification may have failed (URL: {new_url})")
+                        else:
+                            logger.info("Security verification completed successfully")
                         return
 
-            # Also try clicking on any iframe that might contain reCAPTCHA
+            # Try reCAPTCHA iframe
             frames = self.page.frames
             for frame in frames:
                 if 'recaptcha' in frame.url.lower():
                     checkbox = await frame.query_selector('.recaptcha-checkbox')
                     if checkbox:
                         await checkbox.click()
-                        await asyncio.sleep(2)
-                        logger.info("Clicked reCAPTCHA checkbox")
+                        await asyncio.sleep(3)
+                        logger.info("Clicked reCAPTCHA checkbox in iframe")
                         return
 
         except Exception as e:
