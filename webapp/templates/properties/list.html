@@ -128,10 +128,20 @@ function toggleEntity(entity) {
 
 <!-- Filters - Clean and minimal -->
 <div class="bg-white shadow rounded-lg mb-6 px-4 py-3">
-    <form method="GET" class="flex flex-wrap gap-3 items-center">
-        <div class="flex-1 min-w-[200px] max-w-md">
+    <form method="GET" id="property-filter-form" class="flex flex-wrap gap-3 items-center">
+        <!-- Preserve entity params in the form -->
+        {% for ent in selected_entities %}
+        <input type="hidden" name="entity" value="{{ ent }}">
+        {% endfor %}
+        <div class="flex-1 min-w-[200px] max-w-md relative">
             <input type="text" name="search" id="search" value="{{ search }}" placeholder="Search properties..."
-                   class="block w-full rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm px-3">
+                   class="block w-full rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm px-3 pr-8">
+            {% if search %}
+            <button type="button" onclick="document.getElementById('search').value='';document.getElementById('property-filter-form').submit();"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            {% endif %}
         </div>
 
         <!-- Quick Filter: Needs Attention -->
@@ -150,7 +160,7 @@ function toggleEntity(entity) {
         </select>
 
         {% if search or status_filter %}
-        <a href="/properties" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+        <a href="/properties{% for ent in selected_entities %}{% if loop.first %}?{% else %}&{% endif %}entity={{ ent | urlencode }}{% endfor %}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
         {% endif %}
     </form>
 </div>
