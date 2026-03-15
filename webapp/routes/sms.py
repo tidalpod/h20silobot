@@ -436,23 +436,24 @@ async def get_recent_conversations(request: Request):
 
 @router.get("/unmatched")
 async def get_unmatched_messages(request: Request):
-    """Get SMS messages from numbers not matched to a tenant, vendor, or showing"""
+    """Get unmatched SMS conversations grouped by phone, enriched with showing names"""
     user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     async with get_session() as session:
-        # Collect phone numbers that belong to showings so we can exclude them
+        # Build phone→name lookup from showings
         showings_result = await session.execute(
-            select(Showing.contact_phone)
+            select(Showing.contact_phone, Showing.contact_name)
             .where(Showing.contact_phone != None)
             .where(Showing.contact_phone != "")
+            .order_by(Showing.scheduled_date.desc())
         )
-        showing_phones = set()
-        for (phone,) in showings_result.all():
+        phone_to_name = {}
+        for phone, name in showings_result.all():
             normalized = normalize_phone(phone)
-            if normalized:
-                showing_phones.add(normalized)
+            if normalized and normalized not in phone_to_name and name:
+                phone_to_name[normalized] = name
 
         result = await session.execute(
             select(SMSMessage)
@@ -460,19 +461,13 @@ async def get_unmatched_messages(request: Request):
             .where(SMSMessage.vendor_id == None)
             .where(SMSMessage.direction == MessageDirection.INBOUND)
             .order_by(SMSMessage.created_at.desc())
-            .limit(100)
+            .limit(200)
         )
         messages = result.scalars().all()
 
-        # Filter out messages from showing contact phones
-        filtered = [
-            msg for msg in messages
-            if msg.from_number not in showing_phones
-        ]
-
         # Group by phone number — keep only latest message per number
         by_phone = {}
-        for msg in filtered:
+        for msg in messages:
             if msg.from_number not in by_phone:
                 by_phone[msg.from_number] = {"msg": msg, "count": 1}
             else:
@@ -489,6 +484,7 @@ async def get_unmatched_messages(request: Request):
                 {
                     "id": entry["msg"].id,
                     "from_number": entry["msg"].from_number,
+                    "contact_name": phone_to_name.get(entry["msg"].from_number),
                     "body": entry["msg"].body,
                     "created_at": (entry["msg"].created_at.isoformat() + "Z") if entry["msg"].created_at else None,
                     "message_count": entry["count"],

@@ -956,14 +956,19 @@ function renderUnmatchedList() {
         const countBadge = msg.message_count > 1
             ? `<span class="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-gray-400 rounded-full min-w-[18px]">${msg.message_count}</span>`
             : '';
+        const displayName = msg.contact_name ? escapeHtml(msg.contact_name) : msg.from_number;
+        const subtitle = msg.contact_name ? `<span class="text-[10px] text-gray-400">${msg.from_number}</span>` : '';
 
         html += `
             <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors group"
                  onclick="selectUnmatchedConversation('${msg.from_number}')">
                 <div class="flex justify-between items-center mb-0.5">
-                    <span class="text-xs font-semibold text-gray-700 group-hover:text-blue-700">${msg.from_number}${countBadge}</span>
-                    <span class="text-[10px] text-gray-400">${time}</span>
+                    <div class="flex items-center min-w-0">
+                        <span class="text-xs font-semibold text-gray-700 group-hover:text-blue-700 truncate">${displayName}</span>${countBadge}
+                    </div>
+                    <span class="text-[10px] text-gray-400 flex-shrink-0 ml-2">${time}</span>
                 </div>
+                ${subtitle}
                 <p class="text-xs text-gray-500 line-clamp-1">${escapeHtml(msg.body)}</p>
             </div>
         `;
