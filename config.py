@@ -26,6 +26,7 @@ class Config:
     # Scraping
     scrape_interval_hours: int = int(os.getenv("SCRAPE_INTERVAL_HOURS", "24"))
     headless_browser: bool = os.getenv("HEADLESS_BROWSER", "true").lower() == "true"
+    captcha_api_key: str = os.getenv("CAPTCHA_API_KEY", "")
 
     # DocuSign E-Sign
     docusign_integration_key: str = os.getenv("DOCUSIGN_INTEGRATION_KEY", "")

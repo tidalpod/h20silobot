@@ -91,18 +91,158 @@ class BSAScraper:
         city_lower = city.lower().strip()
         return cls.MUNICIPALITY_UIDS.get(city_lower, cls.MUNICIPALITY_UIDS["warren"])
 
+    # reCAPTCHA v2 site key for BSA Online's ValidateUser page
+    CAPTCHA_SITE_KEY = "6LdXuCgkAAAAAImtzf0D3xgYRkT6x0chThnqquIy"
+
+    # Shared validated session (reused across requests after CAPTCHA solve)
+    _validated_session: Optional[aiohttp.ClientSession] = None
+    _session_uid: Optional[str] = None
+
     @classmethod
-    async def http_fetch_by_record_key(cls, record_key: str, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
+    async def _get_validated_session(cls, municipality_uid: str) -> Optional[aiohttp.ClientSession]:
         """
-        Fetch bill data directly via BSA RecordKey — bypasses search AND CAPTCHA.
-        This is the preferred method when we have the RecordKey cached.
+        Get an HTTP session that has passed BSA's CAPTCHA validation.
+        Solves reCAPTCHA v2 via 2captcha if CAPTCHA_API_KEY is configured.
+        Reuses the session for all subsequent requests.
         """
+        # Reuse existing validated session if same municipality
+        if cls._validated_session and not cls._validated_session.closed and cls._session_uid == municipality_uid:
+            return cls._validated_session
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
         }
+        timeout = aiohttp.ClientTimeout(total=30)
+        session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
 
+        try:
+            # Step 1: Visit search page to init session cookies
+            search_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}"
+            async with session.get(search_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
+                logger.info(f"Session init: status={resp.status}")
+
+            # Step 2: Try a test request to see if CAPTCHA is required
+            test_url = f"{cls.BASE_URL}/Ub_OnlinePayment/OnlinePaymentDetails?PaymentApplicationType=UtilityBilling&uid={municipality_uid}&RecordKey=1&RecordKeyType=8"
+            async with session.get(test_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
+                final_url = str(resp.url)
+                if "ValidateUser" not in final_url:
+                    # No CAPTCHA needed — session is already valid
+                    logger.info("Session valid — no CAPTCHA required")
+                    cls._validated_session = session
+                    cls._session_uid = municipality_uid
+                    return session
+
+                logger.info("CAPTCHA required — attempting to solve via 2captcha")
+
+            # Step 3: Solve CAPTCHA using 2captcha API
+            captcha_api_key = config.captcha_api_key if hasattr(config, 'captcha_api_key') else None
+            if not captcha_api_key:
+                import os
+                captcha_api_key = os.environ.get("CAPTCHA_API_KEY", "")
+
+            if not captcha_api_key:
+                logger.warning("CAPTCHA required but CAPTCHA_API_KEY not configured — cannot proceed")
+                await session.close()
+                return None
+
+            # Submit CAPTCHA to 2captcha
+            captcha_token = await cls._solve_recaptcha_v2(captcha_api_key, municipality_uid)
+            if not captcha_token:
+                logger.error("Failed to solve CAPTCHA")
+                await session.close()
+                return None
+
+            # Step 4: Submit the validation form with solved CAPTCHA
+            validate_url = f"{cls.BASE_URL}/Account/ValidateUser"
+            form_data = {
+                "ReturnUrl": f"/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}",
+                "g-recaptcha-response": captcha_token,
+                "submit": "Submit",
+            }
+            headers["Referer"] = f"{cls.BASE_URL}/Account/ValidateUser"
+            headers["Origin"] = cls.BASE_URL
+
+            async with session.post(validate_url, data=form_data, headers=headers, timeout=timeout, allow_redirects=True) as resp:
+                final_url = str(resp.url)
+                logger.info(f"CAPTCHA validation result: status={resp.status}, url={final_url}")
+
+                if "ValidateUser" in final_url:
+                    logger.error("CAPTCHA validation failed — still on validation page")
+                    await session.close()
+                    return None
+
+            logger.info("CAPTCHA solved and session validated successfully")
+            cls._validated_session = session
+            cls._session_uid = municipality_uid
+            return session
+
+        except Exception as e:
+            logger.error(f"Session validation failed: {e}")
+            await session.close()
+            return None
+
+    @classmethod
+    async def _solve_recaptcha_v2(cls, api_key: str, municipality_uid: str) -> Optional[str]:
+        """Solve reCAPTCHA v2 using 2captcha API."""
+        page_url = f"{cls.BASE_URL}/Account/ValidateUser?uid={municipality_uid}"
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=120)
+            async with aiohttp.ClientSession() as solver_session:
+                # Submit captcha task
+                submit_url = "http://2captcha.com/in.php"
+                params = {
+                    "key": api_key,
+                    "method": "userrecaptcha",
+                    "googlekey": cls.CAPTCHA_SITE_KEY,
+                    "pageurl": page_url,
+                    "json": "1",
+                }
+                async with solver_session.get(submit_url, params=params, timeout=timeout) as resp:
+                    result = await resp.json()
+                    if result.get("status") != 1:
+                        logger.error(f"2captcha submit failed: {result}")
+                        return None
+                    task_id = result["request"]
+                    logger.info(f"2captcha task submitted: {task_id}")
+
+                # Poll for result (typically 15-30 seconds)
+                result_url = "http://2captcha.com/res.php"
+                params = {"key": api_key, "action": "get", "id": task_id, "json": "1"}
+
+                for attempt in range(24):  # Max ~2 minutes
+                    await asyncio.sleep(5)
+                    async with solver_session.get(result_url, params=params, timeout=timeout) as resp:
+                        result = await resp.json()
+                        if result.get("status") == 1:
+                            logger.info(f"2captcha solved in {(attempt+1)*5}s")
+                            return result["request"]
+                        if result.get("request") != "CAPCHA_NOT_READY":
+                            logger.error(f"2captcha error: {result}")
+                            return None
+
+                logger.error("2captcha timeout — no solution after 2 minutes")
+                return None
+
+        except Exception as e:
+            logger.error(f"2captcha error: {e}")
+            return None
+
+    @classmethod
+    async def http_fetch_by_record_key(cls, record_key: str, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
+        """
+        Fetch bill data directly via BSA RecordKey using validated session.
+        """
+        session = await cls._get_validated_session(municipality_uid)
+        if not session:
+            return None
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
         detail_url = (
             f"{cls.BASE_URL}/Ub_OnlinePayment/OnlinePaymentDetails"
             f"?PaymentApplicationType=UtilityBilling"
@@ -114,33 +254,25 @@ class BSAScraper:
 
         try:
             timeout = aiohttp.ClientTimeout(total=20)
-            async with aiohttp.ClientSession() as session:
-                # Hit search page first for session cookie
-                search_page_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}"
-                async with session.get(search_page_url, headers=headers, timeout=timeout) as resp:
-                    pass
-
-                # Direct detail page access (no search, no CAPTCHA)
-                async with session.get(detail_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
-                    final_url = str(resp.url)
-                    if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
-                        logger.warning(f"Direct detail URL also requires CAPTCHA: {final_url}")
-                        return None
-                    html = await resp.text()
-                    if "Amount to Pay" in html or "Step 3: Make Payment" in html:
-                        logger.info(f"Direct detail fetch OK for RecordKey={record_key}")
-                        return cls._parse_detail_html(html, account_number)
-                    logger.warning(f"Direct detail page missing expected content")
+            async with session.get(detail_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
+                final_url = str(resp.url)
+                if "ValidateUser" in final_url:
+                    logger.warning(f"Session expired — CAPTCHA required again")
+                    cls._validated_session = None  # Force re-validation next time
                     return None
+                html = await resp.text()
+                if "Amount to Pay" in html or "Step 3: Make Payment" in html:
+                    logger.info(f"Direct detail fetch OK for RecordKey={record_key}")
+                    return cls._parse_detail_html(html, account_number)
+                logger.warning(f"Direct detail page missing expected content")
+                return None
         except Exception as e:
             logger.error(f"Direct detail fetch failed for RecordKey={record_key}: {e}")
             return None
 
     @classmethod
     async def http_search_by_account(cls, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
-        """
-        Search by account number using direct HTTP requests (no browser needed).
-        """
+        """Search by account number using validated HTTP session."""
         return await cls._http_search(
             search_category="Account Number",
             search_text=account_number,
@@ -149,9 +281,7 @@ class BSAScraper:
 
     @classmethod
     async def http_search_by_address(cls, address: str, municipality_uid: str = "305") -> Optional['BillData']:
-        """
-        Search by address using direct HTTP requests (no browser needed).
-        """
+        """Search by address using validated HTTP session."""
         return await cls._http_search(
             search_category="Address",
             search_text=address,
@@ -161,10 +291,12 @@ class BSAScraper:
     @classmethod
     async def _http_search(cls, search_category: str, search_text: str, municipality_uid: str) -> Optional['BillData']:
         """
-        Perform a search via HTTP POST mimicking the actual BSA form submission.
-        BSA Online uses simple POST forms for utility billing search — the reCAPTCHA
-        only applies to the site-wide search bar, not the payment search forms.
+        Perform a search via HTTP POST using a CAPTCHA-validated session.
         """
+        session = await cls._get_validated_session(municipality_uid)
+        if not session:
+            return None
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -182,69 +314,63 @@ class BSAScraper:
 
         try:
             timeout = aiohttp.ClientTimeout(total=20)
-            async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar()) as session:
-                # Step 1: Visit search page to establish session cookies
-                search_page_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}"
-                headers["Referer"] = search_page_url
-                async with session.get(search_page_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
-                    logger.info(f"HTTP session init: status={resp.status}, url={resp.url}")
 
-                # Step 2: Submit the search form (same as browser form POST)
-                async with session.post(
-                    form_action,
-                    data=form_data,
-                    headers=headers,
-                    timeout=timeout,
-                    allow_redirects=True,
-                ) as resp:
-                    final_url = str(resp.url)
-                    html = await resp.text()
-                    logger.info(f"HTTP form POST: status={resp.status}, url={final_url}")
+            # Submit the search form using the validated session
+            async with session.post(
+                form_action,
+                data=form_data,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+            ) as resp:
+                final_url = str(resp.url)
+                html = await resp.text()
+                logger.info(f"HTTP form POST: status={resp.status}, url={final_url}")
 
-                    # Check if redirected to CAPTCHA validation
-                    if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
-                        logger.warning(f"HTTP search redirected to validation: {final_url}")
-                        return None
+                # Check if redirected to CAPTCHA validation
+                if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
+                    logger.warning(f"HTTP search redirected to validation: {final_url}")
+                    cls._validated_session = None  # Invalidate session
+                    return None
 
-                    # Check for no records
-                    if "No records to display" in html or "no records" in html.lower():
-                        logger.info(f"No records found for: {search_text}")
-                        return None
+                # Check for no records
+                if "No records to display" in html or "no records" in html.lower():
+                    logger.info(f"No records found for: {search_text}")
+                    return None
 
-                    # Check if we landed on a detail page (single result auto-redirect)
-                    if "Amount to Pay" in html or "Step 3: Make Payment" in html:
-                        logger.info(f"Single result — landed on detail page")
-                        result = cls._parse_detail_html(html, search_text)
+                # Check if we landed on a detail page (single result auto-redirect)
+                if "Amount to Pay" in html or "Step 3: Make Payment" in html:
+                    logger.info(f"Single result — landed on detail page")
+                    result = cls._parse_detail_html(html, search_text)
+                    if result:
+                        rk_match = re.search(r'RecordKey=(\d+)', final_url)
+                        if rk_match and not result.record_key:
+                            result.record_key = rk_match.group(1)
+                    return result
+
+                # Multiple results — find the best matching detail link and follow it
+                detail_url = cls._find_best_detail_link(html, search_text)
+                if not detail_url:
+                    logger.warning(f"No detail links found in results for: {search_text}")
+                    return None
+
+                # Follow the detail link
+                full_detail_url = f"{cls.BASE_URL}{detail_url}"
+                logger.info(f"Following detail link: {detail_url}")
+                async with session.get(full_detail_url, headers=headers, timeout=timeout, allow_redirects=True) as detail_resp:
+                    detail_html = await detail_resp.text()
+                    detail_final_url = str(detail_resp.url)
+                    if "Amount to Pay" in detail_html or "Step 3: Make Payment" in detail_html:
+                        result = cls._parse_detail_html(detail_html, search_text)
                         if result:
-                            # Extract RecordKey from URL for future direct access
-                            rk_match = re.search(r'RecordKey=(\d+)', final_url)
+                            rk_match = re.search(r'RecordKey=(\d+)', detail_final_url)
+                            if not rk_match:
+                                rk_match = re.search(r'RecordKey=(\d+)', detail_url)
                             if rk_match and not result.record_key:
                                 result.record_key = rk_match.group(1)
                         return result
-
-                    # Multiple results — find the best matching detail link and follow it
-                    detail_url = cls._find_best_detail_link(html, search_text)
-                    if not detail_url:
-                        logger.warning(f"No detail links found in results for: {search_text}")
-                        return None
-
-                    # Step 3: Follow the detail link
-                    full_detail_url = f"{cls.BASE_URL}{detail_url}"
-                    logger.info(f"Following detail link: {detail_url}")
-                    async with session.get(full_detail_url, headers=headers, timeout=timeout, allow_redirects=True) as detail_resp:
-                        detail_html = await detail_resp.text()
-                        detail_final_url = str(detail_resp.url)
-                        if "Amount to Pay" in detail_html or "Step 3: Make Payment" in detail_html:
-                            result = cls._parse_detail_html(detail_html, search_text)
-                            if result:
-                                rk_match = re.search(r'RecordKey=(\d+)', detail_final_url)
-                                if not rk_match:
-                                    rk_match = re.search(r'RecordKey=(\d+)', detail_url)
-                                if rk_match and not result.record_key:
-                                    result.record_key = rk_match.group(1)
-                            return result
-                        logger.warning(f"Detail page missing expected content for: {search_text}")
-                        return None
+                    logger.warning(f"Detail page missing expected content for: {search_text}")
+                    return None
 
         except Exception as e:
             logger.error(f"HTTP search failed for {search_text}: {e}")
