@@ -43,6 +43,7 @@ class BillData:
     water_usage: Optional[int] = None
     owner_name: Optional[str] = None
     parcel_number: Optional[str] = None
+    record_key: Optional[str] = None  # BSA internal ID for direct URL access
     raw_data: Optional[str] = None
 
 
@@ -91,10 +92,54 @@ class BSAScraper:
         return cls.MUNICIPALITY_UIDS.get(city_lower, cls.MUNICIPALITY_UIDS["warren"])
 
     @classmethod
+    async def http_fetch_by_record_key(cls, record_key: str, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
+        """
+        Fetch bill data directly via BSA RecordKey — bypasses search AND CAPTCHA.
+        This is the preferred method when we have the RecordKey cached.
+        """
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+        detail_url = (
+            f"{cls.BASE_URL}/Ub_OnlinePayment/OnlinePaymentDetails"
+            f"?PaymentApplicationType=UtilityBilling"
+            f"&uid={municipality_uid}"
+            f"&RecordKeyDisplayString={account_number}"
+            f"&RecordKey={record_key}"
+            f"&RecordKeyType=8"
+        )
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=20)
+            async with aiohttp.ClientSession() as session:
+                # Hit search page first for session cookie
+                search_page_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}"
+                async with session.get(search_page_url, headers=headers, timeout=timeout) as resp:
+                    pass
+
+                # Direct detail page access (no search, no CAPTCHA)
+                async with session.get(detail_url, headers=headers, timeout=timeout, allow_redirects=True) as resp:
+                    final_url = str(resp.url)
+                    if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
+                        logger.warning(f"Direct detail URL also requires CAPTCHA: {final_url}")
+                        return None
+                    html = await resp.text()
+                    if "Amount to Pay" in html or "Step 3: Make Payment" in html:
+                        logger.info(f"Direct detail fetch OK for RecordKey={record_key}")
+                        return cls._parse_detail_html(html, account_number)
+                    logger.warning(f"Direct detail page missing expected content")
+                    return None
+        except Exception as e:
+            logger.error(f"Direct detail fetch failed for RecordKey={record_key}: {e}")
+            return None
+
+    @classmethod
     async def http_search_by_account(cls, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
         """
         Search by account number using direct HTTP requests (no browser needed).
-        Bypasses reCAPTCHA since it's a client-side JavaScript check.
         """
         return await cls._http_search(
             search_category="Account Number",
@@ -169,7 +214,13 @@ class BSAScraper:
                     # Check if we landed on a detail page (single result auto-redirect)
                     if "Amount to Pay" in html or "Step 3: Make Payment" in html:
                         logger.info(f"Single result — landed on detail page")
-                        return cls._parse_detail_html(html, search_text)
+                        result = cls._parse_detail_html(html, search_text)
+                        if result:
+                            # Extract RecordKey from URL for future direct access
+                            rk_match = re.search(r'RecordKey=(\d+)', final_url)
+                            if rk_match and not result.record_key:
+                                result.record_key = rk_match.group(1)
+                        return result
 
                     # Multiple results — find the best matching detail link and follow it
                     detail_url = cls._find_best_detail_link(html, search_text)
@@ -182,8 +233,16 @@ class BSAScraper:
                     logger.info(f"Following detail link: {detail_url}")
                     async with session.get(full_detail_url, headers=headers, timeout=timeout, allow_redirects=True) as detail_resp:
                         detail_html = await detail_resp.text()
+                        detail_final_url = str(detail_resp.url)
                         if "Amount to Pay" in detail_html or "Step 3: Make Payment" in detail_html:
-                            return cls._parse_detail_html(detail_html, search_text)
+                            result = cls._parse_detail_html(detail_html, search_text)
+                            if result:
+                                rk_match = re.search(r'RecordKey=(\d+)', detail_final_url)
+                                if not rk_match:
+                                    rk_match = re.search(r'RecordKey=(\d+)', detail_url)
+                                if rk_match and not result.record_key:
+                                    result.record_key = rk_match.group(1)
+                            return result
                         logger.warning(f"Detail page missing expected content for: {search_text}")
                         return None
 

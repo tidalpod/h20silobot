@@ -135,8 +135,15 @@ async def api_refresh_property(property_id: int):
 
             bill_data = None
 
-            # === Try HTTP-based search first (bypasses reCAPTCHA) ===
-            if prop.bsa_account_number:
+            # === Try direct detail URL if we have cached RecordKey (bypasses CAPTCHA) ===
+            if prop.bsa_record_key and prop.bsa_account_number:
+                logger.info(f"Direct detail fetch: RecordKey={prop.bsa_record_key}, Account={prop.bsa_account_number}")
+                bill_data = await BSAScraper.http_fetch_by_record_key(
+                    prop.bsa_record_key, prop.bsa_account_number, municipality_uid
+                )
+
+            # === Try HTTP search (works from residential IPs) ===
+            if not bill_data and prop.bsa_account_number:
                 logger.info(f"HTTP search by account: {prop.bsa_account_number}")
                 bill_data = await BSAScraper.http_search_by_account(prop.bsa_account_number, municipality_uid)
 
@@ -144,16 +151,6 @@ async def api_refresh_property(property_id: int):
                 street_address = prop.address.split(',')[0].strip()
                 logger.info(f"HTTP search by address: {street_address}")
                 bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
-
-            # === Fall back to Playwright browser if HTTP didn't work ===
-            if not bill_data:
-                logger.info("HTTP search failed, falling back to Playwright browser")
-                async with BSAScraper(municipality_uid=municipality_uid) as scraper:
-                    if prop.bsa_account_number:
-                        bill_data = await scraper.search_by_account(prop.bsa_account_number)
-                    if not bill_data:
-                        street_address = prop.address.split(',')[0].strip()
-                        bill_data = await scraper.search_by_address(street_address)
 
             if bill_data:
                 bill = WaterBill(
@@ -177,6 +174,10 @@ async def api_refresh_property(property_id: int):
                     prop.parcel_number = bill_data.parcel_number
                 if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
                     prop.bsa_account_number = bill_data.account_number
+                # Cache RecordKey for future direct detail URL access (bypasses CAPTCHA)
+                if hasattr(bill_data, 'record_key') and bill_data.record_key and not prop.bsa_record_key:
+                    logger.info(f"Caching BSA RecordKey for {prop.address}: {bill_data.record_key}")
+                    prop.bsa_record_key = bill_data.record_key
 
                 await session.commit()
                 logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
@@ -339,8 +340,14 @@ async def refresh_all_properties():
                     try:
                         bill_data = None
 
-                        # Try HTTP first (no browser, no reCAPTCHA)
-                        if prop.bsa_account_number:
+                        # Try direct detail URL first (bypasses CAPTCHA)
+                        if prop.bsa_record_key and prop.bsa_account_number:
+                            bill_data = await BSAScraper.http_fetch_by_record_key(
+                                prop.bsa_record_key, prop.bsa_account_number, municipality_uid
+                            )
+
+                        # Fall back to HTTP search
+                        if not bill_data and prop.bsa_account_number:
                             bill_data = await BSAScraper.http_search_by_account(prop.bsa_account_number, municipality_uid)
                         if not bill_data:
                             street_address = prop.address.split(',')[0].strip()
@@ -368,6 +375,8 @@ async def refresh_all_properties():
                                 prop.parcel_number = bill_data.parcel_number
                             if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
                                 prop.bsa_account_number = bill_data.account_number
+                            if hasattr(bill_data, 'record_key') and bill_data.record_key and not prop.bsa_record_key:
+                                prop.bsa_record_key = bill_data.record_key
 
                             scraped_count += 1
                             logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")

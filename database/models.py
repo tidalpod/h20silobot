@@ -157,6 +157,7 @@ class Property(Base):
     zip_code = Column(String(10), nullable=True)
     bsa_account_number = Column(String(50), unique=True, nullable=False)
     parcel_number = Column(String(50), nullable=True)
+    bsa_record_key = Column(String(20), nullable=True)  # BSA internal ID for direct detail URL access
     tenant_name = Column(String(255), nullable=True)
     owner_name = Column(String(255), nullable=True)
 
