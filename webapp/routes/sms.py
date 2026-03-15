@@ -468,17 +468,32 @@ async def get_unmatched_messages(request: Request):
         filtered = [
             msg for msg in messages
             if msg.from_number not in showing_phones
-        ][:50]
+        ]
+
+        # Group by phone number — keep only latest message per number
+        by_phone = {}
+        for msg in filtered:
+            if msg.from_number not in by_phone:
+                by_phone[msg.from_number] = {"msg": msg, "count": 1}
+            else:
+                by_phone[msg.from_number]["count"] += 1
+
+        grouped = sorted(
+            by_phone.values(),
+            key=lambda x: x["msg"].created_at or datetime.min,
+            reverse=True,
+        )[:50]
 
         return JSONResponse({
             "messages": [
                 {
-                    "id": msg.id,
-                    "from_number": msg.from_number,
-                    "body": msg.body,
-                    "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None
+                    "id": entry["msg"].id,
+                    "from_number": entry["msg"].from_number,
+                    "body": entry["msg"].body,
+                    "created_at": (entry["msg"].created_at.isoformat() + "Z") if entry["msg"].created_at else None,
+                    "message_count": entry["count"],
                 }
-                for msg in filtered
+                for entry in grouped
             ]
         })
 
