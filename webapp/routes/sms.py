@@ -436,21 +436,39 @@ async def get_recent_conversations(request: Request):
 
 @router.get("/unmatched")
 async def get_unmatched_messages(request: Request):
-    """Get SMS messages that couldn't be matched to a tenant"""
+    """Get SMS messages from numbers not matched to a tenant, vendor, or showing"""
     user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     async with get_session() as session:
+        # Collect phone numbers that belong to showings so we can exclude them
+        showings_result = await session.execute(
+            select(Showing.contact_phone)
+            .where(Showing.contact_phone != None)
+            .where(Showing.contact_phone != "")
+        )
+        showing_phones = set()
+        for (phone,) in showings_result.all():
+            normalized = normalize_phone(phone)
+            if normalized:
+                showing_phones.add(normalized)
+
         result = await session.execute(
             select(SMSMessage)
             .where(SMSMessage.tenant_id == None)
             .where(SMSMessage.vendor_id == None)
             .where(SMSMessage.direction == MessageDirection.INBOUND)
             .order_by(SMSMessage.created_at.desc())
-            .limit(50)
+            .limit(100)
         )
         messages = result.scalars().all()
+
+        # Filter out messages from showing contact phones
+        filtered = [
+            msg for msg in messages
+            if msg.from_number not in showing_phones
+        ][:50]
 
         return JSONResponse({
             "messages": [
@@ -460,7 +478,7 @@ async def get_unmatched_messages(request: Request):
                     "body": msg.body,
                     "created_at": (msg.created_at.isoformat() + "Z") if msg.created_at else None
                 }
-                for msg in messages
+                for msg in filtered
             ]
         })
 
