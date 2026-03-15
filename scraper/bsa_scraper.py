@@ -143,18 +143,6 @@ class BSAScraper:
         title = await self.page.title()
         logger.info(f"Navigated to utility billing search (title: {title}, url: {self.page.url})")
 
-        # Handle security verification if present (reCAPTCHA v3)
-        await self._handle_security_verification()
-
-        # After verification, check if we got redirected away from search page
-        # If so, navigate back to the search page
-        if "PaymentApplicationType" not in self.page.url:
-            logger.info("Redirected after verification, navigating back to search page")
-            await self.page.goto(url, wait_until="networkidle")
-            await asyncio.sleep(1)
-            title = await self.page.title()
-            logger.info(f"Re-navigated to search (title: {title}, url: {self.page.url})")
-
     async def search_by_account(self, account_number: str) -> Optional[BillData]:
         """
         Search for a property by account/reference number.
@@ -264,12 +252,60 @@ class BSAScraper:
             logger.error(f"Address search failed for {address}: {e}")
             return None
 
+    async def _handle_post_submit_verification(self) -> bool:
+        """
+        Handle security verification that appears AFTER submitting a search form.
+        BSA Online redirects to /Account/ValidateUser with a returnUrl.
+        Returns True if verification was handled and we should re-check the page.
+        """
+        current_url = self.page.url
+        if "ValidateUser" not in current_url and "pendingCaptcha" not in current_url:
+            return False
+
+        logger.info(f"Security verification after form submit (URL: {current_url})")
+
+        # Complete the verification
+        await self._handle_security_verification()
+
+        # After verification, check if we got redirected to results
+        await asyncio.sleep(2)
+        new_url = self.page.url
+
+        if "ValidateUser" in new_url or "pendingCaptcha" in new_url:
+            # Verification might not have redirected — extract returnUrl and navigate directly
+            import urllib.parse
+            parsed = urllib.parse.urlparse(current_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            return_url = params.get("returnUrl", [None])[0]
+
+            if return_url:
+                # returnUrl is URL-encoded, decode it
+                full_url = f"{self.BASE_URL}{return_url}"
+                logger.info(f"Navigating directly to return URL: {full_url}")
+                await self.page.goto(full_url, wait_until="networkidle")
+                await asyncio.sleep(1)
+
+                # Check if we hit verification AGAIN
+                if "ValidateUser" in self.page.url:
+                    logger.warning("Still on verification page after direct navigation")
+                    return False
+
+                return True
+            return False
+
+        logger.info(f"Verification redirected to: {new_url}")
+        return True
+
     async def _parse_search_results(self, search_term: str) -> Optional[BillData]:
         """
         Parse the search results page or detail page.
         The site may go directly to detail page if only one result.
         """
         try:
+            # Check if we landed on security verification page after form submit
+            if await self._handle_post_submit_verification():
+                logger.info("Verification completed, parsing results")
+
             content = await self.page.content()
             current_url = self.page.url
             logger.info(f"Search results URL: {current_url}")
@@ -277,6 +313,11 @@ class BSAScraper:
             # Get page text for debugging
             body = await self.page.query_selector('body')
             page_text = await body.inner_text() if body else ""
+
+            # If still on verification page, we can't proceed
+            if "ValidateUser" in current_url or "Security Verification" in page_text:
+                logger.warning(f"Stuck on security verification for: {search_term}")
+                return None
 
             # Check for "No records to display"
             if "No records to display" in content or "No records to display" in page_text:
@@ -297,7 +338,6 @@ class BSAScraper:
             logger.info(f"Found {len(rows)} table rows on results page")
 
             if len(rows) == 0:
-                # Try alternate table selectors
                 rows = await self.page.query_selector_all("table tr")
                 logger.info(f"Alternate selector found {len(rows)} rows")
 
@@ -307,7 +347,6 @@ class BSAScraper:
                     address = await cells[0].inner_text()
                     reference_num = await cells[1].inner_text()
 
-                    # Skip header-like rows
                     if "Address" in address and "Reference" in reference_num:
                         continue
                     if "Search:" in address or "By:" in reference_num:
@@ -315,15 +354,19 @@ class BSAScraper:
 
                     logger.info(f"Result row: {address.strip()} | {reference_num.strip()}")
 
-                    # Check for detail link
                     detail_link = await row.query_selector('a[href*="Detail"], a[href*="Payment"]')
                     if detail_link:
                         await detail_link.click()
                         await self.page.wait_for_load_state("networkidle")
                         await asyncio.sleep(1)
+
+                        # Check for verification again after clicking detail link
+                        if await self._handle_post_submit_verification():
+                            logger.info("Verification after detail click, parsing")
+
                         return await self._parse_detail_page_direct()
 
-            # Nothing matched — log page content for debugging
+            # Nothing matched
             logger.warning(f"Could not parse results for: {search_term}")
             logger.warning(f"Page text (first 800 chars): {page_text[:800]}")
             return None
