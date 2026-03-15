@@ -279,12 +279,15 @@
 
 <!-- Unmatched Messages Section -->
 <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <span>❓</span> Unregistered Senders
-        <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
-    </h3>
-    <div id="unmatched-list" class="space-y-3">
-        <p class="text-sm text-gray-500">Messages from unregistered numbers will appear here.</p>
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span>❓</span> Unregistered Senders
+            <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
+        </h3>
+        <button id="unmatched-toggle" onclick="toggleUnmatchedList()" class="hidden text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"></button>
+    </div>
+    <div id="unmatched-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <p class="text-sm text-gray-500 col-span-full">Messages from unregistered numbers will appear here.</p>
     </div>
 </div>
 
@@ -311,8 +314,13 @@
                     class="px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200">
                     Vendor
                 </button>
+                <button id="modal-tab-custom" onclick="switchModalTab('custom')"
+                    class="px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                    Custom #
+                </button>
             </div>
-            <div class="p-4 border-b border-white/5">
+            <!-- Search bar (hidden for custom tab) -->
+            <div id="modal-search-wrap" class="p-4 border-b border-white/5">
                 <input
                     type="text"
                     id="modal-search"
@@ -321,6 +329,24 @@
                     style="background: rgba(255,255,255,0.08);"
                     oninput="searchModal(this.value)"
                 >
+            </div>
+            <!-- Custom number input (hidden by default) -->
+            <div id="modal-custom-wrap" class="p-4 border-b border-white/5 hidden">
+                <p class="text-sm text-gray-400 mb-3">Enter any phone number to start a conversation</p>
+                <div class="flex gap-2">
+                    <input
+                        type="tel"
+                        id="custom-phone-input"
+                        placeholder="(313) 555-0100"
+                        class="flex-1 rounded-lg bg-white/8 border-none text-white placeholder-gray-500 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                        style="background: rgba(255,255,255,0.08);"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();startCustomConversation();}"
+                    >
+                    <button onclick="startCustomConversation()" class="px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors">
+                        Start Chat
+                    </button>
+                </div>
+                <p id="custom-phone-error" class="text-xs text-red-400 mt-2 hidden"></p>
             </div>
             <div id="modal-list" class="flex-1 overflow-y-auto p-2 min-h-[200px] max-h-[400px]">
                 <div class="text-center text-gray-500 py-8">
@@ -888,41 +914,72 @@ document.getElementById('send-message-form').addEventListener('submit', async (e
 });
 
 // Load unmatched messages
+let unmatchedExpanded = false;
+let unmatchedMessages = [];
+const UNMATCHED_COLLAPSED_COUNT = 6;
+
+function toggleUnmatchedList() {
+    unmatchedExpanded = !unmatchedExpanded;
+    renderUnmatchedList();
+}
+
+function renderUnmatchedList() {
+    const container = document.getElementById('unmatched-list');
+    const toggleBtn = document.getElementById('unmatched-toggle');
+
+    if (unmatchedMessages.length === 0) {
+        container.innerHTML = `<p class="text-sm text-gray-400 col-span-full">No messages from unregistered numbers</p>`;
+        toggleBtn.classList.add('hidden');
+        return;
+    }
+
+    const showAll = unmatchedExpanded || unmatchedMessages.length <= UNMATCHED_COLLAPSED_COUNT;
+    const visible = showAll ? unmatchedMessages : unmatchedMessages.slice(0, UNMATCHED_COLLAPSED_COUNT);
+    const hiddenCount = unmatchedMessages.length - UNMATCHED_COLLAPSED_COUNT;
+
+    if (unmatchedMessages.length > UNMATCHED_COLLAPSED_COUNT) {
+        toggleBtn.classList.remove('hidden');
+        toggleBtn.textContent = unmatchedExpanded ? 'Show less' : `Show all ${unmatchedMessages.length}`;
+    } else {
+        toggleBtn.classList.add('hidden');
+    }
+
+    let html = '';
+    for (const msg of visible) {
+        const time = msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        }) : '';
+
+        html += `
+            <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-100 transition-colors"
+                 onclick="selectUnmatchedConversation('${msg.from_number}')">
+                <div class="flex justify-between items-center mb-0.5">
+                    <span class="text-xs font-semibold text-amber-800">${msg.from_number}</span>
+                    <span class="text-[10px] text-amber-600">${time}</span>
+                </div>
+                <p class="text-xs text-amber-900 line-clamp-1">${escapeHtml(msg.body)}</p>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
 async function loadUnmatched() {
     try {
         const response = await fetch('/sms/unmatched');
         const data = await response.json();
 
-        const container = document.getElementById('unmatched-list');
         const countEl = document.getElementById('unmatched-count');
 
-        if (data.messages.length === 0) {
+        unmatchedMessages = data.messages || [];
+
+        if (unmatchedMessages.length === 0) {
             countEl.textContent = '';
-            container.innerHTML = `<p class="text-sm text-gray-400">No messages from unregistered numbers</p>`;
-            return;
+        } else {
+            countEl.textContent = `(${unmatchedMessages.length})`;
         }
 
-        countEl.textContent = `(${data.messages.length})`;
-
-        let html = '';
-        for (const msg of data.messages) {
-            const time = msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', {
-                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-            }) : '';
-
-            html += `
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer hover:bg-amber-100 transition-colors"
-                     onclick="selectUnmatchedConversation('${msg.from_number}')">
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="text-sm font-medium text-amber-800">${msg.from_number}</span>
-                        <span class="text-xs text-amber-600">${time}</span>
-                    </div>
-                    <p class="text-sm text-amber-900">${escapeHtml(msg.body)}</p>
-                    <p class="text-xs text-amber-600 mt-1">Click to reply &rarr;</p>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
+        renderUnmatchedList();
 
     } catch (error) {
         console.error('Error loading unmatched messages:', error);
@@ -959,27 +1016,48 @@ function closeNewConversationModal() {
 function switchModalTab(tab) {
     modalTab = tab;
     document.getElementById('modal-search').value = '';
+    document.getElementById('custom-phone-error').classList.add('hidden');
     updateModalTabUI();
     if (tab === 'tenant') {
         loadTenantsForModal();
-    } else {
+    } else if (tab === 'vendor') {
         loadVendorsForModal();
     }
+    // custom tab doesn't need to load anything
 }
 
 function updateModalTabUI() {
     const tenantTab = document.getElementById('modal-tab-tenant');
     const vendorTab = document.getElementById('modal-tab-vendor');
+    const customTab = document.getElementById('modal-tab-custom');
     const searchInput = document.getElementById('modal-search');
+    const searchWrap = document.getElementById('modal-search-wrap');
+    const customWrap = document.getElementById('modal-custom-wrap');
+    const modalList = document.getElementById('modal-list');
+    const inactiveClass = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200';
+
+    tenantTab.className = inactiveClass;
+    vendorTab.className = inactiveClass;
+    customTab.className = inactiveClass;
 
     if (modalTab === 'tenant') {
         tenantTab.className = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-blue-500 text-blue-400';
-        vendorTab.className = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200';
         searchInput.placeholder = 'Search tenants by name, address, or phone...';
-    } else {
+        searchWrap.classList.remove('hidden');
+        customWrap.classList.add('hidden');
+        modalList.classList.remove('hidden');
+    } else if (modalTab === 'vendor') {
         vendorTab.className = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-purple-500 text-purple-400';
-        tenantTab.className = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200';
         searchInput.placeholder = 'Search vendors by name, specialty, or phone...';
+        searchWrap.classList.remove('hidden');
+        customWrap.classList.add('hidden');
+        modalList.classList.remove('hidden');
+    } else {
+        customTab.className = 'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-amber-500 text-amber-400';
+        searchWrap.classList.add('hidden');
+        customWrap.classList.remove('hidden');
+        modalList.classList.add('hidden');
+        setTimeout(() => document.getElementById('custom-phone-input').focus(), 100);
     }
 }
 
@@ -1113,6 +1191,38 @@ function startConversationWith(type, id) {
         switchTab('tenants');
     }
     selectConversation(type, id);
+}
+
+// Start conversation with custom phone number
+function startCustomConversation() {
+    const input = document.getElementById('custom-phone-input');
+    const errorEl = document.getElementById('custom-phone-error');
+    let phone = input.value.trim();
+
+    if (!phone) {
+        errorEl.textContent = 'Please enter a phone number';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Normalize: strip non-digits, prepend +1 if needed
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) {
+        phone = '+1' + digits;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+        phone = '+' + digits;
+    } else if (phone.startsWith('+') && digits.length >= 10) {
+        phone = '+' + digits;
+    } else {
+        errorEl.textContent = 'Enter a valid 10-digit phone number';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    errorEl.classList.add('hidden');
+    input.value = '';
+    closeNewConversationModal();
+    selectUnmatchedConversation(phone);
 }
 
 // Close modal on Escape key
