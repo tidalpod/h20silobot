@@ -34,6 +34,9 @@ async def list_properties(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    # Support multi-select: ?entity=X&entity=Y
+    selected_entities = request.query_params.getlist("entity") if request.query_params.getlist("entity") else []
+
     async with get_session() as session:
         query = select(Property).options(
             selectinload(Property.bills),
@@ -47,9 +50,9 @@ async def list_properties(
                 Property.bsa_account_number.ilike(f"%{search}%")
             )
 
-        # Filter by entity if specified
-        if entity:
-            query = query.where(Property.entity == entity)
+        # Filter by entity if specified (multi-select)
+        if selected_entities:
+            query = query.where(Property.entity.in_(selected_entities))
 
         result = await session.execute(query.order_by(Property.address))
         all_properties = result.scalars().all()
@@ -101,6 +104,7 @@ async def list_properties(
             "status_filter": status,
             "search": search or "",
             "entity_filter": entity or "",
+            "selected_entities": selected_entities,
             "entities": entities,
         }
     )

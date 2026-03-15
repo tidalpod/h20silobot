@@ -9,6 +9,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
+from typing import List
+
 from database.connection import get_session
 from database.models import (
     Property, WaterBill, BillStatus, Notification, Tenant,
@@ -17,6 +19,9 @@ from database.models import (
 )
 from webapp.auth.dependencies import get_current_user
 
+# Canonical entity list
+ENTITIES = ["Silo Capital LLC", "Silo Partners LLC", "Homes for America LLC", "Casa Sicura LLC", "Chulo Apartments LLC"]
+
 router = APIRouter(tags=["dashboard"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -24,15 +29,18 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 @router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, entity: List[str] = None):
     """Main dashboard page"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    # Parse entity filters from query string (?entity=X&entity=Y)
+    selected_entities = request.query_params.getlist("entity") if request.query_params.getlist("entity") else []
+
     async with get_session() as session:
         # Get all active properties with bills and tenants
-        result = await session.execute(
+        query = (
             select(Property)
             .where(Property.is_active == True)
             .options(
@@ -41,6 +49,10 @@ async def dashboard(request: Request):
             )
             .order_by(Property.address)
         )
+        if selected_entities:
+            query = query.where(Property.entity.in_(selected_entities))
+
+        result = await session.execute(query)
         properties = result.scalars().all()
 
         # === KPI 1: PROPERTIES ===
@@ -135,9 +147,12 @@ async def dashboard(request: Request):
         needs_attention_count = len(properties_needing_attention)
 
         # === KPI 4: TENANTS ===
-        result = await session.execute(
-            select(Tenant).where(Tenant.is_active == True)
-        )
+        # When filtering by entity, scope tenants to those properties
+        property_ids = [p.id for p in properties] if selected_entities else None
+        tenant_query = select(Tenant).where(Tenant.is_active == True)
+        if property_ids is not None:
+            tenant_query = tenant_query.where(Tenant.property_id.in_(property_ids))
+        result = await session.execute(tenant_query)
         all_tenants = result.scalars().all()
         total_tenants = len(all_tenants)
         section8_tenants = sum(1 for t in all_tenants if t.is_section8)
@@ -177,13 +192,16 @@ async def dashboard(request: Request):
         recent_notifications = result.scalars().all()
 
         # === UPCOMING RECERTIFICATIONS ===
-        result = await session.execute(
+        recert_query = (
             select(Tenant)
             .where(Tenant.is_active == True)
             .where(Tenant.lease_start_date != None)
             .options(selectinload(Tenant.property_ref))
             .order_by(Tenant.lease_start_date)
         )
+        if property_ids is not None:
+            recert_query = recert_query.where(Tenant.property_id.in_(property_ids))
+        result = await session.execute(recert_query)
         tenants_with_lease = result.scalars().all()
 
         upcoming_recerts = []
@@ -264,36 +282,39 @@ async def dashboard(request: Request):
         total_outstanding = sum(b["amount"] for b in outstanding_bills)
 
         # === WORK ORDERS ===
-        wo_open_result = await session.execute(
-            select(func.count(WorkOrder.id)).where(
-                WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS])
-            )
+        wo_query = select(func.count(WorkOrder.id)).where(
+            WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS])
         )
+        if property_ids is not None:
+            wo_query = wo_query.where(WorkOrder.property_id.in_(property_ids))
+        wo_open_result = await session.execute(wo_query)
         open_work_orders = wo_open_result.scalar() or 0
 
-        wo_emergency_result = await session.execute(
-            select(func.count(WorkOrder.id)).where(
-                WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]),
-                WorkOrder.priority == WorkOrderPriority.EMERGENCY,
-            )
+        wo_em_query = select(func.count(WorkOrder.id)).where(
+            WorkOrder.status.in_([WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]),
+            WorkOrder.priority == WorkOrderPriority.EMERGENCY,
         )
+        if property_ids is not None:
+            wo_em_query = wo_em_query.where(WorkOrder.property_id.in_(property_ids))
+        wo_emergency_result = await session.execute(wo_em_query)
         emergency_work_orders = wo_emergency_result.scalar() or 0
 
         # === UPCOMING SHOWINGS ===
         showing_threshold = today + timedelta(days=7)
-        upcoming_showings_result = await session.execute(
-            select(func.count(Showing.id)).where(
-                Showing.status.in_([ShowingStatus.SCHEDULED.value, ShowingStatus.CONFIRMED.value]),
-                Showing.scheduled_date >= today,
-                Showing.scheduled_date <= showing_threshold,
-            )
+        showing_query = select(func.count(Showing.id)).where(
+            Showing.status.in_([ShowingStatus.SCHEDULED.value, ShowingStatus.CONFIRMED.value]),
+            Showing.scheduled_date >= today,
+            Showing.scheduled_date <= showing_threshold,
         )
+        if property_ids is not None:
+            showing_query = showing_query.where(Showing.property_id.in_(property_ids))
+        upcoming_showings_result = await session.execute(showing_query)
         upcoming_showings = upcoming_showings_result.scalar() or 0
 
         # === EXPIRING LEASES ===
         today = datetime.now().date()
         threshold_30 = today + timedelta(days=30)
-        lease_result = await session.execute(
+        lease_query = (
             select(LeaseDocument)
             .where(
                 LeaseDocument.status == LeaseStatus.ACTIVE,
@@ -307,6 +328,9 @@ async def dashboard(request: Request):
             )
             .order_by(LeaseDocument.lease_end)
         )
+        if property_ids is not None:
+            lease_query = lease_query.where(LeaseDocument.property_id.in_(property_ids))
+        lease_result = await session.execute(lease_query)
         expiring_leases = lease_result.scalars().all()
 
         # === DETERMINE "ALL CAUGHT UP" STATE ===
@@ -361,5 +385,8 @@ async def dashboard(request: Request):
             # Expiring Leases
             "expiring_leases": expiring_leases[:5],
             "today": datetime.now().date(),
+            # Entity filter
+            "entities": ENTITIES,
+            "selected_entities": selected_entities,
         }
     )
