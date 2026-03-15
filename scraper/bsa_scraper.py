@@ -14,7 +14,12 @@ from typing import Optional, List
 from dataclasses import dataclass
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
-from playwright_stealth import stealth_async
+
+try:
+    from playwright_stealth import stealth_async
+    HAS_STEALTH = True
+except ImportError:
+    HAS_STEALTH = False
 
 from config import config
 
@@ -110,8 +115,11 @@ class BSAScraper:
             locale="en-US",
         )
         self.page = await self.context.new_page()
-        await stealth_async(self.page)
-        logger.info("Browser started (stealth mode)")
+        if HAS_STEALTH:
+            await stealth_async(self.page)
+            logger.info("Browser started (stealth mode)")
+        else:
+            logger.warning("Browser started (playwright-stealth not installed, running without stealth)")
 
     async def close(self):
         """Close browser instance"""
