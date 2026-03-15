@@ -133,21 +133,29 @@ async def api_refresh_property(property_id: int):
             municipality_uid = BSAScraper.get_uid_for_city(prop.city)
             logger.info(f"Using BSA municipality UID: {municipality_uid}")
 
-            async with BSAScraper(municipality_uid=municipality_uid) as scraper:
-                bill_data = None
+            bill_data = None
 
-                # First try by account number
-                if prop.bsa_account_number:
-                    logger.info(f"Searching by account: {prop.bsa_account_number}")
-                    bill_data = await scraper.search_by_account(prop.bsa_account_number)
+            # === Try HTTP-based search first (bypasses reCAPTCHA) ===
+            if prop.bsa_account_number:
+                logger.info(f"HTTP search by account: {prop.bsa_account_number}")
+                bill_data = await BSAScraper.http_search_by_account(prop.bsa_account_number, municipality_uid)
 
-                # Fall back to address search
-                if not bill_data:
-                    street_address = prop.address.split(',')[0].strip()
-                    logger.info(f"Trying address search: {street_address}")
-                    bill_data = await scraper.search_by_address(street_address)
+            if not bill_data:
+                street_address = prop.address.split(',')[0].strip()
+                logger.info(f"HTTP search by address: {street_address}")
+                bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
-                if bill_data:
+            # === Fall back to Playwright browser if HTTP didn't work ===
+            if not bill_data:
+                logger.info("HTTP search failed, falling back to Playwright browser")
+                async with BSAScraper(municipality_uid=municipality_uid) as scraper:
+                    if prop.bsa_account_number:
+                        bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                    if not bill_data:
+                        street_address = prop.address.split(',')[0].strip()
+                        bill_data = await scraper.search_by_address(street_address)
+
+            if bill_data:
                     # Create new bill record
                     bill = WaterBill(
                         property_id=prop.id,
@@ -329,49 +337,48 @@ async def refresh_all_properties():
                 municipality_uid = BSAScraper.get_uid_for_city(city)
                 logger.info(f"Scraping {len(city_properties)} properties for {city} (uid={municipality_uid})")
 
-                async with BSAScraper(municipality_uid=municipality_uid) as scraper:
-                    for prop in city_properties:
-                        try:
-                            bill_data = None
+                for prop in city_properties:
+                    try:
+                        bill_data = None
 
-                            if prop.bsa_account_number:
-                                bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                        # Try HTTP first (no browser, no reCAPTCHA)
+                        if prop.bsa_account_number:
+                            bill_data = await BSAScraper.http_search_by_account(prop.bsa_account_number, municipality_uid)
+                        if not bill_data:
+                            street_address = prop.address.split(',')[0].strip()
+                            bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
-                            if not bill_data:
-                                street_address = prop.address.split(',')[0].strip()
-                                bill_data = await scraper.search_by_address(street_address)
+                        if bill_data:
+                            bill = WaterBill(
+                                property_id=prop.id,
+                                amount_due=bill_data.amount_due,
+                                previous_balance=bill_data.previous_balance,
+                                current_charges=bill_data.current_charges,
+                                late_fees=bill_data.late_fees,
+                                payments_received=bill_data.payments_received,
+                                statement_date=bill_data.statement_date,
+                                due_date=bill_data.due_date,
+                                water_usage_gallons=bill_data.water_usage,
+                                raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                            )
+                            bill.status = bill.calculate_status()
+                            session.add(bill)
 
-                            if bill_data:
-                                bill = WaterBill(
-                                    property_id=prop.id,
-                                    amount_due=bill_data.amount_due,
-                                    previous_balance=bill_data.previous_balance,
-                                    current_charges=bill_data.current_charges,
-                                    late_fees=bill_data.late_fees,
-                                    payments_received=bill_data.payments_received,
-                                    statement_date=bill_data.statement_date,
-                                    due_date=bill_data.due_date,
-                                    water_usage_gallons=bill_data.water_usage,
-                                    raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
-                                )
-                                bill.status = bill.calculate_status()
-                                session.add(bill)
+                            if bill_data.owner_name and not prop.owner_name:
+                                prop.owner_name = bill_data.owner_name
+                            if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                                prop.parcel_number = bill_data.parcel_number
+                            if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
+                                prop.bsa_account_number = bill_data.account_number
 
-                                if bill_data.owner_name and not prop.owner_name:
-                                    prop.owner_name = bill_data.owner_name
-                                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
-                                    prop.parcel_number = bill_data.parcel_number
-                                if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
-                                    prop.bsa_account_number = bill_data.account_number
+                            scraped_count += 1
+                            logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
+                        else:
+                            logger.warning(f"No bill data found for {prop.address}")
 
-                                scraped_count += 1
-                                logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
-                            else:
-                                logger.warning(f"No bill data found for {prop.address}")
-
-                        except Exception as e:
-                            logger.error(f"Error refreshing {prop.address}: {e}")
-                            continue
+                    except Exception as e:
+                        logger.error(f"Error refreshing {prop.address}: {e}")
+                        continue
 
             await session.commit()
             logger.info(f"Completed refresh: {scraped_count}/{len(properties)} properties scraped")

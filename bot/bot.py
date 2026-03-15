@@ -191,52 +191,48 @@ class WaterBillBot:
                     municipality_uid = BSAScraper.get_uid_for_city(city)
                     logger.info(f"Scraping {len(city_properties)} properties for {city} (uid={municipality_uid})")
 
-                    async with BSAScraper(municipality_uid=municipality_uid) as scraper:
-                        for prop in city_properties:
-                            try:
-                                bill_data = None
+                    for prop in city_properties:
+                        try:
+                            bill_data = None
 
-                                # First try by account number
-                                if prop.bsa_account_number:
-                                    bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                            # Try HTTP first (no browser, bypasses reCAPTCHA)
+                            if prop.bsa_account_number:
+                                bill_data = await BSAScraper.http_search_by_account(prop.bsa_account_number, municipality_uid)
+                            if not bill_data:
+                                street_address = prop.address.split(',')[0].strip()
+                                logger.info(f"HTTP search failed for {prop.address}, trying address: {street_address}")
+                                bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
-                                # Fallback to address search
-                                if not bill_data:
-                                    street_address = prop.address.split(',')[0].strip()
-                                    logger.info(f"Account search failed for {prop.address}, trying address: {street_address}")
-                                    bill_data = await scraper.search_by_address(street_address)
+                            if bill_data:
+                                if bill_data.address and prop.address.startswith("Pending"):
+                                    prop.address = bill_data.address
+                                if bill_data.owner_name:
+                                    prop.owner_name = bill_data.owner_name
 
-                                if bill_data:
-                                    if bill_data.address and prop.address.startswith("Pending"):
-                                        prop.address = bill_data.address
-                                    if bill_data.owner_name:
-                                        prop.owner_name = bill_data.owner_name
+                                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                                    prop.parcel_number = bill_data.parcel_number
+                                    logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
 
-                                    # Auto-populate parcel number if found from water bill
-                                    if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
-                                        prop.parcel_number = bill_data.parcel_number
-                                        logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
+                                new_bill = WaterBill(
+                                    property_id=prop.id,
+                                    amount_due=bill_data.amount_due,
+                                    due_date=bill_data.due_date,
+                                    statement_date=bill_data.statement_date,
+                                    previous_balance=bill_data.previous_balance,
+                                    current_charges=bill_data.current_charges,
+                                    late_fees=bill_data.late_fees,
+                                    payments_received=bill_data.payments_received,
+                                    water_usage_gallons=bill_data.water_usage,
+                                    raw_data=bill_data.raw_data
+                                )
+                                new_bill.status = new_bill.calculate_status()
 
-                                    new_bill = WaterBill(
-                                        property_id=prop.id,
-                                        amount_due=bill_data.amount_due,
-                                        due_date=bill_data.due_date,
-                                        statement_date=bill_data.statement_date,
-                                        previous_balance=bill_data.previous_balance,
-                                        current_charges=bill_data.current_charges,
-                                        late_fees=bill_data.late_fees,
-                                        payments_received=bill_data.payments_received,
-                                        water_usage_gallons=bill_data.water_usage,
-                                        raw_data=bill_data.raw_data
-                                    )
-                                    new_bill.status = new_bill.calculate_status()
+                                session.add(new_bill)
+                                scraped_count += 1
+                                logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
 
-                                    session.add(new_bill)
-                                    scraped_count += 1
-                                    logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
-
-                            except Exception as e:
-                                logger.error(f"Failed to scrape {prop.bsa_account_number}: {e}")
+                        except Exception as e:
+                            logger.error(f"Failed to scrape {prop.bsa_account_number}: {e}")
 
                 await session.commit()
 

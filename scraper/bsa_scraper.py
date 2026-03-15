@@ -1,7 +1,8 @@
 """
 BSA Online Water Bill Scraper - City of Warren, MI
 
-Uses Playwright to scrape water bill information from BSA Online portal.
+Uses HTTP requests (aiohttp) to scrape water bill information from BSA Online portal.
+Falls back to Playwright browser if needed.
 Specifically configured for City of Warren Utility Billing.
 """
 
@@ -13,6 +14,7 @@ from decimal import Decimal
 from typing import Optional, List
 from dataclasses import dataclass
 
+import aiohttp
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 
 try:
@@ -87,6 +89,189 @@ class BSAScraper:
             return cls.MUNICIPALITY_UIDS["warren"]
         city_lower = city.lower().strip()
         return cls.MUNICIPALITY_UIDS.get(city_lower, cls.MUNICIPALITY_UIDS["warren"])
+
+    @classmethod
+    async def http_search_by_account(cls, account_number: str, municipality_uid: str = "305") -> Optional['BillData']:
+        """
+        Search by account number using direct HTTP requests (no browser needed).
+        Bypasses reCAPTCHA since it's a client-side JavaScript check.
+        """
+        return await cls._http_search(
+            search_category="Account Number",
+            search_text=account_number,
+            municipality_uid=municipality_uid,
+        )
+
+    @classmethod
+    async def http_search_by_address(cls, address: str, municipality_uid: str = "305") -> Optional['BillData']:
+        """
+        Search by address using direct HTTP requests (no browser needed).
+        """
+        return await cls._http_search(
+            search_category="Address",
+            search_text=address,
+            municipality_uid=municipality_uid,
+        )
+
+    @classmethod
+    async def _http_search(cls, search_category: str, search_text: str, municipality_uid: str) -> Optional['BillData']:
+        """Perform a search via HTTP POST and parse the HTML response."""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": f"https://bsaonline.com/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}",
+        }
+
+        search_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearchResults"
+        params = {
+            "PaymentSearchCategory": search_category,
+            "PaymentApplicationType": "UtilityBilling",
+            "PaymentSearchText": search_text,
+            "uid": municipality_uid,
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # First hit the search page to get cookies/session
+                search_page_url = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=10&uid={municipality_uid}"
+                async with session.get(search_page_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    logger.info(f"HTTP search page: status={resp.status}, url={resp.url}")
+
+                # Now submit the search
+                async with session.get(search_url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=15), allow_redirects=True) as resp:
+                    final_url = str(resp.url)
+                    logger.info(f"HTTP search results: status={resp.status}, url={final_url}")
+
+                    # Check if we got redirected to validation
+                    if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
+                        logger.warning("HTTP search redirected to validation page — trying POST form submission")
+                        # Try submitting via POST instead
+                        form_action = f"{cls.BASE_URL}/OnlinePayment/OnlinePaymentSearch"
+                        form_params = {
+                            "PaymentSearchCategory": search_category,
+                            "PaymentApplicationType": "UtilityBilling",
+                        }
+                        form_data = {}
+                        if search_category == "Account Number":
+                            form_data["AccountNumber"] = search_text
+                            form_params["PaymentSearchCategory"] = "Account Number"
+                        else:
+                            form_data["Address"] = search_text
+                            form_params["PaymentSearchCategory"] = "Address"
+
+                        async with session.post(
+                            form_action,
+                            params=form_params,
+                            data=form_data,
+                            headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=15),
+                            allow_redirects=True,
+                        ) as post_resp:
+                            final_url = str(post_resp.url)
+                            logger.info(f"HTTP POST result: status={post_resp.status}, url={final_url}")
+
+                            if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
+                                logger.warning("HTTP POST also redirected to validation — CAPTCHA required")
+                                return None
+
+                            html = await post_resp.text()
+                            return cls._parse_html_results(html, search_text)
+
+                    html = await resp.text()
+                    return cls._parse_html_results(html, search_text)
+
+        except Exception as e:
+            logger.error(f"HTTP search failed for {search_text}: {e}")
+            return None
+
+    @classmethod
+    def _parse_html_results(cls, html: str, search_term: str) -> Optional['BillData']:
+        """Parse bill data from HTML response (search results or detail page)."""
+        if not html:
+            return None
+
+        # Check for no records
+        if "No records to display" in html:
+            logger.info(f"No records found for: {search_term}")
+            return None
+
+        # Strip HTML tags to get text content
+        text = re.sub(r'<[^>]+>', '\n', html)
+        text = re.sub(r'\n\s*\n', '\n', text)
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+        # Check if this is a detail/payment page
+        is_detail = "Amount to Pay" in text or "Step 3: Make Payment" in text
+
+        if not is_detail:
+            # This might be a results list — try to find a detail link URL
+            detail_match = re.search(r'href="(/OnlinePayment/OnlinePaymentDetail[^"]*)"', html)
+            if not detail_match:
+                detail_match = re.search(r'href="(/OnlinePayment/[^"]*Detail[^"]*)"', html)
+            if detail_match:
+                logger.info(f"Found detail link in results: {detail_match.group(1)}")
+                # We'd need to follow this link — return None for now and let caller retry
+                # Store the detail URL for the caller
+                return None
+
+            logger.warning(f"Not a detail page and no detail links found for: {search_term}")
+            logger.warning(f"HTML preview: {text[:500]}")
+            return None
+
+        # Parse the detail page
+        account_number = ""
+        for line in lines:
+            if line.startswith("Account:"):
+                account_number = line.replace("Account:", "").strip()
+                break
+            # Also try "Account" followed by a number
+            m = re.match(r'^Account\s*#?\s*:?\s*(\d+)', line)
+            if m:
+                account_number = m.group(1)
+                break
+
+        # Extract address
+        address = ""
+        owner_name = ""
+        mi_cities = ["Warren", "Roseville", "Eastpointe"]
+        for i, line in enumerate(lines):
+            if "OCCUPANT" in line.upper():
+                owner_name = line
+            elif re.match(r'^\d+\s+[A-Z]', line.upper()) and not any(c in line for c in mi_cities):
+                street = line
+                if i + 1 < len(lines) and ("MI" in lines[i + 1] or any(c in lines[i + 1] for c in mi_cities)):
+                    address = f"{street}, {lines[i + 1]}"
+                    break
+
+        # Extract amount due
+        amount_due = Decimal("0")
+        for i, line in enumerate(lines):
+            if "Amount to Pay" in line:
+                match = re.search(r'\$([\d,]+\.?\d*)', line)
+                if match:
+                    amount_due = Decimal(match.group(1).replace(',', ''))
+                elif i + 1 < len(lines):
+                    match = re.search(r'\$([\d,]+\.?\d*)', lines[i + 1])
+                    if match:
+                        amount_due = Decimal(match.group(1).replace(',', ''))
+                break
+
+        logger.info(f"HTTP parsed: Account={account_number}, Address={address}, Amount=${amount_due}")
+
+        return BillData(
+            account_number=account_number,
+            address=address,
+            amount_due=amount_due,
+            due_date=None,
+            statement_date=None,
+            previous_balance=None,
+            current_charges=None,
+            late_fees=None,
+            water_usage=None,
+            owner_name=owner_name if owner_name else None,
+            raw_data=text[:5000],
+        )
 
     def __init__(self, municipality_uid: str = None):
         self.municipality_uid = municipality_uid or config.bsa_municipality_uid
