@@ -117,12 +117,12 @@ class WaterBillBot:
 
     def _setup_scheduled_jobs(self):
         """Configure scheduled scraping jobs"""
-        # Daily scrape at 6 AM
+        # Weekly scrape every Monday at 6 AM
         self.scheduler.add_job(
             self.scheduled_scrape,
-            CronTrigger(hour=6, minute=0),
-            id="daily_scrape",
-            name="Daily bill scrape"
+            CronTrigger(day_of_week="mon", hour=6, minute=0),
+            id="weekly_scrape",
+            name="Weekly bill scrape"
         )
 
         # Due date reminders at 9 AM
