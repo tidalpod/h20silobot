@@ -156,36 +156,34 @@ async def api_refresh_property(property_id: int):
                         bill_data = await scraper.search_by_address(street_address)
 
             if bill_data:
-                    # Create new bill record
-                    bill = WaterBill(
-                        property_id=prop.id,
-                        amount_due=bill_data.amount_due,
-                        previous_balance=bill_data.previous_balance,
-                        current_charges=bill_data.current_charges,
-                        late_fees=bill_data.late_fees,
-                        payments_received=bill_data.payments_received,
-                        statement_date=bill_data.statement_date,
-                        due_date=bill_data.due_date,
-                        water_usage_gallons=bill_data.water_usage,
-                        raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
-                    )
-                    bill.status = bill.calculate_status()
-                    session.add(bill)
+                bill = WaterBill(
+                    property_id=prop.id,
+                    amount_due=bill_data.amount_due,
+                    previous_balance=bill_data.previous_balance,
+                    current_charges=bill_data.current_charges,
+                    late_fees=bill_data.late_fees,
+                    payments_received=bill_data.payments_received,
+                    statement_date=bill_data.statement_date,
+                    due_date=bill_data.due_date,
+                    water_usage_gallons=bill_data.water_usage,
+                    raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                )
+                bill.status = bill.calculate_status()
+                session.add(bill)
 
-                    # Update property info
-                    if bill_data.owner_name and not prop.owner_name:
-                        prop.owner_name = bill_data.owner_name
-                    if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
-                        prop.parcel_number = bill_data.parcel_number
-                    if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
-                        prop.bsa_account_number = bill_data.account_number
+                if bill_data.owner_name and not prop.owner_name:
+                    prop.owner_name = bill_data.owner_name
+                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                    prop.parcel_number = bill_data.parcel_number
+                if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
+                    prop.bsa_account_number = bill_data.account_number
 
-                    await session.commit()
-                    logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
-                    return {"status": "success", "message": f"Found bill: ${bill_data.amount_due}"}
-                else:
-                    logger.warning(f"No bill data found for {prop.address}")
-                    return {"status": "not_found", "message": "No bill data found on BSA Online"}
+                await session.commit()
+                logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
+                return {"status": "success", "message": f"Found bill: ${bill_data.amount_due}"}
+            else:
+                logger.warning(f"No bill data found for {prop.address}")
+                return {"status": "not_found", "message": "No bill data found on BSA Online"}
 
         except Exception as e:
             logger.error(f"Error refreshing {prop.address}: {e}")
