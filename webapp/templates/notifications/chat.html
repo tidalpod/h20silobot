@@ -280,9 +280,12 @@
 <!-- Unmatched Messages Section -->
 <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
     <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <span>❓</span> Unregistered Senders
-            <span id="unmatched-count" class="text-sm font-normal text-gray-500"></span>
+        <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+            </svg>
+            Unregistered Senders
+            <span id="unmatched-count" class="text-sm font-normal text-gray-400"></span>
         </h3>
         <button id="unmatched-toggle" onclick="toggleUnmatchedList()" class="hidden text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"></button>
     </div>
@@ -951,13 +954,13 @@ function renderUnmatchedList() {
         }) : '';
 
         html += `
-            <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-100 transition-colors"
+            <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors group"
                  onclick="selectUnmatchedConversation('${msg.from_number}')">
                 <div class="flex justify-between items-center mb-0.5">
-                    <span class="text-xs font-semibold text-amber-800">${msg.from_number}</span>
-                    <span class="text-[10px] text-amber-600">${time}</span>
+                    <span class="text-xs font-semibold text-gray-700 group-hover:text-blue-700">${msg.from_number}</span>
+                    <span class="text-[10px] text-gray-400">${time}</span>
                 </div>
-                <p class="text-xs text-amber-900 line-clamp-1">${escapeHtml(msg.body)}</p>
+                <p class="text-xs text-gray-500 line-clamp-1">${escapeHtml(msg.body)}</p>
             </div>
         `;
     }
