@@ -25,27 +25,27 @@
 
 {% block content %}
 <!-- Entity Filter -->
-<div class="mb-4 flex flex-wrap items-center gap-2">
-    <span class="text-sm font-medium text-gray-500 mr-1">Portfolio:</span>
-    <a href="/properties{% if status_filter %}?status={{ status_filter }}{% endif %}"
-       class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-              {% if not selected_entities %}bg-gray-900 text-white{% else %}bg-white text-gray-600 border border-gray-300 hover:bg-gray-50{% endif %}">
-        All
-    </a>
-    {% for ent in entities %}
-    {% set is_selected = ent in selected_entities %}
-    <button onclick="toggleEntity('{{ ent }}')"
-       class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer
-              {% if is_selected %}bg-blue-600 text-white{% else %}bg-white text-gray-600 border border-gray-300 hover:bg-gray-50{% endif %}">
-        {{ ent.split(' ')[0] }}
-        {% if is_selected %}
-        <svg class="w-3.5 h-3.5 ml-1.5 -mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+<div class="bg-white shadow-sm rounded-xl border border-gray-200 px-4 py-3 mb-4">
+    <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Portfolio</span>
+        <a href="/properties{% if status_filter %}?status={{ status_filter }}{% endif %}"
+           class="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all
+                  {% if not selected_entities %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100{% endif %}">
+            All
+        </a>
+        <div class="w-px h-5 bg-gray-200"></div>
+        {% for ent_name, ent_label in entities %}
+        {% set is_selected = ent_name in selected_entities %}
+        <button onclick="toggleEntity('{{ ent_name }}')"
+           class="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer
+                  {% if is_selected %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100{% endif %}">
+            {{ ent_label }}
+        </button>
+        {% endfor %}
+        {% if selected_entities %}
+        <a href="/properties{% if status_filter %}?status={{ status_filter }}{% endif %}" class="text-xs text-gray-400 hover:text-gray-600 ml-auto">Reset</a>
         {% endif %}
-    </button>
-    {% endfor %}
-    {% if selected_entities %}
-    <a href="/properties{% if status_filter %}?status={{ status_filter }}{% endif %}" class="text-xs text-gray-400 hover:text-gray-600 ml-1">Clear</a>
-    {% endif %}
+    </div>
 </div>
 
 <!-- Total Rent Tracker -->
@@ -78,7 +78,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
             <p class="text-blue-100 text-sm font-medium">
-                {% if selected_entities %}{{ selected_entities | join(', ') }}{% else %}All Portfolios{% endif %} - Monthly Rent
+                {% if selected_entities %}{{ selected_entities | join(' + ') }}{% else %}All Portfolios{% endif %} - Monthly Rent
             </p>
             <p class="text-white text-3xl font-bold">${{ "{:,.0f}".format(total_rent.amount) }}<span class="text-lg font-normal text-blue-200">/mo</span></p>
         </div>

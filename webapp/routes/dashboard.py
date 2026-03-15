@@ -19,8 +19,14 @@ from database.models import (
 )
 from webapp.auth.dependencies import get_current_user
 
-# Canonical entity list
-ENTITIES = ["Silo Capital LLC", "Silo Partners LLC", "Homes for America LLC", "Casa Sicura LLC", "Chulo Apartments LLC"]
+# Canonical entity list — (full_name, short_label)
+ENTITIES = [
+    ("Silo Capital LLC", "Silo Capital"),
+    ("Silo Partners LLC", "Silo P"),
+    ("Homes for America LLC", "HFA"),
+    ("Casa Sicura LLC", "Casa Sicura"),
+    ("Chulo Apartments LLC", "Chulo"),
+]
 
 router = APIRouter(tags=["dashboard"])
 

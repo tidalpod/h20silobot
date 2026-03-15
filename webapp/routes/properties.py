@@ -92,8 +92,14 @@ async def list_properties(
                 if prop.is_active:
                     properties.append({"property": prop, "status": bill_status})
 
-    # Get list of unique entities for the dropdown
-    entities = ["Silo Capital LLC", "Silo Partners LLC", "Homes for America LLC", "Casa Sicura LLC", "Chulo Apartments LLC"]
+    # Entity list — (full_name, short_label)
+    entities = [
+        ("Silo Capital LLC", "Silo Capital"),
+        ("Silo Partners LLC", "Silo P"),
+        ("Homes for America LLC", "HFA"),
+        ("Casa Sicura LLC", "Casa Sicura"),
+        ("Chulo Apartments LLC", "Chulo"),
+    ]
 
     return templates.TemplateResponse(
         "properties/list.html",
