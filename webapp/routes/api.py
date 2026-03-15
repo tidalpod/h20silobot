@@ -243,9 +243,11 @@ async def refresh_single_property(property_id: int):
                 logger.error(f"Property {property_id} not found for refresh")
                 return
 
-            logger.info(f"Refreshing bills for property: {prop.address}")
+            # Get the correct BSA UID for this property's city
+            municipality_uid = BSAScraper.get_uid_for_city(prop.city)
+            logger.info(f"Refreshing bills for property: {prop.address} (city={prop.city}, uid={municipality_uid})")
 
-            async with BSAScraper() as scraper:
+            async with BSAScraper(municipality_uid=municipality_uid) as scraper:
                 bill_data = None
 
                 # First try by account number if we have one
@@ -303,9 +305,10 @@ async def refresh_single_property(property_id: int):
 
 
 async def refresh_all_properties():
-    """Background task to refresh all active properties"""
+    """Background task to refresh all active properties (grouped by city for efficiency)"""
     try:
         from scraper.bsa_scraper import BSAScraper
+        from collections import defaultdict
 
         async with get_session() as session:
             result = await session.execute(
@@ -315,15 +318,63 @@ async def refresh_all_properties():
 
             logger.info(f"Starting refresh for {len(properties)} properties")
 
-            async with BSAScraper() as scraper:
-                for prop in properties:
-                    try:
-                        await refresh_single_property(prop.id)
-                    except Exception as e:
-                        logger.error(f"Error refreshing {prop.address}: {e}")
-                        continue
+            # Group properties by city for efficient scraping (one browser per city)
+            properties_by_city = defaultdict(list)
+            for prop in properties:
+                city = (prop.city or "warren").lower().strip()
+                properties_by_city[city].append(prop)
 
-            logger.info("Completed refresh for all properties")
+            scraped_count = 0
+            for city, city_properties in properties_by_city.items():
+                municipality_uid = BSAScraper.get_uid_for_city(city)
+                logger.info(f"Scraping {len(city_properties)} properties for {city} (uid={municipality_uid})")
+
+                async with BSAScraper(municipality_uid=municipality_uid) as scraper:
+                    for prop in city_properties:
+                        try:
+                            bill_data = None
+
+                            if prop.bsa_account_number:
+                                bill_data = await scraper.search_by_account(prop.bsa_account_number)
+
+                            if not bill_data:
+                                street_address = prop.address.split(',')[0].strip()
+                                bill_data = await scraper.search_by_address(street_address)
+
+                            if bill_data:
+                                bill = WaterBill(
+                                    property_id=prop.id,
+                                    amount_due=bill_data.amount_due,
+                                    previous_balance=bill_data.previous_balance,
+                                    current_charges=bill_data.current_charges,
+                                    late_fees=bill_data.late_fees,
+                                    payments_received=bill_data.payments_received,
+                                    statement_date=bill_data.statement_date,
+                                    due_date=bill_data.due_date,
+                                    water_usage_gallons=bill_data.water_usage,
+                                    raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                                )
+                                bill.status = bill.calculate_status()
+                                session.add(bill)
+
+                                if bill_data.owner_name and not prop.owner_name:
+                                    prop.owner_name = bill_data.owner_name
+                                if hasattr(bill_data, 'parcel_number') and bill_data.parcel_number and not prop.parcel_number:
+                                    prop.parcel_number = bill_data.parcel_number
+                                if bill_data.account_number and bill_data.account_number != prop.bsa_account_number:
+                                    prop.bsa_account_number = bill_data.account_number
+
+                                scraped_count += 1
+                                logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
+                            else:
+                                logger.warning(f"No bill data found for {prop.address}")
+
+                        except Exception as e:
+                            logger.error(f"Error refreshing {prop.address}: {e}")
+                            continue
+
+            await session.commit()
+            logger.info(f"Completed refresh: {scraped_count}/{len(properties)} properties scraped")
 
     except ImportError:
         logger.error("BSAScraper not available")

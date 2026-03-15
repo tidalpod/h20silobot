@@ -286,18 +286,19 @@ class BSAScraper:
                     account_number = line.replace("Account:", "").strip()
                     break
 
-            # Extract address - look for pattern: street address followed by "Warren, MI"
+            # Extract address - look for pattern: street address followed by city, MI
             address = ""
             owner_name = ""
+            mi_cities = ["Warren", "Roseville", "Eastpointe"]
             for i, line in enumerate(lines):
                 # Owner/name line typically has "OCCUPANT" or is all caps before address
                 if "OCCUPANT" in line.upper():
                     owner_name = line
                 # Street address is typically a number followed by street name
-                elif re.match(r'^\d+\s+[A-Z]', line.upper()) and "Warren" not in line:
+                elif re.match(r'^\d+\s+[A-Z]', line.upper()) and not any(c in line for c in mi_cities):
                     street = line
-                    # Next line should be city/state/zip
-                    if i + 1 < len(lines) and "Warren" in lines[i + 1]:
+                    # Next line should be city/state/zip (any supported MI city)
+                    if i + 1 < len(lines) and ("MI" in lines[i + 1] or any(c in lines[i + 1] for c in mi_cities)):
                         city_state = lines[i + 1]
                         address = f"{street}, {city_state}"
                         break

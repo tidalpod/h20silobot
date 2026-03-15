@@ -194,7 +194,17 @@ class WaterBillBot:
                     async with BSAScraper(municipality_uid=municipality_uid) as scraper:
                         for prop in city_properties:
                             try:
-                                bill_data = await scraper.search_by_account(prop.bsa_account_number)
+                                bill_data = None
+
+                                # First try by account number
+                                if prop.bsa_account_number:
+                                    bill_data = await scraper.search_by_account(prop.bsa_account_number)
+
+                                # Fallback to address search
+                                if not bill_data:
+                                    street_address = prop.address.split(',')[0].strip()
+                                    logger.info(f"Account search failed for {prop.address}, trying address: {street_address}")
+                                    bill_data = await scraper.search_by_address(street_address)
 
                                 if bill_data:
                                     if bill_data.address and prop.address.startswith("Pending"):
