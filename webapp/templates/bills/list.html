@@ -72,12 +72,24 @@
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statement Date</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Due</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scraped</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(0, 'string')">
+                    <span class="inline-flex items-center gap-1">Property <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(1, 'date')">
+                    <span class="inline-flex items-center gap-1">Statement Date <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(2, 'date')">
+                    <span class="inline-flex items-center gap-1">Due Date <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(3, 'number')">
+                    <span class="inline-flex items-center gap-1">Amount Due <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(4, 'string')">
+                    <span class="inline-flex items-center gap-1">Status <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none" onclick="sortTable(5, 'date')">
+                    <span class="inline-flex items-center gap-1">Scraped <span class="sort-icon text-gray-300">&#8597;</span></span>
+                </th>
             </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
@@ -119,6 +131,62 @@
         </tbody>
     </table>
 </div>
+
+<script>
+let currentSort = { col: -1, asc: true };
+
+function sortTable(colIndex, type) {
+    const table = document.querySelector('table');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const icons = table.querySelectorAll('.sort-icon');
+
+    // Toggle direction
+    if (currentSort.col === colIndex) {
+        currentSort.asc = !currentSort.asc;
+    } else {
+        currentSort.col = colIndex;
+        currentSort.asc = true;
+    }
+
+    // Update icons
+    icons.forEach((icon, i) => {
+        if (i === colIndex) {
+            icon.textContent = currentSort.asc ? '\u2191' : '\u2193';
+            icon.classList.remove('text-gray-300');
+            icon.classList.add('text-blue-600');
+        } else {
+            icon.textContent = '\u2195';
+            icon.classList.remove('text-blue-600');
+            icon.classList.add('text-gray-300');
+        }
+    });
+
+    rows.sort((a, b) => {
+        const cellA = a.cells[colIndex].textContent.trim();
+        const cellB = b.cells[colIndex].textContent.trim();
+
+        let valA, valB;
+        if (type === 'number') {
+            valA = parseFloat(cellA.replace(/[$,]/g, '')) || 0;
+            valB = parseFloat(cellB.replace(/[$,]/g, '')) || 0;
+        } else if (type === 'date') {
+            valA = cellA === 'N/A' ? 0 : new Date(cellA).getTime() || 0;
+            valB = cellB === 'N/A' ? 0 : new Date(cellB).getTime() || 0;
+        } else {
+            valA = cellA.toLowerCase();
+            valB = cellB.toLowerCase();
+        }
+
+        if (valA < valB) return currentSort.asc ? -1 : 1;
+        if (valA > valB) return currentSort.asc ? 1 : -1;
+        return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+
     {% else %}
     <div class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
