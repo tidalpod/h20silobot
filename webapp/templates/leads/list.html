@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Leads{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Leads</h1>
+            <p class="mt-1 text-sm text-gray-500">Section 8 tenant lead tracker</p>
+        </div>
+        <a href="/leads/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
+            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Lead
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<!-- Status filter pills -->
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="/leads"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+              {% if not status_filter %}bg-gray-900 text-white{% else %}bg-white text-gray-700 border border-gray-300 hover:bg-gray-50{% endif %}">
+        All <span class="{% if not status_filter %}bg-white/20{% else %}bg-gray-100{% endif %} px-1.5 py-0.5 rounded-full text-xs">{{ total_count }}</span>
+    </a>
+    {% for s in LeadStatus %}
+    <a href="/leads?status={{ s.value }}"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+              {% if status_filter == s.value %}
+                {% if s.value == 'new' %}bg-blue-600 text-white
+                {% elif s.value == 'contacted' %}bg-yellow-500 text-white
+                {% elif s.value == 'touring' %}bg-purple-600 text-white
+                {% elif s.value == 'applied' %}bg-cyan-600 text-white
+                {% elif s.value == 'converted' %}bg-green-600 text-white
+                {% elif s.value == 'lost' %}bg-gray-500 text-white
+                {% endif %}
+              {% else %}bg-white text-gray-700 border border-gray-300 hover:bg-gray-50{% endif %}">
+        {{ s.value|capitalize }}
+        <span class="{% if status_filter == s.value %}bg-white/20{% else %}bg-gray-100{% endif %} px-1.5 py-0.5 rounded-full text-xs">{{ status_counts.get(s.value, 0) }}</span>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Leads list -->
+<div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+    {% if leads %}
+    <!-- Mobile card view -->
+    <div class="sm:hidden divide-y divide-gray-200">
+        {% for lead in leads %}
+        <a href="/leads/{{ lead.id }}" class="block p-4 hover:bg-gray-50">
+            <div class="flex items-start justify-between mb-2">
+                <div>
+                    <div class="text-sm font-medium text-gray-900">{{ lead.name }}</div>
+                    {% if lead.property_ref %}
+                    <div class="text-xs text-gray-500">{{ lead.property_ref.address }}</div>
+                    {% endif %}
+                </div>
+                {% set s = lead.status %}
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                    {% if s == 'new' %}bg-blue-100 text-blue-700
+                    {% elif s == 'contacted' %}bg-yellow-100 text-yellow-700
+                    {% elif s == 'touring' %}bg-purple-100 text-purple-700
+                    {% elif s == 'applied' %}bg-cyan-100 text-cyan-700
+                    {% elif s == 'converted' %}bg-green-100 text-green-700
+                    {% elif s == 'lost' %}bg-gray-100 text-gray-700
+                    {% endif %}">{{ s|capitalize }}</span>
+            </div>
+            <div class="text-xs text-gray-500 flex flex-wrap gap-3">
+                {% if lead.phone %}<span>{{ lead.phone }}</span>{% endif %}
+                {% if lead.voucher_amount %}<span>${{ "%.2f"|format(lead.voucher_amount) }}</span>{% endif %}
+                {% if lead.source %}<span>{{ lead.source }}</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop table view -->
+    <div class="hidden sm:block">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher $</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for lead in leads %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/leads/{{ lead.id }}'">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-blue-600">{{ lead.name }}</div>
+                        {% if lead.email %}<div class="text-xs text-gray-500">{{ lead.email }}</div>{% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ lead.phone or '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ lead.property_ref.address if lead.property_ref else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {% if lead.voucher_amount %}${{ "%.2f"|format(lead.voucher_amount) }}{% else %}-{% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ lead.source or '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% set s = lead.status %}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                            {% if s == 'new' %}bg-blue-100 text-blue-700
+                            {% elif s == 'contacted' %}bg-yellow-100 text-yellow-700
+                            {% elif s == 'touring' %}bg-purple-100 text-purple-700
+                            {% elif s == 'applied' %}bg-cyan-100 text-cyan-700
+                            {% elif s == 'converted' %}bg-green-100 text-green-700
+                            {% elif s == 'lost' %}bg-gray-100 text-gray-700
+                            {% endif %}">{{ s|capitalize }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ lead.created_at.strftime('%b %d, %Y') if lead.created_at else '-' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        <svg class="mx-auto h-16 w-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+        </svg>
+        <h3 class="mt-4 text-lg font-semibold text-gray-900">No Leads Yet</h3>
+        <p class="mt-2 text-gray-500">Start tracking Section 8 tenant leads</p>
+        <div class="mt-6">
+            <a href="/leads/new" class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-blue-400 transition-all">
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add Your First Lead
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

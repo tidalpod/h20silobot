@@ -112,6 +112,15 @@ class ApplicationStatus(PyEnum):
     CANCELLED = "cancelled"
 
 
+class LeadStatus(PyEnum):
+    NEW = "new"
+    CONTACTED = "contacted"
+    TOURING = "touring"
+    APPLIED = "applied"
+    CONVERTED = "converted"
+    LOST = "lost"
+
+
 class ShowingType(PyEnum):
     INSPECTOR = "inspector"
     TENANT = "tenant"
@@ -645,6 +654,37 @@ class PHA(Base):
 
     def __repr__(self):
         return f"<PHA {self.name}>"
+
+
+class Lead(Base):
+    """Section 8 tenant lead tracking"""
+    __tablename__ = "leads"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=True)
+    email = Column(String(255), nullable=True)
+    has_section8_voucher = Column(Boolean, default=True)
+    pha_id = Column(Integer, ForeignKey("phas.id", ondelete="SET NULL"), nullable=True)
+    voucher_amount = Column(Numeric(10, 2), nullable=True)
+    current_pha_name = Column(String(255), nullable=True)  # free-text fallback
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="SET NULL"), nullable=True)
+    desired_bedrooms = Column(Integer, nullable=True)
+    desired_move_in = Column(Date, nullable=True)
+    status = Column(String(30), default=LeadStatus.NEW.value, nullable=False)
+    source = Column(String(100), nullable=True)  # "GoSection8", "Referral", etc.
+    notes = Column(Text, nullable=True)
+    converted_tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    pha = relationship("PHA")
+    property_ref = relationship("Property")
+    converted_tenant = relationship("Tenant")
+
+    def __repr__(self):
+        return f"<Lead {self.name} ({self.status})>"
 
 
 class Recertification(Base):

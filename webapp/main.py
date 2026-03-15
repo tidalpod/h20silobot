@@ -200,6 +200,7 @@ from .routes.lease_builder import router as lease_builder_router
 from .routes.assets import router as assets_router
 from .routes.pwa import router as pwa_router
 from .routes.applications import router as applications_router
+from .routes.leads import router as leads_router
 from .routes.esign_public import router as esign_public_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
@@ -220,6 +221,7 @@ app.include_router(inspections_router)
 app.include_router(sms_router)
 app.include_router(legal_router)
 app.include_router(applications_router)
+app.include_router(leads_router, prefix="/leads")
 app.include_router(public_router)
 app.include_router(maintenance_router, prefix="/maintenance")
 app.include_router(lease_builder_router, prefix="/leases/builder")
