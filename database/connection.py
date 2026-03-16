@@ -64,6 +64,26 @@ async def run_migrations(engine):
         ("tenant_applications", "application_data", "TEXT"),
         # Stripe payment for application fee
         ("tenant_applications", "stripe_checkout_session_id", "VARCHAR(255)"),
+        # Expanded entity config fields
+        ("entity_configs", "entity_type", "VARCHAR(50)"),
+        ("entity_configs", "ein", "VARCHAR(20)"),
+        ("entity_configs", "address_street", "VARCHAR(255)"),
+        ("entity_configs", "address_city", "VARCHAR(100)"),
+        ("entity_configs", "address_state", "VARCHAR(2)"),
+        ("entity_configs", "address_zip", "VARCHAR(10)"),
+        ("entity_configs", "billing_contact_name", "VARCHAR(255)"),
+        ("entity_configs", "billing_email", "VARCHAR(255)"),
+        ("entity_configs", "billing_phone", "VARCHAR(20)"),
+        ("entity_configs", "billing_address_street", "VARCHAR(255)"),
+        ("entity_configs", "billing_address_city", "VARCHAR(100)"),
+        ("entity_configs", "billing_address_state", "VARCHAR(2)"),
+        ("entity_configs", "billing_address_zip", "VARCHAR(10)"),
+        ("entity_configs", "state_of_formation", "VARCHAR(2)"),
+        ("entity_configs", "formation_date", "DATE"),
+        # Entity document extended fields
+        ("entity_documents", "doc_label", "VARCHAR(100)"),
+        ("entity_documents", "expiration_date", "DATE"),
+        ("entity_documents", "notes", "TEXT"),
     ]
 
     async with engine.begin() as conn:
