@@ -271,10 +271,11 @@ async def update_co_inspection(
         "building": ("co_building_date", "co_building_time", "co_building_status"),
     }
 
-    if inspection_type.lower() not in field_map:
-        return RedirectResponse(url="/inspections", status_code=303)
+    # Support "all" to schedule all 5 types at once
+    types_to_update = list(field_map.keys()) if inspection_type.lower() == "all" else [inspection_type.lower()]
 
-    date_field, time_field, status_field = field_map[inspection_type.lower()]
+    if not any(t in field_map for t in types_to_update):
+        return RedirectResponse(url="/inspections", status_code=303)
 
     async with get_session() as session:
         result = await session.execute(
@@ -282,9 +283,11 @@ async def update_co_inspection(
         )
         prop = result.scalar_one_or_none()
         if prop:
-            setattr(prop, date_field, parse_date(date))
-            setattr(prop, time_field, time if time else None)
-            setattr(prop, status_field, status if status in ("passed", "failed") else None)
+            for t in types_to_update:
+                date_field, time_field, status_field = field_map[t]
+                setattr(prop, date_field, parse_date(date))
+                setattr(prop, time_field, time if time else None)
+                setattr(prop, status_field, status if status in ("passed", "failed") else None)
             await session.commit()
 
     if redirect:
