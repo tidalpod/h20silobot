@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Entity Bank Accounts{% endblock %}
+{% block title %}Entity Management{% endblock %}
 
 {% block header %}
 <header class="bg-white shadow-sm">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
         <div>
             <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-                Entity Bank Accounts
+                Entity Management
             </h1>
-            <p class="mt-1 text-sm text-gray-500">Manage entity bank accounts for payment routing</p>
+            <p class="mt-1 text-sm text-gray-500">Manage entities, bank accounts, and documents</p>
         </div>
         <button onclick="document.getElementById('add-entity-modal').classList.remove('hidden')"
                 class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">
@@ -78,7 +78,17 @@
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900">{{ entity.entity_name }}</h3>
-                    <div class="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                    <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-0.5">
+                        {% if entity.entity_type %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">
+                            {{ entity.entity_type.value|replace('_', ' ')|title }}
+                        </span>
+                        {% endif %}
+                        {% if entity.ein %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            EIN: {{ entity.ein }}
+                        </span>
+                        {% endif %}
                         {% if entity.owner_name %}<span>{{ entity.owner_name }}</span>{% endif %}
                         {% if entity.email %}<span>&middot; {{ entity.email }}</span>{% endif %}
                         {% if entity.phone %}<span>&middot; {{ entity.phone }}</span>{% endif %}
@@ -89,14 +99,14 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="openEditModal({{ entity.id }}, '{{ entity.entity_name|e }}', '{{ (entity.owner_name or '')|e }}', '{{ (entity.email or '')|e }}', '{{ (entity.phone or '')|e }}', '{{ (entity.mailing_address or '')|e }}')"
+                <button onclick="openEditModal({{ entity.id }})"
                         class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit entity">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
                 </button>
                 <form method="POST" action="/payments/bank-accounts/entities/{{ entity.id }}/delete"
-                      onsubmit="return confirm('Delete {{ entity.entity_name|e }}? This will unlink all bank accounts.')">
+                      onsubmit="return confirm('Delete {{ entity.entity_name|e }}? This will unlink all bank accounts and documents.')">
                     <button type="submit" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete entity">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
@@ -104,6 +114,174 @@
                     </button>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- Entity Details (collapsible) -->
+    <div class="border-b border-gray-100">
+        <button onclick="toggleSection('details-{{ entity.id }}')" class="w-full px-5 py-3 flex items-center justify-between text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                </svg>
+                Entity Details
+            </span>
+            <svg class="w-4 h-4 text-gray-400 transition-transform" id="chevron-details-{{ entity.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+        </button>
+        <div id="details-{{ entity.id }}" class="hidden px-5 pb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <h4 class="font-medium text-gray-900 mb-2">Entity Address</h4>
+                    {% if entity.address_street %}
+                    <p class="text-gray-600">{{ entity.address_street }}</p>
+                    <p class="text-gray-600">{{ entity.address_city or '' }}{% if entity.address_state %}, {{ entity.address_state }}{% endif %} {{ entity.address_zip or '' }}</p>
+                    {% else %}
+                    <p class="text-gray-400 italic">Not set</p>
+                    {% endif %}
+                    {% if entity.mailing_address %}
+                    <p class="text-xs text-gray-400 mt-2">Mailing: {{ entity.mailing_address }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <h4 class="font-medium text-gray-900 mb-2">Formation</h4>
+                    <div class="space-y-1 text-gray-600">
+                        {% if entity.state_of_formation %}<p>State: {{ entity.state_of_formation }}</p>{% endif %}
+                        {% if entity.formation_date %}<p>Date: {{ entity.formation_date.strftime('%m/%d/%Y') }}</p>{% endif %}
+                        {% if not entity.state_of_formation and not entity.formation_date %}<p class="text-gray-400 italic">Not set</p>{% endif %}
+                    </div>
+                </div>
+                <div class="sm:col-span-2">
+                    <h4 class="font-medium text-gray-900 mb-2">Billing Information</h4>
+                    {% if entity.billing_contact_name or entity.billing_email or entity.billing_phone or entity.billing_address_street %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-600">
+                        <div>
+                            {% if entity.billing_contact_name %}<p>{{ entity.billing_contact_name }}</p>{% endif %}
+                            {% if entity.billing_email %}<p>{{ entity.billing_email }}</p>{% endif %}
+                            {% if entity.billing_phone %}<p>{{ entity.billing_phone }}</p>{% endif %}
+                        </div>
+                        <div>
+                            {% if entity.billing_address_street %}
+                            <p>{{ entity.billing_address_street }}</p>
+                            <p>{{ entity.billing_address_city or '' }}{% if entity.billing_address_state %}, {{ entity.billing_address_state }}{% endif %} {{ entity.billing_address_zip or '' }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-400 italic">Not set</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Section (collapsible) -->
+    <div class="border-b border-gray-100">
+        <button onclick="toggleSection('docs-{{ entity.id }}')" class="w-full px-5 py-3 flex items-center justify-between text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                Documents
+                {% if entity.documents %}
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">{{ entity.documents|length }}</span>
+                {% endif %}
+            </span>
+            <svg class="w-4 h-4 text-gray-400 transition-transform" id="chevron-docs-{{ entity.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+        </button>
+        <div id="docs-{{ entity.id }}" class="hidden px-5 pb-4">
+            {% if entity.documents %}
+            <div class="space-y-2 mb-4">
+                {% for doc in entity.documents %}
+                <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-900">
+                                    {% set doc_labels = {"w9": "W-9", "payee_auth": "Payee Authorization", "articles_of_org": "Articles of Organization", "operating_agreement": "Operating Agreement", "ein_letter": "EIN Confirmation Letter", "certificate_good_standing": "Certificate of Good Standing", "insurance_coi": "Insurance COI", "other": "Other"} %}
+                                    {{ doc.doc_label or doc_labels.get(doc.doc_type, doc.doc_type) }}
+                                </span>
+                                {% if doc.expiration_date %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ 'bg-red-100 text-red-700' if doc.expiration_date < today else 'bg-green-100 text-green-700' }}">
+                                    Exp: {{ doc.expiration_date.strftime('%m/%d/%Y') }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <p class="text-xs text-gray-500">
+                                {{ doc.original_filename or 'Document' }}
+                                &middot; {{ doc.uploaded_at.strftime('%m/%d/%Y') }}
+                                {% if doc.notes %}&middot; {{ doc.notes }}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ doc.file_url }}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors">
+                            View
+                        </a>
+                        <form method="POST" action="/payments/bank-accounts/entities/documents/{{ doc.id }}/delete"
+                              onsubmit="return confirm('Delete this document?')">
+                            <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Upload Document -->
+            <form method="POST" action="/payments/bank-accounts/entities/{{ entity.id }}/documents/upload" enctype="multipart/form-data" class="p-3 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Document Type *</label>
+                        <select name="doc_type" required onchange="this.closest('form').querySelector('[name=doc_label]').parentElement.style.display = this.value === 'other' ? 'block' : 'none'"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs">
+                            <option value="w9">W-9</option>
+                            <option value="payee_auth">Payee Authorization</option>
+                            <option value="articles_of_org">Articles of Organization</option>
+                            <option value="operating_agreement">Operating Agreement</option>
+                            <option value="ein_letter">EIN Confirmation Letter</option>
+                            <option value="certificate_good_standing">Certificate of Good Standing</option>
+                            <option value="insurance_coi">Insurance COI</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div style="display:none">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Custom Label</label>
+                        <input type="text" name="doc_label" placeholder="Document name"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Expiration Date</label>
+                        <input type="date" name="expiration_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">File *</label>
+                        <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                               class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <input type="text" name="notes" placeholder="Notes (optional)"
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs">
+                </div>
+                <div class="mt-3 text-right">
+                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 shadow-sm">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
+                        Upload Document
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -172,7 +350,7 @@
 <div id="add-entity-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex min-h-full items-center justify-center p-4">
         <div class="fixed inset-0 bg-gray-500/75 transition-opacity" onclick="document.getElementById('add-entity-modal').classList.add('hidden')"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
+        <div class="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 z-10 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-lg font-semibold text-gray-900">Add Entity</h3>
                 <button onclick="document.getElementById('add-entity-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
@@ -180,33 +358,147 @@
                 </button>
             </div>
             <form method="POST" action="/payments/bank-accounts/entities/create">
-                <div class="space-y-4">
+                <div class="space-y-5">
+                    <!-- Basic Info -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
-                        <input type="text" name="entity_name" required placeholder="e.g. Blue Deer Holdings LLC"
-                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
-                        <input type="text" name="owner_name" placeholder="e.g. John Smith"
-                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" name="email" placeholder="entity@example.com"
-                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Basic Information</h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
+                                    <input type="text" name="entity_name" required placeholder="e.g. Blue Deer Holdings LLC"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Entity Type</label>
+                                    <select name="entity_type" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                        <option value="">-- Select --</option>
+                                        <option value="llc">LLC</option>
+                                        <option value="corporation">Corporation</option>
+                                        <option value="sole_proprietorship">Sole Proprietorship</option>
+                                        <option value="partnership">Partnership</option>
+                                        <option value="trust">Trust</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">EIN</label>
+                                    <input type="text" name="ein" placeholder="XX-XXXXXXX" maxlength="20"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Owner / Manager Name</label>
+                                    <input type="text" name="owner_name" placeholder="e.g. John Smith"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" name="email" placeholder="entity@example.com"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                    <input type="tel" name="phone" placeholder="(555) 555-5555"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State of Formation</label>
+                                    <input type="text" name="state_of_formation" placeholder="MI" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Formation Date</label>
+                                    <input type="date" name="formation_date"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                            <input type="tel" name="phone" placeholder="(555) 555-5555"
-                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+
+                    <!-- Entity Address -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Entity Address</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                                <input type="text" name="address_street" placeholder="123 Main St"
+                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                    <input type="text" name="address_city" placeholder="Detroit"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    <input type="text" name="address_state" placeholder="MI" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                                    <input type="text" name="address_zip" placeholder="48201" maxlength="10"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address <span class="font-normal text-gray-400">(if different)</span></label>
+                                <textarea name="mailing_address" rows="2" placeholder="P.O. Box 123, Detroit, MI 48201"
+                                          class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Billing Info -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
-                        <textarea name="mailing_address" rows="2" placeholder="123 Main St, Detroit, MI 48201"
-                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Billing Information</h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Contact</label>
+                                    <input type="text" name="billing_contact_name" placeholder="Contact name"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Email</label>
+                                    <input type="email" name="billing_email" placeholder="billing@example.com"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Phone</label>
+                                    <input type="tel" name="billing_phone" placeholder="(555) 555-5555"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Billing Street Address</label>
+                                <input type="text" name="billing_address_street" placeholder="123 Main St"
+                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                    <input type="text" name="billing_address_city" placeholder="Detroit"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    <input type="text" name="billing_address_state" placeholder="MI" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                                    <input type="text" name="billing_address_zip" placeholder="48201" maxlength="10"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
@@ -228,7 +520,7 @@
 <div id="edit-entity-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex min-h-full items-center justify-center p-4">
         <div class="fixed inset-0 bg-gray-500/75 transition-opacity" onclick="document.getElementById('edit-entity-modal').classList.add('hidden')"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
+        <div class="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 z-10 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-lg font-semibold text-gray-900">Edit Entity</h3>
                 <button onclick="document.getElementById('edit-entity-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
@@ -236,33 +528,147 @@
                 </button>
             </div>
             <form id="edit-entity-form" method="POST" action="">
-                <div class="space-y-4">
+                <div class="space-y-5">
+                    <!-- Basic Info -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
-                        <input type="text" name="entity_name" id="edit-entity-name" required
-                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
-                        <input type="text" name="owner_name" id="edit-owner-name"
-                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" name="email" id="edit-email"
-                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Basic Information</h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Entity Name *</label>
+                                    <input type="text" name="entity_name" id="edit-entity-name" required
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Entity Type</label>
+                                    <select name="entity_type" id="edit-entity-type" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                        <option value="">-- Select --</option>
+                                        <option value="llc">LLC</option>
+                                        <option value="corporation">Corporation</option>
+                                        <option value="sole_proprietorship">Sole Proprietorship</option>
+                                        <option value="partnership">Partnership</option>
+                                        <option value="trust">Trust</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">EIN</label>
+                                    <input type="text" name="ein" id="edit-ein" placeholder="XX-XXXXXXX" maxlength="20"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Owner / Manager Name</label>
+                                    <input type="text" name="owner_name" id="edit-owner-name"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input type="email" name="email" id="edit-email"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                    <input type="tel" name="phone" id="edit-phone"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State of Formation</label>
+                                    <input type="text" name="state_of_formation" id="edit-state-of-formation" placeholder="MI" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Formation Date</label>
+                                    <input type="date" name="formation_date" id="edit-formation-date"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                            <input type="tel" name="phone" id="edit-phone"
-                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    </div>
+
+                    <!-- Entity Address -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Entity Address</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                                <input type="text" name="address_street" id="edit-address-street"
+                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                    <input type="text" name="address_city" id="edit-address-city"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    <input type="text" name="address_state" id="edit-address-state" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                                    <input type="text" name="address_zip" id="edit-address-zip" maxlength="10"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address <span class="font-normal text-gray-400">(if different)</span></label>
+                                <textarea name="mailing_address" id="edit-mailing-address" rows="2"
+                                          class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Billing Info -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
-                        <textarea name="mailing_address" id="edit-mailing-address" rows="2"
-                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"></textarea>
+                        <h4 class="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Billing Information</h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Contact</label>
+                                    <input type="text" name="billing_contact_name" id="edit-billing-contact-name"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Email</label>
+                                    <input type="email" name="billing_email" id="edit-billing-email"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Billing Phone</label>
+                                    <input type="tel" name="billing_phone" id="edit-billing-phone"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Billing Street Address</label>
+                                <input type="text" name="billing_address_street" id="edit-billing-address-street"
+                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                    <input type="text" name="billing_address_city" id="edit-billing-address-city"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    <input type="text" name="billing_address_state" id="edit-billing-address-state" maxlength="2"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                                    <input type="text" name="billing_address_zip" id="edit-billing-address-zip" maxlength="10"
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
@@ -283,14 +689,70 @@
 
 {% block scripts %}
 <script>
-function openEditModal(id, name, owner, email, phone, address) {
+/* Store entity data for edit modal population */
+const entityData = {
+{% for entity in entities %}
+    {{ entity.id }}: {
+        entity_name: {{ (entity.entity_name or '')|tojson }},
+        entity_type: {{ (entity.entity_type.value if entity.entity_type else '')|tojson }},
+        ein: {{ (entity.ein or '')|tojson }},
+        owner_name: {{ (entity.owner_name or '')|tojson }},
+        email: {{ (entity.email or '')|tojson }},
+        phone: {{ (entity.phone or '')|tojson }},
+        address_street: {{ (entity.address_street or '')|tojson }},
+        address_city: {{ (entity.address_city or '')|tojson }},
+        address_state: {{ (entity.address_state or '')|tojson }},
+        address_zip: {{ (entity.address_zip or '')|tojson }},
+        mailing_address: {{ (entity.mailing_address or '')|tojson }},
+        billing_contact_name: {{ (entity.billing_contact_name or '')|tojson }},
+        billing_email: {{ (entity.billing_email or '')|tojson }},
+        billing_phone: {{ (entity.billing_phone or '')|tojson }},
+        billing_address_street: {{ (entity.billing_address_street or '')|tojson }},
+        billing_address_city: {{ (entity.billing_address_city or '')|tojson }},
+        billing_address_state: {{ (entity.billing_address_state or '')|tojson }},
+        billing_address_zip: {{ (entity.billing_address_zip or '')|tojson }},
+        state_of_formation: {{ (entity.state_of_formation or '')|tojson }},
+        formation_date: {{ (entity.formation_date.isoformat() if entity.formation_date else '')|tojson }},
+    },
+{% endfor %}
+};
+
+function openEditModal(id) {
+    const d = entityData[id];
+    if (!d) return;
+
     document.getElementById('edit-entity-form').action = '/payments/bank-accounts/entities/' + id + '/update';
-    document.getElementById('edit-entity-name').value = name;
-    document.getElementById('edit-owner-name').value = owner;
-    document.getElementById('edit-email').value = email;
-    document.getElementById('edit-phone').value = phone;
-    document.getElementById('edit-mailing-address').value = address;
+    document.getElementById('edit-entity-name').value = d.entity_name;
+    document.getElementById('edit-entity-type').value = d.entity_type;
+    document.getElementById('edit-ein').value = d.ein;
+    document.getElementById('edit-owner-name').value = d.owner_name;
+    document.getElementById('edit-email').value = d.email;
+    document.getElementById('edit-phone').value = d.phone;
+    document.getElementById('edit-address-street').value = d.address_street;
+    document.getElementById('edit-address-city').value = d.address_city;
+    document.getElementById('edit-address-state').value = d.address_state;
+    document.getElementById('edit-address-zip').value = d.address_zip;
+    document.getElementById('edit-mailing-address').value = d.mailing_address;
+    document.getElementById('edit-billing-contact-name').value = d.billing_contact_name;
+    document.getElementById('edit-billing-email').value = d.billing_email;
+    document.getElementById('edit-billing-phone').value = d.billing_phone;
+    document.getElementById('edit-billing-address-street').value = d.billing_address_street;
+    document.getElementById('edit-billing-address-city').value = d.billing_address_city;
+    document.getElementById('edit-billing-address-state').value = d.billing_address_state;
+    document.getElementById('edit-billing-address-zip').value = d.billing_address_zip;
+    document.getElementById('edit-state-of-formation').value = d.state_of_formation;
+    document.getElementById('edit-formation-date').value = d.formation_date;
+
     document.getElementById('edit-entity-modal').classList.remove('hidden');
+}
+
+function toggleSection(id) {
+    const el = document.getElementById(id);
+    const chevron = document.getElementById('chevron-' + id);
+    el.classList.toggle('hidden');
+    if (chevron) {
+        chevron.style.transform = el.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
 }
 </script>
 {% endblock %}
