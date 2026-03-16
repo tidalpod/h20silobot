@@ -258,6 +258,7 @@ class BSAScraper:
                 final_url = str(resp.url)
                 if "ValidateUser" in final_url:
                     logger.warning(f"Session expired — CAPTCHA required again")
+                    await session.close()
                     cls._validated_session = None  # Force re-validation next time
                     return None
                 html = await resp.text()
@@ -315,62 +316,75 @@ class BSAScraper:
         try:
             timeout = aiohttp.ClientTimeout(total=20)
 
-            # Submit the search form using the validated session
-            async with session.post(
-                form_action,
-                data=form_data,
-                headers=headers,
-                timeout=timeout,
-                allow_redirects=True,
-            ) as resp:
-                final_url = str(resp.url)
-                html = await resp.text()
-                logger.info(f"HTTP form POST: status={resp.status}, url={final_url}")
+            # Try up to 2 times — retry with fresh session if CAPTCHA redirect
+            for attempt in range(2):
+                async with session.post(
+                    form_action,
+                    data=form_data,
+                    headers=headers,
+                    timeout=timeout,
+                    allow_redirects=True,
+                ) as resp:
+                    final_url = str(resp.url)
+                    html = await resp.text()
+                    logger.info(f"HTTP form POST (attempt {attempt+1}): status={resp.status}, url={final_url}")
 
                 # Check if redirected to CAPTCHA validation
                 if "ValidateUser" in final_url or "pendingCaptcha" in final_url:
                     logger.warning(f"HTTP search redirected to validation: {final_url}")
-                    cls._validated_session = None  # Invalidate session
-                    return None
+                    await session.close()
+                    cls._validated_session = None
+                    if attempt == 0:
+                        logger.info(f"Re-validating session and retrying: {search_text}")
+                        session = await cls._get_validated_session(municipality_uid)
+                        if not session:
+                            return None
+                        continue
+                    else:
+                        logger.error(f"Still redirected after re-validation — giving up")
+                        return None
 
-                # Check for no records
-                if "No records to display" in html or "no records" in html.lower():
-                    logger.info(f"No records found for: {search_text}")
-                    return None
+                # Success — break out of retry loop
+                break
 
-                # Check if we landed on a detail page (single result auto-redirect)
-                if "Amount to Pay" in html or "Step 3: Make Payment" in html:
-                    logger.info(f"Single result — landed on detail page")
-                    result = cls._parse_detail_html(html, search_text)
+            # Check for no records
+            if "No records to display" in html or "no records" in html.lower():
+                logger.info(f"No records found for: {search_text}")
+                return None
+
+            # Check if we landed on a detail page (single result auto-redirect)
+            if "Amount to Pay" in html or "Step 3: Make Payment" in html:
+                logger.info(f"Single result — landed on detail page")
+                result = cls._parse_detail_html(html, search_text)
+                if result:
+                    rk_match = re.search(r'RecordKey=(\d+)', final_url)
+                    if rk_match and not result.record_key:
+                        result.record_key = rk_match.group(1)
+                return result
+
+            # Multiple results — find the best matching detail link and follow it
+            detail_url = cls._find_best_detail_link(html, search_text)
+            if not detail_url:
+                logger.warning(f"No detail links found in results for: {search_text}")
+                return None
+
+            # Follow the detail link
+            full_detail_url = f"{cls.BASE_URL}{detail_url}"
+            logger.info(f"Following detail link: {detail_url}")
+            async with session.get(full_detail_url, headers=headers, timeout=timeout, allow_redirects=True) as detail_resp:
+                detail_html = await detail_resp.text()
+                detail_final_url = str(detail_resp.url)
+                if "Amount to Pay" in detail_html or "Step 3: Make Payment" in detail_html:
+                    result = cls._parse_detail_html(detail_html, search_text)
                     if result:
-                        rk_match = re.search(r'RecordKey=(\d+)', final_url)
+                        rk_match = re.search(r'RecordKey=(\d+)', detail_final_url)
+                        if not rk_match:
+                            rk_match = re.search(r'RecordKey=(\d+)', detail_url)
                         if rk_match and not result.record_key:
                             result.record_key = rk_match.group(1)
                     return result
-
-                # Multiple results — find the best matching detail link and follow it
-                detail_url = cls._find_best_detail_link(html, search_text)
-                if not detail_url:
-                    logger.warning(f"No detail links found in results for: {search_text}")
-                    return None
-
-                # Follow the detail link
-                full_detail_url = f"{cls.BASE_URL}{detail_url}"
-                logger.info(f"Following detail link: {detail_url}")
-                async with session.get(full_detail_url, headers=headers, timeout=timeout, allow_redirects=True) as detail_resp:
-                    detail_html = await detail_resp.text()
-                    detail_final_url = str(detail_resp.url)
-                    if "Amount to Pay" in detail_html or "Step 3: Make Payment" in detail_html:
-                        result = cls._parse_detail_html(detail_html, search_text)
-                        if result:
-                            rk_match = re.search(r'RecordKey=(\d+)', detail_final_url)
-                            if not rk_match:
-                                rk_match = re.search(r'RecordKey=(\d+)', detail_url)
-                            if rk_match and not result.record_key:
-                                result.record_key = rk_match.group(1)
-                        return result
-                    logger.warning(f"Detail page missing expected content for: {search_text}")
-                    return None
+                logger.warning(f"Detail page missing expected content for: {search_text}")
+                return None
 
         except Exception as e:
             logger.error(f"HTTP search failed for {search_text}: {e}")
