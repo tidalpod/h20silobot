@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}MSHDA Packets{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bd-fade-up">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">MSHDA Landlord Packets</h1>
+            <p class="text-sm text-gray-500 mt-1">Generate and manage Section 8 landlord packets</p>
+        </div>
+        <a href="/packets/generate" class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm bd-btn-press">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Generate Packet
+        </a>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% set success = request.query_params.get('success', '') %}
+    {% set error = request.query_params.get('error', '') %}
+    {% if success %}
+    <div class="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        {% if success == 'generated' %}Packet generated successfully.
+        {% elif success == 'deleted' %}Packet deleted.
+        {% elif success == 'uploaded' %}Document uploaded successfully.
+        {% elif success == 'doc_deleted' %}Document deleted.
+        {% else %}{{ success }}{% endif %}
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+        {% if error == 'blank_pdf_missing' %}Blank MSHDA packet PDF not found. Place it at webapp/static/templates/mshda_blank_packet.pdf
+        {% elif error == 'generation_failed' %}Packet generation failed. Check logs for details.
+        {% elif error == 'pdf_only' %}Only PDF files are accepted.
+        {% elif error == 'file_too_large' %}File too large (max 10MB).
+        {% elif error == 'not_found' %}Packet not found.
+        {% elif error == 'file_missing' %}Packet file is missing from storage.
+        {% else %}{{ error }}{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Generated Packets Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="text-base font-semibold text-gray-900">Generated Packets</h2>
+        </div>
+        {% if packets %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-5 py-3">Property</th>
+                        <th class="px-5 py-3">Tenant</th>
+                        <th class="px-5 py-3">Entity</th>
+                        <th class="px-5 py-3">Generated</th>
+                        <th class="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for pkt in packets %}
+                    <tr class="bd-table-row hover:bg-blue-50/50">
+                        <td class="px-5 py-3 font-medium text-gray-900">
+                            {{ pkt.property.address if pkt.property else 'N/A' }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-600">
+                            {{ pkt.tenant.name if pkt.tenant else '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-600">
+                            {{ pkt.entity.entity_name if pkt.entity else '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-500">
+                            {{ pkt.generated_at.strftime('%m/%d/%Y %I:%M %p') if pkt.generated_at else '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/packets/{{ pkt.id }}/download" class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-xs font-medium transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                    Download
+                                </a>
+                                <form method="POST" action="/packets/{{ pkt.id }}/delete" onsubmit="return confirm('Delete this packet?')">
+                                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-xs font-medium transition-colors">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                        </svg>
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-12 text-center text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+            <p class="text-sm">No packets generated yet.</p>
+            <a href="/packets/generate" class="inline-block mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium">Generate your first packet</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Entity Documents Management -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="text-base font-semibold text-gray-900">Entity Documents</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Upload W-9 and Payee Authorization PDFs per entity. These get appended to generated packets.</p>
+        </div>
+
+        {% if entities %}
+        <div class="divide-y divide-gray-100">
+            {% for entity in entities %}
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900">{{ entity.entity_name }}</h3>
+                        {% if entity.owner_name %}
+                        <p class="text-xs text-gray-500">{{ entity.owner_name }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- W-9 -->
+                    <div class="border border-gray-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">W-9</span>
+                            {% set w9_doc = entity.documents | selectattr('doc_type', 'equalto', 'w9') | first %}
+                            {% if w9_doc is defined and w9_doc %}
+                            <span class="bd-badge bd-badge-success text-[10px]">Uploaded</span>
+                            {% else %}
+                            <span class="bd-badge bd-badge-warning text-[10px]">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if w9_doc is defined and w9_doc %}
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+                            <span>{{ w9_doc.original_filename or 'w9.pdf' }}</span>
+                            <form method="POST" action="/packets/entities/{{ entity.id }}/documents/{{ w9_doc.id }}/delete" class="inline" onsubmit="return confirm('Remove this W-9?')">
+                                <button type="submit" class="text-red-600 hover:text-red-700">Remove</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        <form method="POST" action="/packets/entities/{{ entity.id }}/documents/upload" enctype="multipart/form-data">
+                            <input type="hidden" name="doc_type" value="w9">
+                            <div class="flex items-center gap-2">
+                                <input type="file" name="file" accept=".pdf" class="text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 flex-1">
+                                <button type="submit" class="px-2.5 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors whitespace-nowrap">Upload</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Payee Auth -->
+                    <div class="border border-gray-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Payee Authorization</span>
+                            {% set payee_doc = entity.documents | selectattr('doc_type', 'equalto', 'payee_auth') | first %}
+                            {% if payee_doc is defined and payee_doc %}
+                            <span class="bd-badge bd-badge-success text-[10px]">Uploaded</span>
+                            {% else %}
+                            <span class="bd-badge bd-badge-warning text-[10px]">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if payee_doc is defined and payee_doc %}
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+                            <span>{{ payee_doc.original_filename or 'payee_auth.pdf' }}</span>
+                            <form method="POST" action="/packets/entities/{{ entity.id }}/documents/{{ payee_doc.id }}/delete" class="inline" onsubmit="return confirm('Remove this Payee Auth?')">
+                                <button type="submit" class="text-red-600 hover:text-red-700">Remove</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        <form method="POST" action="/packets/entities/{{ entity.id }}/documents/upload" enctype="multipart/form-data">
+                            <input type="hidden" name="doc_type" value="payee_auth">
+                            <div class="flex items-center gap-2">
+                                <input type="file" name="file" accept=".pdf" class="text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 flex-1">
+                                <button type="submit" class="px-2.5 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors whitespace-nowrap">Upload</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center text-gray-400">
+            <p class="text-sm">No entities configured. <a href="/payments/bank-accounts" class="text-blue-600 hover:text-blue-700">Add entities</a> first.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

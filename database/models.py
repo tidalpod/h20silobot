@@ -1392,21 +1392,76 @@ class LeaseBuilder(Base):
         return f"<LeaseBuilder {self.id} step={self.current_step} status={self.status.value}>"
 
 
+class EntityType(PyEnum):
+    LLC = "llc"
+    CORPORATION = "corporation"
+    SOLE_PROPRIETORSHIP = "sole_proprietorship"
+    PARTNERSHIP = "partnership"
+    TRUST = "trust"
+    OTHER = "other"
+
+
 class EntityConfig(Base):
     """Landlord entity configuration for lease auto-fill"""
     __tablename__ = "entity_configs"
 
     id = Column(Integer, primary_key=True)
     entity_name = Column(String(255), unique=True, nullable=False)
+    entity_type = Column(Enum(EntityType), nullable=True)
+    ein = Column(String(20), nullable=True)  # XX-XXXXXXX format
     owner_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
+
+    # Structured entity address (registered/principal address)
+    address_street = Column(String(255), nullable=True)
+    address_city = Column(String(100), nullable=True)
+    address_state = Column(String(2), nullable=True)
+    address_zip = Column(String(10), nullable=True)
+
+    # Mailing address (if different from entity address)
     mailing_address = Column(Text, nullable=True)
+
+    # Billing info
+    billing_contact_name = Column(String(255), nullable=True)
+    billing_email = Column(String(255), nullable=True)
+    billing_phone = Column(String(20), nullable=True)
+    billing_address_street = Column(String(255), nullable=True)
+    billing_address_city = Column(String(100), nullable=True)
+    billing_address_state = Column(String(2), nullable=True)
+    billing_address_zip = Column(String(10), nullable=True)
+
+    # Formation details
+    state_of_formation = Column(String(2), nullable=True)
+    formation_date = Column(Date, nullable=True)
+
     is_default = Column(Boolean, default=False)
 
     # Tracking
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def full_address(self):
+        """Formatted full entity address"""
+        parts = [self.address_street]
+        city_state_zip = ", ".join(filter(None, [self.address_city, self.address_state]))
+        if city_state_zip:
+            if self.address_zip:
+                city_state_zip += f" {self.address_zip}"
+            parts.append(city_state_zip)
+        return ", ".join(filter(None, parts)) or self.mailing_address or ""
+
+    @property
+    def full_billing_address(self):
+        """Formatted full billing address"""
+        parts = [self.billing_address_street]
+        city_state_zip = ", ".join(filter(None, [self.billing_address_city, self.billing_address_state]))
+        if city_state_zip:
+            if self.billing_address_zip:
+                city_state_zip += f" {self.billing_address_zip}"
+            parts.append(city_state_zip)
+        return ", ".join(filter(None, parts)) or ""
 
     def __repr__(self):
         return f"<EntityConfig {self.entity_name}>"
@@ -1449,6 +1504,56 @@ class EntityBankAccount(Base):
 
     def __repr__(self):
         return f"<EntityBankAccount {self.institution_name} ...{self.account_mask}>"
+
+
+class EntityDocument(Base):
+    """Uploaded documents for landlord entities — used in MSHDA packets and compliance."""
+    __tablename__ = "entity_documents"
+
+    id = Column(Integer, primary_key=True)
+    entity_id = Column(Integer, ForeignKey("entity_configs.id", ondelete="CASCADE"), nullable=False)
+    # Doc types: w9, payee_auth, articles_of_org, operating_agreement,
+    #            ein_letter, certificate_good_standing, insurance_coi, other
+    doc_type = Column(String(50), nullable=False)
+    doc_label = Column(String(100), nullable=True)  # Custom label for "other" docs
+    file_url = Column(String(500), nullable=False)
+    original_filename = Column(String(255), nullable=True)
+    expiration_date = Column(Date, nullable=True)  # For insurance COIs, certifications
+    notes = Column(Text, nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    entity = relationship("EntityConfig", backref="documents")
+
+    __table_args__ = (
+        Index("ix_entity_documents_entity", "entity_id"),
+    )
+
+    def __repr__(self):
+        return f"<EntityDocument {self.doc_type} for entity {self.entity_id}>"
+
+
+class LandlordPacket(Base):
+    """Generated MSHDA landlord packets for Section 8 tenants."""
+    __tablename__ = "landlord_packets"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+    entity_id = Column(Integer, ForeignKey("entity_configs.id", ondelete="SET NULL"), nullable=True)
+    file_url = Column(String(500), nullable=True)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+    form_data = Column(Text, nullable=True)  # JSON blob of all form inputs for re-generation
+
+    property = relationship("Property")
+    tenant = relationship("Tenant")
+    entity = relationship("EntityConfig")
+
+    __table_args__ = (
+        Index("ix_landlord_packets_property", "property_id"),
+    )
+
+    def __repr__(self):
+        return f"<LandlordPacket {self.id} property={self.property_id}>"
 
 
 class LeaseDefaultTerms(Base):

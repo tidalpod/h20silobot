@@ -1,16 +1,16 @@
-"""Entity bank account management — CRUD for entities + Plaid Link for bank accounts"""
+"""Entity management — CRUD for entities, bank accounts, and entity documents"""
 
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import EntityConfig, EntityBankAccount, Property
+from database.models import EntityConfig, EntityBankAccount, EntityDocument, Property
 from webapp.auth.dependencies import get_current_user
 from webapp.services import plaid_service
 
@@ -29,10 +29,13 @@ async def bank_accounts_page(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     async with get_session() as session:
-        # Get all entities with their bank accounts
+        # Get all entities with their bank accounts and documents
         result = await session.execute(
             select(EntityConfig)
-            .options(selectinload(EntityConfig.bank_accounts))
+            .options(
+                selectinload(EntityConfig.bank_accounts),
+                selectinload(EntityConfig.documents),
+            )
             .order_by(EntityConfig.entity_name)
         )
         entities = result.scalars().all()
@@ -62,23 +65,70 @@ async def bank_accounts_page(request: Request):
 async def create_entity(
     request: Request,
     entity_name: str = Form(...),
+    entity_type: str = Form(None),
+    ein: str = Form(None),
     owner_name: str = Form(None),
     email: str = Form(None),
     phone: str = Form(None),
+    address_street: str = Form(None),
+    address_city: str = Form(None),
+    address_state: str = Form(None),
+    address_zip: str = Form(None),
     mailing_address: str = Form(None),
+    billing_contact_name: str = Form(None),
+    billing_email: str = Form(None),
+    billing_phone: str = Form(None),
+    billing_address_street: str = Form(None),
+    billing_address_city: str = Form(None),
+    billing_address_state: str = Form(None),
+    billing_address_zip: str = Form(None),
+    state_of_formation: str = Form(None),
+    formation_date: str = Form(None),
 ):
     """Create a new entity."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    from database.models import EntityType
+    from datetime import datetime as dt
+
+    entity_type_enum = None
+    if entity_type:
+        try:
+            entity_type_enum = EntityType(entity_type)
+        except ValueError:
+            pass
+
+    formation_dt = None
+    if formation_date:
+        try:
+            formation_dt = dt.strptime(formation_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
     async with get_session() as session:
         entity = EntityConfig(
             entity_name=entity_name,
+            entity_type=entity_type_enum,
+            ein=ein or None,
             owner_name=owner_name or None,
             email=email or None,
             phone=phone or None,
+            address_street=address_street or None,
+            address_city=address_city or None,
+            address_state=address_state or None,
+            address_zip=address_zip or None,
             mailing_address=mailing_address or None,
+            billing_contact_name=billing_contact_name or None,
+            billing_email=billing_email or None,
+            billing_phone=billing_phone or None,
+            billing_address_street=billing_address_street or None,
+            billing_address_city=billing_address_city or None,
+            billing_address_state=billing_address_state or None,
+            billing_address_zip=billing_address_zip or None,
+            state_of_formation=state_of_formation or None,
+            formation_date=formation_dt,
         )
         session.add(entity)
 
@@ -90,15 +140,47 @@ async def update_entity(
     request: Request,
     entity_id: int,
     entity_name: str = Form(...),
+    entity_type: str = Form(None),
+    ein: str = Form(None),
     owner_name: str = Form(None),
     email: str = Form(None),
     phone: str = Form(None),
+    address_street: str = Form(None),
+    address_city: str = Form(None),
+    address_state: str = Form(None),
+    address_zip: str = Form(None),
     mailing_address: str = Form(None),
+    billing_contact_name: str = Form(None),
+    billing_email: str = Form(None),
+    billing_phone: str = Form(None),
+    billing_address_street: str = Form(None),
+    billing_address_city: str = Form(None),
+    billing_address_state: str = Form(None),
+    billing_address_zip: str = Form(None),
+    state_of_formation: str = Form(None),
+    formation_date: str = Form(None),
 ):
     """Update an entity."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    from database.models import EntityType
+    from datetime import datetime as dt
+
+    entity_type_enum = None
+    if entity_type:
+        try:
+            entity_type_enum = EntityType(entity_type)
+        except ValueError:
+            pass
+
+    formation_dt = None
+    if formation_date:
+        try:
+            formation_dt = dt.strptime(formation_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
 
     async with get_session() as session:
         result = await session.execute(
@@ -109,10 +191,25 @@ async def update_entity(
             return RedirectResponse(url="/payments/bank-accounts", status_code=303)
 
         entity.entity_name = entity_name
+        entity.entity_type = entity_type_enum
+        entity.ein = ein or None
         entity.owner_name = owner_name or None
         entity.email = email or None
         entity.phone = phone or None
+        entity.address_street = address_street or None
+        entity.address_city = address_city or None
+        entity.address_state = address_state or None
+        entity.address_zip = address_zip or None
         entity.mailing_address = mailing_address or None
+        entity.billing_contact_name = billing_contact_name or None
+        entity.billing_email = billing_email or None
+        entity.billing_phone = billing_phone or None
+        entity.billing_address_street = billing_address_street or None
+        entity.billing_address_city = billing_address_city or None
+        entity.billing_address_state = billing_address_state or None
+        entity.billing_address_zip = billing_address_zip or None
+        entity.state_of_formation = state_of_formation or None
+        entity.formation_date = formation_dt
 
     return RedirectResponse(url="/payments/bank-accounts", status_code=303)
 
@@ -382,5 +479,87 @@ async def unlink_account(request: Request, account_id: int):
             next_account = next_result.scalar_one_or_none()
             if next_account:
                 next_account.is_default = True
+
+    return RedirectResponse(url="/payments/bank-accounts", status_code=303)
+
+
+# =============================================================================
+# Entity Document Upload / Delete
+# =============================================================================
+
+ENTITY_DOC_TYPES = {
+    "w9": "W-9",
+    "payee_auth": "Payee Authorization",
+    "articles_of_org": "Articles of Organization",
+    "operating_agreement": "Operating Agreement",
+    "ein_letter": "EIN Confirmation Letter",
+    "certificate_good_standing": "Certificate of Good Standing",
+    "insurance_coi": "Insurance COI",
+    "other": "Other",
+}
+
+
+@router.post("/bank-accounts/entities/{entity_id}/documents/upload")
+async def upload_entity_document(
+    request: Request,
+    entity_id: int,
+    doc_type: str = Form(...),
+    doc_label: str = Form(None),
+    expiration_date: str = Form(None),
+    notes: str = Form(None),
+    file: UploadFile = File(...),
+):
+    """Upload a document for an entity."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    from webapp.services.storage_service import storage
+    from datetime import datetime as dt
+
+    contents = await file.read()
+    if not contents:
+        return RedirectResponse(url="/payments/bank-accounts", status_code=303)
+
+    ext = Path(file.filename).suffix if file.filename else ".pdf"
+    key = f"entity-docs/{entity_id}/{doc_type}_{int(dt.utcnow().timestamp())}{ext}"
+    file_url = storage.upload(key, contents, content_type=file.content_type or "application/pdf")
+
+    exp_date = None
+    if expiration_date:
+        try:
+            exp_date = dt.strptime(expiration_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    async with get_session() as session:
+        doc = EntityDocument(
+            entity_id=entity_id,
+            doc_type=doc_type,
+            doc_label=doc_label or None,
+            file_url=file_url,
+            original_filename=file.filename,
+            expiration_date=exp_date,
+            notes=notes or None,
+        )
+        session.add(doc)
+
+    return RedirectResponse(url="/payments/bank-accounts", status_code=303)
+
+
+@router.post("/bank-accounts/entities/documents/{doc_id}/delete")
+async def delete_entity_document(request: Request, doc_id: int):
+    """Delete an entity document."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(EntityDocument).where(EntityDocument.id == doc_id)
+        )
+        doc = result.scalar_one_or_none()
+        if doc:
+            await session.delete(doc)
 
     return RedirectResponse(url="/payments/bank-accounts", status_code=303)

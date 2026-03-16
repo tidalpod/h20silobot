@@ -1,0 +1,352 @@
+"""MSHDA Landlord Packet PDF generator.
+
+Overlays text onto a scanned (image-based) blank MSHDA packet PDF.
+Uses ReportLab to create transparent text overlays and pypdf to merge
+them onto the original scanned pages, then appends entity-specific
+W-9 and Payee Authorization PDFs.
+
+The blank packet template should be placed at:
+    webapp/static/templates/mshda_blank_packet.pdf
+"""
+
+import io
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Optional
+
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas as rl_canvas
+from pypdf import PdfReader, PdfWriter
+
+logger = logging.getLogger(__name__)
+
+# Path to the blank MSHDA packet (20-page scanned PDF)
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+BLANK_PACKET_PATH = STATIC_DIR / "templates" / "mshda_blank_packet.pdf"
+
+# Letter page dimensions in points (8.5 x 11 inches)
+PAGE_W, PAGE_H = letter  # 612 x 792
+
+# =============================================================================
+# Field coordinate map
+# =============================================================================
+# Each entry: page_number (0-indexed) -> list of (field_name, x, y, font_size)
+# Coordinates are in points from bottom-left (ReportLab convention).
+# These are initial approximations — calibrate with test prints.
+#
+# Pages are 0-indexed to match pypdf page numbering.
+# =============================================================================
+
+FIELD_MAP = {
+    # ------------------------------------------------------------------
+    # P1 (page 0): Checklist cover page
+    # ------------------------------------------------------------------
+    0: [
+        ("property_address",    150, 605, 10),
+        ("tenant_name",         150, 580, 10),
+    ],
+
+    # ------------------------------------------------------------------
+    # P2 (page 1): Communications notice
+    # ------------------------------------------------------------------
+    1: [
+        ("tenant_name",         180, 620, 10),
+        ("tenant_email",        180, 600, 10),
+        ("owner_name",          180, 560, 10),
+        ("owner_email",         180, 540, 10),
+        ("owner_phone",         180, 520, 10),
+    ],
+
+    # ------------------------------------------------------------------
+    # P4 (page 3): Property Owner Checklist p1
+    # ------------------------------------------------------------------
+    3: [
+        ("unit_address",        160, 680, 9),
+        ("owner_name",          160, 655, 9),
+        ("owner_mailing_address", 160, 635, 9),
+        ("owner_phone",         160, 615, 9),
+        ("owner_email",         420, 615, 9),
+        ("bedrooms",            200, 575, 9),
+        ("bathrooms",           320, 575, 9),
+        ("year_built",          440, 575, 9),
+        ("property_type",       200, 555, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P5 (page 4): Property Owner Checklist p2 — owner certification
+    # ------------------------------------------------------------------
+    4: [
+        ("owner_name",          160, 200, 10),
+        ("signature_date",      420, 200, 10),
+    ],
+
+    # ------------------------------------------------------------------
+    # P6 (page 5): HUD-52517 p2 — certifications, lead paint
+    # ------------------------------------------------------------------
+    5: [
+        ("owner_name",          120, 280, 9),
+        ("signature_date",      420, 280, 9),
+        ("tenant_name",         120, 240, 9),
+        ("tenant_sign_date",    420, 240, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P7 (page 6): HUD-52517 p1 — Request for Tenancy Approval
+    # ------------------------------------------------------------------
+    6: [
+        ("tenant_name",         180, 660, 10),
+        ("unit_address",        180, 635, 9),
+        ("city",                180, 615, 9),
+        ("state",               340, 615, 9),
+        ("zip_code",            420, 615, 9),
+        ("property_type",       180, 590, 9),
+        ("bedrooms",            340, 590, 9),
+        ("lease_start_date",    180, 545, 9),
+        ("lease_end_date",      340, 545, 9),
+        ("proposed_rent",       180, 510, 10),
+        ("utility_allowance",   340, 510, 10),
+        ("owner_name",          180, 440, 10),
+        ("owner_mailing_address", 180, 420, 9),
+        ("owner_phone",         180, 400, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P8 (page 7): Lead-Based Paint Disclosure
+    # ------------------------------------------------------------------
+    7: [
+        ("property_address",    180, 640, 10),
+        ("owner_name",          160, 280, 9),
+        ("signature_date",      420, 280, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P9 (page 8): Owner Certification Lead Paint
+    # ------------------------------------------------------------------
+    8: [
+        ("property_address",    180, 660, 10),
+        ("owner_name",          160, 240, 9),
+        ("signature_date",      420, 240, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P11 (page 10): HCV Rules p2 — signatures
+    # ------------------------------------------------------------------
+    10: [
+        ("tenant_name",         160, 320, 10),
+        ("tenant_sign_date",    420, 320, 10),
+        ("owner_name",          160, 260, 10),
+        ("signature_date",      420, 260, 10),
+    ],
+
+    # ------------------------------------------------------------------
+    # P13 (page 12): MSHDA Payee Authorization p1
+    # ------------------------------------------------------------------
+    12: [
+        ("entity_name",         180, 600, 10),
+        ("owner_name",          180, 575, 10),
+        ("owner_mailing_address", 180, 550, 9),
+        ("owner_phone",         180, 525, 9),
+        ("owner_email",         380, 525, 9),
+    ],
+
+    # ------------------------------------------------------------------
+    # P14 (page 13): Payee Authorization p2 — bank info
+    # ------------------------------------------------------------------
+    13: [
+        ("bank_routing_number", 200, 560, 10),
+        ("bank_account_number", 200, 535, 10),
+        ("bank_name",           200, 510, 10),
+        ("owner_name",          160, 300, 10),
+        ("signature_date",      420, 300, 10),
+    ],
+}
+
+# Checkbox field map: page -> list of (field_name, x, y, size)
+# field_name should be a boolean key in form_data
+CHECKBOX_MAP = {
+    # P4 (page 3): Building features
+    3: [
+        ("has_central_air",     160, 490, 10),
+        ("has_window_units",    280, 490, 10),
+        ("has_gas_heat",        160, 470, 10),
+        ("has_electric_heat",   280, 470, 10),
+        ("has_basement",        160, 450, 10),
+        ("has_garage",          280, 450, 10),
+    ],
+
+    # P6 (page 5): Lead paint checkboxes
+    5: [
+        ("lead_paint_pre1978",  100, 480, 10),
+        ("lead_paint_post1978", 100, 460, 10),
+        ("lead_paint_unknown",  100, 440, 10),
+    ],
+
+    # P8 (page 7): Lead paint disclosure checkboxes
+    7: [
+        ("lead_known_hazards",      100, 520, 10),
+        ("lead_no_known_hazards",   100, 500, 10),
+        ("lead_records_available",  100, 460, 10),
+        ("lead_no_records",         100, 440, 10),
+    ],
+
+    # P9 (page 8): Pre/post 1978
+    8: [
+        ("built_pre_1978",      160, 580, 10),
+        ("built_post_1978",     160, 560, 10),
+    ],
+}
+
+# Pages to SKIP in the base PDF (0-indexed) when entity docs are appended.
+# Page 11 = W-9 (replaced by entity upload)
+# Pages 12-13 = Payee Auth (replaced by entity upload)
+SKIP_PAGES = {11, 12, 13}
+
+
+def _create_text_overlay(page_num: int, form_data: dict) -> Optional[bytes]:
+    """Create a single-page transparent PDF with text at mapped coordinates.
+
+    Returns PDF bytes for one page, or None if no fields for this page.
+    """
+    text_fields = FIELD_MAP.get(page_num, [])
+    checkbox_fields = CHECKBOX_MAP.get(page_num, [])
+
+    if not text_fields and not checkbox_fields:
+        return None
+
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=letter)
+
+    # Draw text fields
+    for field_name, x, y, font_size in text_fields:
+        value = form_data.get(field_name, "")
+        if value:
+            c.setFont("Helvetica", font_size)
+            c.drawString(x, y, str(value))
+
+    # Draw checkbox fields
+    for field_name, x, y, size in checkbox_fields:
+        value = form_data.get(field_name)
+        if value and str(value).lower() in ("true", "1", "yes", "on"):
+            c.setFont("Helvetica-Bold", size)
+            c.drawString(x, y, "X")
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf.read()
+
+
+def generate_packet(
+    form_data: dict,
+    entity_w9_path: Optional[str] = None,
+    entity_payee_path: Optional[str] = None,
+    blank_pdf_path: Optional[str] = None,
+) -> bytes:
+    """Generate a filled MSHDA landlord packet PDF.
+
+    Args:
+        form_data: Dict of field values to overlay on the scanned pages.
+        entity_w9_path: Path or URL to the entity's W-9 PDF.
+        entity_payee_path: Path or URL to the entity's Payee Authorization PDF.
+        blank_pdf_path: Override path to the blank packet PDF (for testing).
+
+    Returns:
+        bytes: The generated PDF file contents.
+    """
+    template_path = blank_pdf_path or str(BLANK_PACKET_PATH)
+
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(
+            f"Blank MSHDA packet not found at {template_path}. "
+            "Place the scanned PDF at webapp/static/templates/mshda_blank_packet.pdf"
+        )
+
+    # Derive composite fields if not explicitly provided
+    _derive_fields(form_data)
+
+    reader = PdfReader(template_path)
+    writer = PdfWriter()
+
+    total_pages = len(reader.pages)
+    logger.info(f"Processing {total_pages}-page blank packet")
+
+    for page_num in range(total_pages):
+        # Skip pages replaced by entity uploads
+        if page_num in SKIP_PAGES and (entity_w9_path or entity_payee_path):
+            logger.debug(f"Skipping page {page_num + 1} (replaced by entity doc)")
+            continue
+
+        page = reader.pages[page_num]
+
+        # Create text overlay for this page
+        overlay_bytes = _create_text_overlay(page_num, form_data)
+        if overlay_bytes:
+            overlay_reader = PdfReader(io.BytesIO(overlay_bytes))
+            overlay_page = overlay_reader.pages[0]
+            page.merge_page(overlay_page)
+
+        writer.add_page(page)
+
+    # Append entity W-9 PDF
+    if entity_w9_path:
+        _append_pdf(writer, entity_w9_path, "W-9")
+
+    # Append entity Payee Authorization PDF
+    if entity_payee_path:
+        _append_pdf(writer, entity_payee_path, "Payee Auth")
+
+    # Write final PDF to bytes
+    output = io.BytesIO()
+    writer.write(output)
+    output.seek(0)
+
+    logger.info(f"Generated packet: {len(writer.pages)} pages")
+    return output.read()
+
+
+def _derive_fields(form_data: dict):
+    """Fill in composite/derived fields from existing data."""
+    # Build full unit address if components exist
+    if "unit_address" not in form_data or not form_data["unit_address"]:
+        parts = [
+            form_data.get("property_address", ""),
+        ]
+        city_state_zip = ", ".join(filter(None, [
+            form_data.get("city", ""),
+            form_data.get("state", ""),
+        ]))
+        if form_data.get("zip_code"):
+            city_state_zip += " " + form_data["zip_code"]
+        if city_state_zip.strip():
+            parts.append(city_state_zip.strip())
+        form_data["unit_address"] = ", ".join(filter(None, parts))
+
+    # Default signature date to today
+    if "signature_date" not in form_data or not form_data["signature_date"]:
+        from datetime import date
+        form_data["signature_date"] = date.today().strftime("%m/%d/%Y")
+
+    if "tenant_sign_date" not in form_data or not form_data["tenant_sign_date"]:
+        form_data["tenant_sign_date"] = form_data.get("signature_date", "")
+
+
+def _append_pdf(writer: PdfWriter, pdf_path: str, label: str):
+    """Append all pages from an external PDF file to the writer."""
+    try:
+        if pdf_path.startswith(("http://", "https://")):
+            # Download from URL (R2 or external)
+            import urllib.request
+            with urllib.request.urlopen(pdf_path) as resp:
+                pdf_bytes = resp.read()
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+        else:
+            reader = PdfReader(pdf_path)
+
+        for page in reader.pages:
+            writer.add_page(page)
+        logger.info(f"Appended {len(reader.pages)} {label} pages")
+    except Exception as e:
+        logger.error(f"Failed to append {label} from {pdf_path}: {e}")

@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}Generate MSHDA Packet{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bd-fade-up">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Generate MSHDA Packet</h1>
+            <p class="text-sm text-gray-500 mt-1">Fill in the details to generate a landlord packet for Section 8</p>
+        </div>
+        <a href="/packets" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            Back to Packets
+        </a>
+    </div>
+
+    <!-- Error Messages -->
+    {% set error = request.query_params.get('error', '') %}
+    {% if error %}
+    <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+        {% if error == 'property_required' %}Please select a property.
+        {% elif error == 'blank_pdf_missing' %}Blank MSHDA packet PDF not found. Place the scanned PDF at webapp/static/templates/mshda_blank_packet.pdf
+        {% elif error == 'generation_failed' %}Packet generation failed. Check server logs for details.
+        {% else %}{{ error }}{% endif %}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/packets/generate" id="packet-form">
+        <!-- Section 1: Property & Tenant Selection -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                    Property & Tenant
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Property *</label>
+                        <select name="property_id" id="property-select" required class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Select property...</option>
+                            {% for prop in properties %}
+                            <option value="{{ prop.id }}" data-entity="{{ prop.entity or '' }}">{{ prop.address }}{% if prop.city %}, {{ prop.city }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Tenant</label>
+                        <select name="tenant_id" id="tenant-select" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Select tenant...</option>
+                            {% for tenant in tenants %}
+                            <option value="{{ tenant.id }}" data-property="{{ tenant.property_id }}">{{ tenant.name }}{% if tenant.property_ref %} — {{ tenant.property_ref.address }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Entity Selection -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                    Entity / Owner
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Entity</label>
+                    <select name="entity_id" id="entity-select" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">Select entity...</option>
+                        {% for entity in entities %}
+                        <option value="{{ entity.id }}">{{ entity.entity_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="entity-doc-status" class="mt-2 hidden">
+                        <div class="flex items-center gap-3 text-xs">
+                            <span id="w9-status" class="bd-badge bd-badge-warning">W-9: Missing</span>
+                            <span id="payee-status" class="bd-badge bd-badge-warning">Payee Auth: Missing</span>
+                        </div>
+                        <p id="entity-doc-warning" class="text-xs text-amber-600 mt-1 hidden">
+                            Missing documents will not be appended. <a href="/packets" class="underline">Upload them first</a>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Entity Name</label>
+                        <input type="text" name="entity_name" id="entity_name" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Silo Capital LLC">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Owner Name</label>
+                        <input type="text" name="owner_name" id="owner_name" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Owner Email</label>
+                        <input type="email" name="owner_email" id="owner_email" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Owner Phone</label>
+                        <input type="text" name="owner_phone" id="owner_phone" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Mailing Address</label>
+                        <input type="text" name="owner_mailing_address" id="owner_mailing_address" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Property Details -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">3</span>
+                    Unit Details
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Property Address</label>
+                    <input type="text" name="property_address" id="property_address" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">City</label>
+                        <input type="text" name="city" id="city" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">State</label>
+                        <input type="text" name="state" id="state" value="MI" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ZIP</label>
+                        <input type="text" name="zip_code" id="zip_code" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Year Built</label>
+                        <input type="text" name="year_built" id="year_built" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Bedrooms</label>
+                        <input type="text" name="bedrooms" id="bedrooms" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Bathrooms</label>
+                        <input type="text" name="bathrooms" id="bathrooms" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Property Type</label>
+                        <select name="property_type" id="property_type" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Select...</option>
+                            <option value="Single Family">Single Family</option>
+                            <option value="Duplex">Duplex</option>
+                            <option value="Multi-Family">Multi-Family</option>
+                            <option value="Townhouse">Townhouse</option>
+                            <option value="Apartment">Apartment</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Building Features Checkboxes -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-2">Building Features</label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_central_air" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Central Air
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_window_units" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Window Units
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_gas_heat" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Gas Heat
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_electric_heat" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Electric Heat
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_basement" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Basement
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="has_garage" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Garage
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Tenant & Lease Terms -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">4</span>
+                    Tenant & Lease Terms
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Tenant Name</label>
+                        <input type="text" name="tenant_name" id="tenant_name" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Tenant Email</label>
+                        <input type="email" name="tenant_email" id="tenant_email" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Lease Start</label>
+                        <input type="date" name="lease_start_date" id="lease_start_date" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Lease End</label>
+                        <input type="date" name="lease_end_date" id="lease_end_date" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Proposed Rent</label>
+                        <input type="text" name="proposed_rent" id="proposed_rent" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="$0.00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Utility Allowance</label>
+                        <input type="text" name="utility_allowance" id="utility_allowance" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="$0.00">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: Lead Paint -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">5</span>
+                    Lead-Based Paint
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-2">Year Built Classification</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="radio" name="lead_year_class" value="pre1978" class="border-gray-300 text-blue-600 focus:ring-blue-500" onchange="updateLeadCheckboxes(this.value)"> Built before 1978 (lead paint disclosure required)
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="radio" name="lead_year_class" value="post1978" class="border-gray-300 text-blue-600 focus:ring-blue-500" onchange="updateLeadCheckboxes(this.value)"> Built 1978 or later (exempt)
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="radio" name="lead_year_class" value="unknown" class="border-gray-300 text-blue-600 focus:ring-blue-500" onchange="updateLeadCheckboxes(this.value)"> Year unknown
+                        </label>
+                    </div>
+                    <!-- Hidden fields for checkbox mapping -->
+                    <input type="hidden" name="built_pre_1978" id="built_pre_1978" value="">
+                    <input type="hidden" name="built_post_1978" id="built_post_1978" value="">
+                    <input type="hidden" name="lead_paint_pre1978" id="lead_paint_pre1978" value="">
+                    <input type="hidden" name="lead_paint_post1978" id="lead_paint_post1978" value="">
+                    <input type="hidden" name="lead_paint_unknown" id="lead_paint_unknown" value="">
+                </div>
+
+                <div id="lead-disclosure-section" class="hidden border-t border-gray-100 pt-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-2">Lead Paint Disclosure (pre-1978 properties)</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="lead_known_hazards" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Known lead-based paint and/or hazards are present
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="lead_no_known_hazards" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> No known lead-based paint and/or hazards
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="lead_records_available" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> Records and reports available
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="lead_no_records" value="true" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"> No records or reports available
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 6: Bank Info -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">6</span>
+                    Bank Information (Payee Auth)
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Bank Name</label>
+                        <input type="text" name="bank_name" id="bank_name" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Routing Number</label>
+                        <input type="text" name="bank_routing_number" id="bank_routing_number" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Account Number</label>
+                        <input type="text" name="bank_account_number" id="bank_account_number" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 7: Signature Date -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">7</span>
+                    Review & Generate
+                </h2>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Signature Date</label>
+                        <input type="date" name="signature_date_input" id="signature_date_input" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" name="signature_date" id="signature_date">
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
+                    <p class="font-medium mb-1">Before generating:</p>
+                    <ul class="list-disc list-inside space-y-0.5 text-xs text-blue-700">
+                        <li>Ensure the blank MSHDA packet PDF is placed at <code class="bg-blue-100 px-1 rounded">webapp/static/templates/mshda_blank_packet.pdf</code></li>
+                        <li>Upload entity W-9 and Payee Authorization on the <a href="/packets" class="underline">Packets page</a> if not done already</li>
+                        <li>Review all fields above — they will be overlaid on the scanned packet pages</li>
+                        <li>Coordinate calibration may be needed — generate a test packet and adjust</li>
+                    </ul>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <a href="/packets" class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</a>
+                    <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm bd-btn-press">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                        </svg>
+                        Generate Packet
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// ── Auto-fill on property selection ──
+document.getElementById('property-select').addEventListener('change', async function() {
+    const id = this.value;
+    if (!id) return;
+    try {
+        const res = await fetch(`/packets/api/property/${id}`);
+        const data = await res.json();
+        setVal('property_address', data.address);
+        setVal('city', data.city);
+        setVal('state', data.state);
+        setVal('zip_code', data.zip_code);
+        setVal('bedrooms', data.bedrooms);
+        setVal('bathrooms', data.bathrooms);
+        setVal('year_built', data.year_built);
+        if (data.property_type) setSelectVal('property_type', data.property_type);
+        if (data.monthly_rent) setVal('proposed_rent', data.monthly_rent);
+        if (data.lease_start_date) setVal('lease_start_date', data.lease_start_date);
+        if (data.lease_end_date) setVal('lease_end_date', data.lease_end_date);
+
+        // Auto-select entity if property has one
+        if (data.entity) {
+            const entitySelect = document.getElementById('entity-select');
+            for (const opt of entitySelect.options) {
+                if (opt.text === data.entity) {
+                    entitySelect.value = opt.value;
+                    entitySelect.dispatchEvent(new Event('change'));
+                    break;
+                }
+            }
+        }
+
+        // Auto-set lead paint year classification
+        if (data.year_built) {
+            const yr = parseInt(data.year_built);
+            if (yr < 1978) {
+                document.querySelector('input[name="lead_year_class"][value="pre1978"]').checked = true;
+                updateLeadCheckboxes('pre1978');
+            } else if (yr >= 1978) {
+                document.querySelector('input[name="lead_year_class"][value="post1978"]').checked = true;
+                updateLeadCheckboxes('post1978');
+            }
+        }
+    } catch(e) { console.error('Failed to fetch property data:', e); }
+});
+
+// ── Auto-fill on tenant selection ──
+document.getElementById('tenant-select').addEventListener('change', async function() {
+    const id = this.value;
+    if (!id) return;
+    try {
+        const res = await fetch(`/packets/api/tenant/${id}`);
+        const data = await res.json();
+        setVal('tenant_name', data.name);
+        setVal('tenant_email', data.email);
+        if (data.proposed_rent) setVal('proposed_rent', data.proposed_rent);
+        if (data.lease_start_date) setVal('lease_start_date', data.lease_start_date);
+        if (data.lease_end_date) setVal('lease_end_date', data.lease_end_date);
+
+        // Auto-select property if not already selected
+        const propSelect = document.getElementById('property-select');
+        if (!propSelect.value && data.property_id) {
+            propSelect.value = data.property_id;
+            propSelect.dispatchEvent(new Event('change'));
+        }
+    } catch(e) { console.error('Failed to fetch tenant data:', e); }
+});
+
+// ── Auto-fill on entity selection ──
+document.getElementById('entity-select').addEventListener('change', async function() {
+    const id = this.value;
+    const statusDiv = document.getElementById('entity-doc-status');
+    if (!id) {
+        statusDiv.classList.add('hidden');
+        return;
+    }
+    try {
+        const res = await fetch(`/packets/api/entity/${id}`);
+        const data = await res.json();
+        setVal('entity_name', data.entity_name);
+        setVal('owner_name', data.owner_name);
+        setVal('owner_email', data.email);
+        setVal('owner_phone', data.phone);
+        setVal('owner_mailing_address', data.mailing_address);
+        setVal('bank_name', data.bank_name);
+        setVal('bank_routing_number', data.bank_routing_number);
+        setVal('bank_account_number', data.bank_account_number);
+
+        // Update doc status badges
+        statusDiv.classList.remove('hidden');
+        const w9El = document.getElementById('w9-status');
+        const payeeEl = document.getElementById('payee-status');
+        const warnEl = document.getElementById('entity-doc-warning');
+
+        w9El.className = data.has_w9 ? 'bd-badge bd-badge-success' : 'bd-badge bd-badge-warning';
+        w9El.textContent = data.has_w9 ? 'W-9: Uploaded' : 'W-9: Missing';
+        payeeEl.className = data.has_payee_auth ? 'bd-badge bd-badge-success' : 'bd-badge bd-badge-warning';
+        payeeEl.textContent = data.has_payee_auth ? 'Payee Auth: Uploaded' : 'Payee Auth: Missing';
+
+        if (!data.has_w9 || !data.has_payee_auth) {
+            warnEl.classList.remove('hidden');
+        } else {
+            warnEl.classList.add('hidden');
+        }
+    } catch(e) { console.error('Failed to fetch entity data:', e); }
+});
+
+// ── Lead paint checkbox logic ──
+function updateLeadCheckboxes(value) {
+    document.getElementById('built_pre_1978').value = value === 'pre1978' ? 'true' : '';
+    document.getElementById('built_post_1978').value = value === 'post1978' ? 'true' : '';
+    document.getElementById('lead_paint_pre1978').value = value === 'pre1978' ? 'true' : '';
+    document.getElementById('lead_paint_post1978').value = value === 'post1978' ? 'true' : '';
+    document.getElementById('lead_paint_unknown').value = value === 'unknown' ? 'true' : '';
+
+    const section = document.getElementById('lead-disclosure-section');
+    if (value === 'pre1978') {
+        section.classList.remove('hidden');
+    } else {
+        section.classList.add('hidden');
+    }
+}
+
+// ── Signature date formatting ──
+document.getElementById('signature_date_input').addEventListener('change', function() {
+    const val = this.value;
+    if (val) {
+        const parts = val.split('-');
+        document.getElementById('signature_date').value = `${parts[1]}/${parts[2]}/${parts[0]}`;
+    }
+});
+// Default to today
+const today = new Date();
+const todayStr = today.toISOString().split('T')[0];
+document.getElementById('signature_date_input').value = todayStr;
+const tp = todayStr.split('-');
+document.getElementById('signature_date').value = `${tp[1]}/${tp[2]}/${tp[0]}`;
+
+// ── Helpers ──
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (el && val) el.value = val;
+}
+function setSelectVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    for (const opt of el.options) {
+        if (opt.value === val) { el.value = val; return; }
+    }
+}
+</script>
+
+{% endblock %}

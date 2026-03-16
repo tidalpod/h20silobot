@@ -63,6 +63,10 @@ PyJWT==2.8.0
 # PDF manipulation (signature page append)
 pypdf>=3.0.0
 
+# PDF text overlay for MSHDA packet generation
+reportlab>=4.0.0
+PyMuPDF>=1.23.0
+
 # Cloudflare R2 / S3-compatible object storage
 boto3>=1.34.0
 
