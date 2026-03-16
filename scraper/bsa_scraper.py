@@ -104,7 +104,7 @@ class BSAScraper:
     async def _get_validated_session(cls, municipality_uid: str) -> Optional[aiohttp.ClientSession]:
         """
         Get an HTTP session that has passed BSA's CAPTCHA validation.
-        Solves reCAPTCHA v2 via 2captcha if CAPTCHA_API_KEY is configured.
+        Solves reCAPTCHA v2 via CapSolver if CAPTCHA_API_KEY is configured.
         Reuses the session for all subsequent requests.
         """
         # Reuse existing validated session if same municipality
@@ -194,49 +194,55 @@ class BSAScraper:
 
     @classmethod
     async def _solve_recaptcha_v2(cls, api_key: str, municipality_uid: str) -> Optional[str]:
-        """Solve reCAPTCHA v2 using 2captcha API."""
+        """Solve reCAPTCHA v2 using CapSolver API."""
         page_url = f"{cls.BASE_URL}/Account/ValidateUser?uid={municipality_uid}"
 
         try:
-            timeout = aiohttp.ClientTimeout(total=120)
+            timeout = aiohttp.ClientTimeout(total=180)
             async with aiohttp.ClientSession() as solver_session:
-                # Submit captcha task
-                submit_url = "http://2captcha.com/in.php"
-                params = {
-                    "key": api_key,
-                    "method": "userrecaptcha",
-                    "googlekey": cls.CAPTCHA_SITE_KEY,
-                    "pageurl": page_url,
-                    "json": "1",
+                # Create task
+                create_url = "https://api.capsolver.com/createTask"
+                payload = {
+                    "clientKey": api_key,
+                    "task": {
+                        "type": "ReCaptchaV2TaskProxyLess",
+                        "websiteURL": page_url,
+                        "websiteKey": cls.CAPTCHA_SITE_KEY,
+                    }
                 }
-                async with solver_session.get(submit_url, params=params, timeout=timeout) as resp:
+                async with solver_session.post(create_url, json=payload, timeout=timeout) as resp:
                     result = await resp.json()
-                    if result.get("status") != 1:
-                        logger.error(f"2captcha submit failed: {result}")
+                    if result.get("errorId", 1) != 0:
+                        logger.error(f"CapSolver create task failed: {result}")
                         return None
-                    task_id = result["request"]
-                    logger.info(f"2captcha task submitted: {task_id}")
+                    task_id = result["taskId"]
+                    logger.info(f"CapSolver task submitted: {task_id}")
 
-                # Poll for result (typically 15-30 seconds)
-                result_url = "http://2captcha.com/res.php"
-                params = {"key": api_key, "action": "get", "id": task_id, "json": "1"}
+                # Poll for result
+                result_url = "https://api.capsolver.com/getTaskResult"
+                poll_payload = {"clientKey": api_key, "taskId": task_id}
 
                 for attempt in range(36):  # Max ~3 minutes
                     await asyncio.sleep(5)
-                    async with solver_session.get(result_url, params=params, timeout=timeout) as resp:
+                    async with solver_session.post(result_url, json=poll_payload, timeout=timeout) as resp:
                         result = await resp.json()
-                        if result.get("status") == 1:
-                            logger.info(f"2captcha solved in {(attempt+1)*5}s")
-                            return result["request"]
-                        if result.get("request") != "CAPCHA_NOT_READY":
-                            logger.error(f"2captcha error: {result}")
+                        status = result.get("status", "")
+                        if status == "ready":
+                            token = result.get("solution", {}).get("gRecaptchaResponse")
+                            if token:
+                                logger.info(f"CapSolver solved in {(attempt+1)*5}s")
+                                return token
+                            logger.error(f"CapSolver ready but no token: {result}")
+                            return None
+                        if status != "processing":
+                            logger.error(f"CapSolver error: {result}")
                             return None
 
-                logger.error("2captcha timeout — no solution after 3 minutes")
+                logger.error("CapSolver timeout — no solution after 3 minutes")
                 return None
 
         except Exception as e:
-            logger.error(f"2captcha error: {e}")
+            logger.error(f"CapSolver error: {e}")
             return None
 
     @classmethod
