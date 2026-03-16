@@ -101,7 +101,12 @@
         <tbody class="bg-white divide-y divide-gray-200">
             {% for bill in bills %}
             {% set bill_status = bill.calculate_status() %}
-            <tr class="hover:bg-gray-50">
+            {% if bill.scraped_at %}
+                {% set days_ago = (now - bill.scraped_at).days %}
+            {% else %}
+                {% set days_ago = 999 %}
+            {% endif %}
+            <tr class="hover:bg-gray-50 {% if days_ago > 30 %}bg-orange-50/40{% endif %}">
                 <td class="px-6 py-4 whitespace-nowrap">
                     <a href="/properties/{{ bill.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                         {{ bill.property.address }}
@@ -129,8 +134,11 @@
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">Unknown</span>
                     {% endif %}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-6 py-4 whitespace-nowrap text-sm {% if days_ago <= 7 %}text-green-600 font-medium{% elif days_ago <= 30 %}text-gray-500{% else %}text-orange-600 font-medium{% endif %}">
                     {{ bill.scraped_at.strftime('%b %d, %H:%M') if bill.scraped_at else 'N/A' }}
+                    {% if days_ago > 30 %}
+                    <span class="text-[10px] text-orange-500 block">{{ days_ago }}d ago</span>
+                    {% endif %}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right">
                     <button onclick="refreshProperty({{ bill.property.id }}, this)"

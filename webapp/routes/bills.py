@@ -1,5 +1,6 @@
 """Bill management routes"""
 
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request, HTTPException
@@ -77,6 +78,7 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
             "properties": properties,
             "property_id": property_id,
             "show_all": show_all,
+            "now": datetime.utcnow(),
         }
     )
 
