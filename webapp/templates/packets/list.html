@@ -139,14 +139,15 @@
                     <div class="border border-gray-200 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">W-9</span>
-                            {% set w9_doc = entity.documents | selectattr('doc_type', 'equalto', 'w9') | first %}
-                            {% if w9_doc is defined and w9_doc %}
+                            {% set w9_docs = entity.documents | selectattr('doc_type', 'equalto', 'w9') | list %}
+                            {% set w9_doc = w9_docs[0] if w9_docs else None %}
+                            {% if w9_doc %}
                             <span class="bd-badge bd-badge-success text-[10px]">Uploaded</span>
                             {% else %}
                             <span class="bd-badge bd-badge-warning text-[10px]">Missing</span>
                             {% endif %}
                         </div>
-                        {% if w9_doc is defined and w9_doc %}
+                        {% if w9_doc %}
                         <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
                             <span>{{ w9_doc.original_filename or 'w9.pdf' }}</span>
                             <form method="POST" action="/packets/entities/{{ entity.id }}/documents/{{ w9_doc.id }}/delete" class="inline" onsubmit="return confirm('Remove this W-9?')">
@@ -167,14 +168,15 @@
                     <div class="border border-gray-200 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Payee Authorization</span>
-                            {% set payee_doc = entity.documents | selectattr('doc_type', 'equalto', 'payee_auth') | first %}
-                            {% if payee_doc is defined and payee_doc %}
+                            {% set payee_docs = entity.documents | selectattr('doc_type', 'equalto', 'payee_auth') | list %}
+                            {% set payee_doc = payee_docs[0] if payee_docs else None %}
+                            {% if payee_doc %}
                             <span class="bd-badge bd-badge-success text-[10px]">Uploaded</span>
                             {% else %}
                             <span class="bd-badge bd-badge-warning text-[10px]">Missing</span>
                             {% endif %}
                         </div>
-                        {% if payee_doc is defined and payee_doc %}
+                        {% if payee_doc %}
                         <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
                             <span>{{ payee_doc.original_filename or 'payee_auth.pdf' }}</span>
                             <form method="POST" action="/packets/entities/{{ entity.id }}/documents/{{ payee_doc.id }}/delete" class="inline" onsubmit="return confirm('Remove this Payee Auth?')">
