@@ -9,6 +9,7 @@ Specifically configured for City of Warren Utility Billing.
 import asyncio
 import logging
 import re
+import time
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
@@ -97,6 +98,7 @@ class BSAScraper:
     # Shared validated session (reused across requests after CAPTCHA solve)
     _validated_session: Optional[aiohttp.ClientSession] = None
     _session_uid: Optional[str] = None
+    _last_captcha_failure: float = 0  # timestamp of last CAPTCHA failure
 
     @classmethod
     async def _get_validated_session(cls, municipality_uid: str) -> Optional[aiohttp.ClientSession]:
@@ -147,10 +149,17 @@ class BSAScraper:
                 await session.close()
                 return None
 
+            # Don't retry CAPTCHA if one just failed (30s cooldown)
+            if time.time() - cls._last_captcha_failure < 30:
+                logger.warning("CAPTCHA solve failed recently — skipping retry (30s cooldown)")
+                await session.close()
+                return None
+
             # Submit CAPTCHA to 2captcha
             captcha_token = await cls._solve_recaptcha_v2(captcha_api_key, municipality_uid)
             if not captcha_token:
                 logger.error("Failed to solve CAPTCHA")
+                cls._last_captcha_failure = time.time()
                 await session.close()
                 return None
 
@@ -212,7 +221,7 @@ class BSAScraper:
                 result_url = "http://2captcha.com/res.php"
                 params = {"key": api_key, "action": "get", "id": task_id, "json": "1"}
 
-                for attempt in range(24):  # Max ~2 minutes
+                for attempt in range(36):  # Max ~3 minutes
                     await asyncio.sleep(5)
                     async with solver_session.get(result_url, params=params, timeout=timeout) as resp:
                         result = await resp.json()
@@ -223,7 +232,7 @@ class BSAScraper:
                             logger.error(f"2captcha error: {result}")
                             return None
 
-                logger.error("2captcha timeout — no solution after 2 minutes")
+                logger.error("2captcha timeout — no solution after 3 minutes")
                 return None
 
         except Exception as e:
