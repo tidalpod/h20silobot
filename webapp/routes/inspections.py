@@ -1,19 +1,24 @@
 """Inspections routes"""
 
+import uuid
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, Tenant, SMSMessage, MessageDirection
+from database.models import (
+    Property, Tenant, SMSMessage, MessageDirection,
+    Vendor, COInspectionDocument, COInspectionVendor,
+)
 from webapp.auth.dependencies import get_current_user
+from webapp.services.storage_service import storage
 from webapp.services.twilio_service import twilio_service
 
 logger = logging.getLogger(__name__)
@@ -423,3 +428,224 @@ async def delete_inspection(
             await session.commit()
 
     return RedirectResponse(url="/inspections", status_code=303)
+
+
+# =============================================================================
+# CO Inspection Profile
+# =============================================================================
+
+CO_TYPES = ["building", "zoning", "electrical", "mechanical", "plumbing"]
+CO_TYPE_META = {
+    "building": {"label": "Building", "icon": "🏢"},
+    "zoning": {"label": "Zoning", "icon": "📐"},
+    "electrical": {"label": "Electrical", "icon": "⚡"},
+    "mechanical": {"label": "Mechanical", "icon": "⚙️"},
+    "plumbing": {"label": "Plumbing", "icon": "🔧"},
+}
+
+
+@router.get("/co/property/{property_id}", response_class=HTMLResponse)
+async def co_profile(request: Request, property_id: int):
+    """CO inspection profile page for a property"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        # Load CO documents grouped by type
+        docs_result = await session.execute(
+            select(COInspectionDocument)
+            .where(COInspectionDocument.property_id == property_id)
+            .order_by(COInspectionDocument.uploaded_at.desc())
+        )
+        all_docs = docs_result.scalars().all()
+        co_docs_by_type = {}
+        for t in CO_TYPES:
+            co_docs_by_type[t] = [d for d in all_docs if d.inspection_type == t]
+
+        # Load CO vendor assignments keyed by type
+        vendors_result = await session.execute(
+            select(COInspectionVendor)
+            .where(COInspectionVendor.property_id == property_id)
+            .options(selectinload(COInspectionVendor.vendor))
+        )
+        all_vendor_assignments = vendors_result.scalars().all()
+        co_vendors_by_type = {va.inspection_type: va for va in all_vendor_assignments}
+
+        # Load all active vendors for dropdown
+        vendor_list_result = await session.execute(
+            select(Vendor)
+            .where(Vendor.is_active == True)
+            .order_by(Vendor.name)
+        )
+        vendors = vendor_list_result.scalars().all()
+
+    return templates.TemplateResponse(
+        "inspections/co_profile.html",
+        {
+            "request": request,
+            "user": user,
+            "property": prop,
+            "co_types": CO_TYPES,
+            "co_type_meta": CO_TYPE_META,
+            "co_docs_by_type": co_docs_by_type,
+            "co_vendors_by_type": co_vendors_by_type,
+            "vendors": vendors,
+        }
+    )
+
+
+@router.post("/co/property/{property_id}/vendor/assign")
+async def assign_co_vendor(
+    request: Request,
+    property_id: int,
+    inspection_type: str = Form(...),
+    vendor_id: int = Form(...),
+    notes: str = Form(""),
+):
+    """Assign a vendor to a CO inspection type (or all types)"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    types_to_assign = CO_TYPES if inspection_type == "all" else [inspection_type]
+
+    async with get_session() as session:
+        for t in types_to_assign:
+            if t not in CO_TYPES:
+                continue
+            result = await session.execute(
+                select(COInspectionVendor).where(
+                    COInspectionVendor.property_id == property_id,
+                    COInspectionVendor.inspection_type == t,
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.vendor_id = vendor_id
+                existing.notes = notes or None
+                existing.assigned_at = datetime.utcnow()
+            else:
+                session.add(COInspectionVendor(
+                    property_id=property_id,
+                    inspection_type=t,
+                    vendor_id=vendor_id,
+                    notes=notes or None,
+                ))
+        await session.commit()
+
+    return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)
+
+
+@router.post("/co/property/{property_id}/docs/upload")
+async def upload_co_document(
+    request: Request,
+    property_id: int,
+    inspection_type: str = Form(...),
+    description: str = Form(""),
+    doc_file: UploadFile = File(None),
+    doc_image: UploadFile = File(None),
+):
+    """Upload a document (PDF and/or image) for a CO inspection type"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    if inspection_type not in CO_TYPES:
+        return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)
+
+    # Handle PDF
+    pdf_contents = None
+    pdf_filename = None
+    if doc_file and doc_file.filename:
+        if doc_file.content_type == "application/pdf":
+            pdf_contents = await doc_file.read()
+            if len(pdf_contents) > 20 * 1024 * 1024:
+                pdf_contents = None
+            else:
+                ext = Path(doc_file.filename).suffix.lower() or ".pdf"
+                pdf_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{ext}"
+
+    # Handle image
+    image_contents = None
+    image_filename = None
+    if doc_image and doc_image.filename:
+        allowed_image_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+        if doc_image.content_type in allowed_image_types:
+            image_contents = await doc_image.read()
+            if len(image_contents) > 10 * 1024 * 1024:
+                image_contents = None
+            else:
+                img_ext = Path(doc_image.filename).suffix.lower() or ".jpg"
+                image_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{img_ext}"
+
+    if not pdf_contents and not image_contents:
+        return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        saved_pdf_url = None
+        original_name = None
+        if pdf_contents and pdf_filename:
+            key = f"co_inspections/{pdf_filename}"
+            saved_pdf_url = storage.upload(key, pdf_contents, "application/pdf")
+            original_name = doc_file.filename
+
+        saved_image_url = None
+        if image_contents and image_filename:
+            key = f"co_inspections/{image_filename}"
+            saved_image_url = storage.upload(key, image_contents, doc_image.content_type)
+
+        doc = COInspectionDocument(
+            property_id=property_id,
+            inspection_type=inspection_type,
+            file_url=saved_pdf_url,
+            image_url=saved_image_url,
+            original_filename=original_name,
+            description=description or None,
+        )
+        session.add(doc)
+        await session.commit()
+
+    return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)
+
+
+@router.post("/co/property/{property_id}/docs/{doc_id}/delete")
+async def delete_co_document(request: Request, property_id: int, doc_id: int):
+    """Delete a CO inspection document"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(COInspectionDocument)
+            .where(COInspectionDocument.id == doc_id)
+            .where(COInspectionDocument.property_id == property_id)
+        )
+        doc = result.scalar_one_or_none()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        if doc.file_url:
+            storage.delete(doc.file_url)
+        if doc.image_url:
+            storage.delete(doc.image_url)
+
+        await session.delete(doc)
+        await session.commit()
+
+    return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)

@@ -263,6 +263,8 @@ class Property(Base):
     work_orders = relationship("WorkOrder", back_populates="property_ref", order_by="desc(WorkOrder.created_at)")
     lease_documents = relationship("LeaseDocument", back_populates="property_ref", order_by="desc(LeaseDocument.created_at)")
     violations = relationship("InspectionViolation", back_populates="property", order_by="desc(InspectionViolation.violation_date)")
+    co_documents = relationship("COInspectionDocument", back_populates="property", order_by="desc(COInspectionDocument.uploaded_at)")
+    co_vendors = relationship("COInspectionVendor", back_populates="property")
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -321,6 +323,49 @@ class InspectionViolation(Base):
 
     def __repr__(self):
         return f"<InspectionViolation {self.id} - {self.description}>"
+
+
+class COInspectionDocument(Base):
+    """Document (PDF/image) attached to a CO inspection type"""
+    __tablename__ = "co_inspection_documents"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    inspection_type = Column(String(20), nullable=False)  # building|zoning|electrical|mechanical|plumbing
+    file_url = Column(String(500), nullable=True)
+    image_url = Column(String(500), nullable=True)
+    original_filename = Column(String(255), nullable=True)
+    description = Column(String(255), nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    property = relationship("Property", back_populates="co_documents")
+
+    def __repr__(self):
+        return f"<COInspectionDocument {self.id} - {self.inspection_type}>"
+
+
+class COInspectionVendor(Base):
+    """Vendor assignment for a CO inspection type"""
+    __tablename__ = "co_inspection_vendors"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    inspection_type = Column(String(20), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    assigned_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    property = relationship("Property", back_populates="co_vendors")
+    vendor = relationship("Vendor", back_populates="co_inspection_assignments")
+
+    __table_args__ = (
+        Index("ix_co_insp_vendor_prop_type", "property_id", "inspection_type", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<COInspectionVendor {self.id} - {self.inspection_type}>"
 
 
 class WaterBill(Base):
@@ -850,6 +895,7 @@ class Vendor(Base):
     invoices = relationship("Invoice", back_populates="vendor_ref")
     projects = relationship("Project", back_populates="vendor_ref")
     sms_messages = relationship("SMSMessage", back_populates="vendor", lazy="selectin")
+    co_inspection_assignments = relationship("COInspectionVendor", back_populates="vendor")
 
     def __repr__(self):
         return f"<Vendor {self.name}>"

@@ -93,6 +93,7 @@
                             {% endif %}
                         </td>
                         <td class="px-5 py-4 whitespace-nowrap text-right">
+                            <a href="/inspections/co/property/{{ item.property.id }}" class="text-orange-600 hover:text-orange-800 text-sm font-medium mr-2">Profile</a>
                             <button onclick="openEditCoModal({{ item.property.id }}, '{{ item.type }}', '{{ item.date.strftime('%Y-%m-%d') }}', '{{ item.time or '' }}', '{{ item.property.address }}')"
                                     class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">Edit</button>
                             <button onclick="confirmDeleteInspection({{ item.property.id }}, 'co', '{{ item.type }}', '{{ item.property.address }}')"
@@ -125,6 +126,7 @@
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase"></th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
@@ -143,6 +145,9 @@
                         </td>
                         <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-400">
                             {{ item.time or '—' }}
+                        </td>
+                        <td class="px-5 py-3 whitespace-nowrap text-right">
+                            <a href="/inspections/co/property/{{ item.property.id }}" class="text-orange-600 hover:text-orange-800 text-sm font-medium">Profile</a>
                         </td>
                     </tr>
                     {% endfor %}

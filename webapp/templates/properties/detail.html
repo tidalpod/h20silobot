@@ -654,7 +654,10 @@
             <!-- Certificate of Occupancy Inspections -->
             <div class="bg-white shadow rounded-lg">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-gray-900">🏗️ Certificate of Occupancy Inspections</h3>
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-base font-semibold text-gray-900">🏗️ Certificate of Occupancy Inspections</h3>
+                        <a href="/inspections/co/property/{{ property.id }}" class="text-sm text-blue-600 hover:text-blue-500">Full CO Profile</a>
+                    </div>
                     {% set has_any_co = property.co_mechanical_date or property.co_electrical_date or property.co_plumbing_date or property.co_zoning_date or property.co_building_date %}
                     {% if has_any_co %}
                     {% set all_passed = true %}
