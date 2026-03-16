@@ -50,6 +50,7 @@ async def bank_accounts_page(request: Request):
             )
             property_counts[entity.id] = count_result.scalar() or 0
 
+    from datetime import date
     return templates.TemplateResponse(
         "payments/bank_accounts.html",
         {
@@ -57,6 +58,7 @@ async def bank_accounts_page(request: Request):
             "user": user,
             "entities": entities,
             "property_counts": property_counts,
+            "today": date.today(),
         },
     )
 
