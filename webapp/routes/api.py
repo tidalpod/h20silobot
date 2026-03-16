@@ -17,6 +17,9 @@ from database.models import Property, WaterBill, BillStatus, Tenant, WorkOrder, 
 router = APIRouter(tags=["api"])
 logger = logging.getLogger(__name__)
 
+# Track refresh-all progress
+_refresh_status = {"running": False, "total": 0, "completed": 0, "last_property": ""}
+
 
 @router.get("/properties")
 async def api_list_properties(request: Request):
@@ -194,8 +197,16 @@ async def api_refresh_property(property_id: int):
 @router.post("/refresh-bills")
 async def api_refresh_all_bills(background_tasks: BackgroundTasks):
     """Trigger bill refresh for all active properties"""
+    if _refresh_status["running"]:
+        return {"status": "already_running", "message": "Refresh already in progress"}
     background_tasks.add_task(refresh_all_properties)
     return {"status": "started", "message": "Refreshing all bills in background"}
+
+
+@router.get("/refresh-bills/status")
+async def api_refresh_status():
+    """Get current refresh-all progress"""
+    return _refresh_status
 
 
 @router.get("/dashboard/stats")
@@ -313,6 +324,9 @@ async def refresh_single_property(property_id: int):
 
 async def refresh_all_properties():
     """Background task to refresh all active properties (grouped by city for efficiency)"""
+    _refresh_status["running"] = True
+    _refresh_status["completed"] = 0
+    _refresh_status["last_property"] = ""
     try:
         from scraper.bsa_scraper import BSAScraper
         from collections import defaultdict
@@ -323,6 +337,7 @@ async def refresh_all_properties():
             )
             properties = result.scalars().all()
 
+            _refresh_status["total"] = len(properties)
             logger.info(f"Starting refresh for {len(properties)} properties")
 
             # Group properties by city for efficient scraping (one browser per city)
@@ -386,6 +401,9 @@ async def refresh_all_properties():
                     except Exception as e:
                         logger.error(f"Error refreshing {prop.address}: {e}")
                         continue
+                    finally:
+                        _refresh_status["completed"] += 1
+                        _refresh_status["last_property"] = prop.address
 
             await session.commit()
             logger.info(f"Completed refresh: {scraped_count}/{len(properties)} properties scraped")
@@ -394,6 +412,8 @@ async def refresh_all_properties():
         logger.error("BSAScraper not available")
     except Exception as e:
         logger.error(f"Error in bulk refresh: {e}")
+    finally:
+        _refresh_status["running"] = False
 
 
 

@@ -155,12 +155,40 @@
             addStatus('Starting water bills refresh...', 'info');
             const resp = await fetch('/api/refresh-bills', { method: 'POST' });
             const data = await resp.json();
-            addStatus('Water bills refresh started in background', 'success');
-            addStatus('Check back in a few minutes to see updated data', 'info');
 
-            setTimeout(() => {
-                setButtonLoading(false);
-            }, 3000);
+            if (data.status === 'already_running') {
+                addStatus('Refresh already in progress, tracking...', 'info');
+            } else {
+                addStatus('Water bills refresh started', 'success');
+            }
+
+            // Poll for progress
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusResp = await fetch('/api/refresh-bills/status');
+                    const status = await statusResp.json();
+
+                    // Update progress display
+                    statusDiv.innerHTML = '';
+                    if (status.total > 0) {
+                        const pct = Math.round((status.completed / status.total) * 100);
+                        addStatus(`Progress: ${status.completed}/${status.total} properties (${pct}%)`, 'info');
+                        if (status.last_property) {
+                            addStatus(`Last: ${status.last_property}`, 'info');
+                        }
+                    }
+
+                    if (!status.running && status.completed > 0) {
+                        clearInterval(pollInterval);
+                        addStatus(`Refresh complete! ${status.completed}/${status.total} properties updated.`, 'success');
+                        setButtonLoading(false);
+                        // Reload after a moment so the user sees the success message
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                } catch (e) {
+                    // Polling error, keep trying
+                }
+            }, 2000);
 
         } catch (error) {
             addStatus('Error: ' + error.message, 'error');
