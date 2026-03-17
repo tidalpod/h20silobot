@@ -42,162 +42,129 @@ PAGE_W, PAGE_H = letter  # 612 x 792
 
 FIELD_MAP = {
     # ------------------------------------------------------------------
-    # P1 (page 0): Checklist cover page
-    # ------------------------------------------------------------------
-    0: [
-        ("property_address",    150, 605, 10),
-        ("tenant_name",         150, 580, 10),
-    ],
-
-    # ------------------------------------------------------------------
     # P2 (page 1): Communications notice
+    # Calibrated from grid: fields at y≈340, 300, 222, 187
     # ------------------------------------------------------------------
     1: [
-        ("tenant_name",         180, 620, 10),
-        ("tenant_email",        180, 600, 10),
-        ("owner_name",          180, 560, 10),
-        ("owner_email",         180, 540, 10),
-        ("owner_phone",         180, 520, 10),
+        ("tenant_name",    205, 342, 12),
+        ("tenant_email",   205, 302, 12),
+        ("owner_name",     205, 224, 12),
+        ("owner_email",    215, 187, 12),
     ],
 
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
+    # Calibrated from grid: rows at y≈665, 645, 625, 605, 585, 205, 185, 165
     # ------------------------------------------------------------------
     3: [
-        ("unit_address",        160, 680, 9),
-        ("owner_name",          160, 655, 9),
-        ("owner_mailing_address", 160, 635, 9),
-        ("owner_phone",         160, 615, 9),
-        ("owner_email",         420, 615, 9),
-        ("bedrooms",            200, 575, 9),
-        ("bathrooms",           320, 575, 9),
-        ("year_built",          440, 575, 9),
-        ("property_type",       200, 555, 9),
+        ("tenant_name",         145, 665, 11),
+        ("unit_address",        145, 645, 10),
+        ("city",                 90, 625, 11),
+        ("state",               445, 625, 11),
+        ("zip_code",            510, 625, 11),
+        ("bedrooms",            175, 605, 11),
+        ("bathrooms",           345, 605, 11),
+        ("year_built",          335, 585, 11),
+        ("proposed_rent",       515, 585, 11),
+        ("entity_name",        160, 205, 10),
+        ("owner_name",         145, 185, 11),
+        ("owner_phone",        105, 165, 10),
+        ("owner_email",        420, 165, 10),
     ],
 
     # ------------------------------------------------------------------
     # P5 (page 4): Property Owner Checklist p2 — owner certification
+    # Calibrated: printed name at y≈260, signature at y≈228
     # ------------------------------------------------------------------
     4: [
-        ("owner_name",          160, 200, 10),
-        ("signature_date",      420, 200, 10),
+        ("owner_name",     100, 260, 11),
+        ("signature_date", 400, 228, 11),
     ],
 
     # ------------------------------------------------------------------
-    # P6 (page 5): HUD-52517 p2 — certifications, lead paint
+    # P6 (page 5): HUD-52517 p2 — certifications, signatures at bottom
+    # Calibrated: owner name y≈103, tenant name y≈103, dates y≈50
     # ------------------------------------------------------------------
     5: [
-        ("owner_name",          120, 280, 9),
-        ("signature_date",      420, 280, 9),
-        ("tenant_name",         120, 240, 9),
-        ("tenant_sign_date",    420, 240, 9),
+        ("owner_name",         60, 103, 10),
+        ("tenant_name",       345, 103, 10),
+        ("signature_date",    230,  50, 10),
+        ("tenant_sign_date",  495,  50, 10),
     ],
 
     # ------------------------------------------------------------------
     # P7 (page 6): HUD-52517 p1 — Request for Tenancy Approval
+    # Calibrated: address y≈420, items 3-8 y≈368, rent fields y≈298
     # ------------------------------------------------------------------
     6: [
-        ("tenant_name",         180, 660, 10),
-        ("unit_address",        180, 635, 9),
-        ("city",                180, 615, 9),
-        ("state",               340, 615, 9),
-        ("zip_code",            420, 615, 9),
-        ("property_type",       180, 590, 9),
-        ("bedrooms",            340, 590, 9),
-        ("lease_start_date",    180, 545, 9),
-        ("lease_end_date",      340, 545, 9),
-        ("proposed_rent",       180, 510, 10),
-        ("utility_allowance",   340, 510, 10),
-        ("owner_name",          180, 440, 10),
-        ("owner_mailing_address", 180, 420, 9),
-        ("owner_phone",         180, 400, 9),
+        ("unit_address",        325, 420, 10),
+        ("lease_start_date",     60, 368, 10),
+        ("bedrooms",            200, 368, 10),
+        ("year_built",          265, 368, 10),
+        ("proposed_rent",       350, 368, 10),
+        ("utility_allowance",   430, 368, 10),
     ],
 
     # ------------------------------------------------------------------
     # P8 (page 7): Lead-Based Paint Disclosure
+    # Calibrated: address y≈712, signature y≈203
     # ------------------------------------------------------------------
     7: [
-        ("property_address",    180, 640, 10),
-        ("owner_name",          160, 280, 9),
-        ("signature_date",      420, 280, 9),
+        ("property_address", 100, 712, 10),
+        ("owner_name",       100, 203, 10),
+        ("signature_date",   370, 203, 10),
     ],
 
     # ------------------------------------------------------------------
-    # P9 (page 8): Owner Certification Lead Paint
+    # P9 (page 8): Owner Certification — Lead Paint
+    # Calibrated: address y≈728, printed name y≈312
     # ------------------------------------------------------------------
     8: [
-        ("property_address",    180, 660, 10),
-        ("owner_name",          160, 240, 9),
-        ("signature_date",      420, 240, 9),
+        ("property_address", 300, 728, 10),
+        ("owner_name",       160, 312, 10),
+        ("signature_date",   435, 312, 10),
     ],
 
     # ------------------------------------------------------------------
-    # P11 (page 10): HCV Rules p2 — signatures
+    # P11 (page 10): HCV Rules p2 — signatures at very bottom
+    # Calibrated: tenant name y≈92, tenant date y≈77, owner y≈57, date y≈42
     # ------------------------------------------------------------------
     10: [
-        ("tenant_name",         160, 320, 10),
-        ("tenant_sign_date",    420, 320, 10),
-        ("owner_name",          160, 260, 10),
-        ("signature_date",      420, 260, 10),
+        ("tenant_name",       160,  92, 10),
+        ("tenant_sign_date",  490,  77, 10),
+        ("owner_name",        160,  57, 10),
+        ("signature_date",    490,  42, 10),
     ],
 
     # ------------------------------------------------------------------
     # P13 (page 12): MSHDA Payee Authorization p1
+    # Calibrated: payee name y≈628, address y≈452, phone y≈372, email y≈357
     # ------------------------------------------------------------------
     12: [
-        ("entity_name",         180, 600, 10),
-        ("owner_name",          180, 575, 10),
-        ("owner_mailing_address", 180, 550, 9),
-        ("owner_phone",         180, 525, 9),
-        ("owner_email",         380, 525, 9),
+        ("tenant_name",            410, 748, 10),
+        ("entity_name",             55, 628, 10),
+        ("owner_mailing_address",   55, 452, 10),
+        ("owner_phone",            100, 372, 10),
+        ("owner_email",            100, 357, 10),
     ],
 
     # ------------------------------------------------------------------
     # P14 (page 13): Payee Authorization p2 — bank info
+    # Calibrated: bank name y≈728, routing y≈672, acct y≈655, sig y≈405
     # ------------------------------------------------------------------
     13: [
-        ("bank_routing_number", 200, 560, 10),
-        ("bank_account_number", 200, 535, 10),
-        ("bank_name",           200, 510, 10),
-        ("owner_name",          160, 300, 10),
-        ("signature_date",      420, 300, 10),
+        ("bank_name",           200, 728, 11),
+        ("bank_routing_number", 200, 672, 11),
+        ("bank_account_number", 200, 655, 11),
+        ("owner_name",          255, 422, 11),
+        ("signature_date",      490, 405, 11),
     ],
 }
 
 # Checkbox field map: page -> list of (field_name, x, y, size)
-# field_name should be a boolean key in form_data
-CHECKBOX_MAP = {
-    # P4 (page 3): Building features
-    3: [
-        ("has_central_air",     160, 490, 10),
-        ("has_window_units",    280, 490, 10),
-        ("has_gas_heat",        160, 470, 10),
-        ("has_electric_heat",   280, 470, 10),
-        ("has_basement",        160, 450, 10),
-        ("has_garage",          280, 450, 10),
-    ],
-
-    # P6 (page 5): Lead paint checkboxes
-    5: [
-        ("lead_paint_pre1978",  100, 480, 10),
-        ("lead_paint_post1978", 100, 460, 10),
-        ("lead_paint_unknown",  100, 440, 10),
-    ],
-
-    # P8 (page 7): Lead paint disclosure checkboxes
-    7: [
-        ("lead_known_hazards",      100, 520, 10),
-        ("lead_no_known_hazards",   100, 500, 10),
-        ("lead_records_available",  100, 460, 10),
-        ("lead_no_records",         100, 440, 10),
-    ],
-
-    # P9 (page 8): Pre/post 1978
-    8: [
-        ("built_pre_1978",      160, 580, 10),
-        ("built_post_1978",     160, 560, 10),
-    ],
-}
+# Checkbox coordinates need per-page calibration — left empty for now.
+# Generate a test packet to identify exact checkbox positions.
+CHECKBOX_MAP = {}
 
 # Pages to SKIP in the base PDF (0-indexed) when entity docs are appended.
 # Page 11 = W-9 (replaced by entity upload)
@@ -219,11 +186,11 @@ def _create_text_overlay(page_num: int, form_data: dict) -> Optional[bytes]:
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=letter)
 
-    # Draw text fields
+    # Draw text fields (bold for visibility on scanned backgrounds)
     for field_name, x, y, font_size in text_fields:
         value = form_data.get(field_name, "")
         if value:
-            c.setFont("Helvetica", font_size)
+            c.setFont("Helvetica-Bold", font_size)
             c.drawString(x, y, str(value))
 
     # Draw checkbox fields
