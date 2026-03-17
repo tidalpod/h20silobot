@@ -59,21 +59,21 @@ FIELD_MAP = {
     # Measured from 400 DPI grid analysis (fitz coords)
     # ------------------------------------------------------------------
     3: [
-        ("tenant_name",         120, 125, 11),
-        ("unit_address",        105, 145, 10),
-        ("city",                 50, 165, 11),
-        ("state",               425, 165, 11),
-        ("zip_code",            482, 165, 11),
-        ("bedrooms",            155, 185, 11),
-        ("bathrooms",           355, 185, 11),
-        ("year_built",          310, 205, 11),
-        ("proposed_rent",       510, 205, 11),
-        # Property Owner section
-        ("entity_name",        155, 580, 10),
-        ("ein",                475, 580, 10),
-        ("owner_name",         120, 602, 11),
-        ("owner_phone",        100, 622, 10),
-        ("owner_email",        395, 622, 10),
+        ("tenant_name",         120, 130, 11),
+        ("unit_address",        105, 150, 10),
+        ("city",                 50, 170, 11),
+        ("state",               425, 170, 11),
+        ("zip_code",            482, 170, 11),
+        ("bedrooms",            155, 190, 11),
+        ("bathrooms",           355, 190, 11),
+        ("year_built",          310, 210, 11),
+        ("proposed_rent",       510, 210, 11),
+        # Property Owner section — baselines aligned with label text
+        ("entity_name",        155, 584, 10),
+        ("ein",                490, 584, 10),
+        ("owner_name",         120, 606, 11),
+        ("owner_phone",        100, 628, 10),
+        ("owner_email",        395, 628, 10),
     ],
 
     # ------------------------------------------------------------------
