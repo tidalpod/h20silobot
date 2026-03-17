@@ -86,7 +86,7 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P5 (page 4): Property Owner Checklist p2 — owner certification
-    # Printed Name row → Title row → Signature | Date row
+    # Printed Name → Title → Signature | Date
     # ------------------------------------------------------------------
     4: [
         ("owner_name",          100, 296, 11),   # Printed Name
@@ -97,12 +97,16 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — certifications, signatures at bottom
+    # Grid-calibrated: Print Name y≈228, Sig y≈198, Addr y≈162, Phone/Date y≈128
     # ------------------------------------------------------------------
     5: [
-        ("owner_name__sig",    60, 103, 11),    # Owner signature (cursive)
-        ("tenant_name",       345, 103, 10),
-        ("signature_date",    230,  50, 10),
-        ("tenant_sign_date",  495,  50, 10),
+        ("owner_name",             60, 228, 10),   # Print or Type Name (left)
+        ("tenant_name",           345, 228, 10),   # Print or Type Name (right)
+        ("owner_name__sig",        60, 198, 12),   # Owner Signature (cursive)
+        ("owner_mailing_address",  60, 162, 9),    # Business Address
+        ("owner_phone",            60, 128, 10),   # Telephone Number (left)
+        ("signature_date",        260, 128, 10),   # Date (left)
+        ("tenant_sign_date",      490, 128, 10),   # Date (right)
     ],
 
     # ------------------------------------------------------------------
@@ -119,20 +123,29 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P8 (page 7): Lead-Based Paint Disclosure
+    # Grid-calibrated: initials at (a)y≈618, (b)y≈520, (e)y≈378
+    # Signature at y≈238, Certification text y≈288
     # ------------------------------------------------------------------
     7: [
-        ("property_address",  100, 712, 10),
-        ("owner_name__sig",   100, 203, 11),   # Signature (cursive)
-        ("signature_date",    370, 203, 10),
+        ("property_address",     100, 712, 10),
+        # Owner/Landlord initials on disclosure lines
+        ("owner_initials",        55, 618, 10),   # (a) initial
+        ("owner_initials",        55, 520, 10),   # (b) initial
+        ("owner_initials",        55, 378, 10),   # (e) initial
+        # Certification of Accuracy — signature section
+        ("owner_name__sig",      120, 238, 12),   # Owner/Landlord Signature
+        ("signature_date",       460, 238, 10),   # Date
     ],
 
     # ------------------------------------------------------------------
     # P9 (page 8): Owner Certification — Lead Paint
+    # Grid-calibrated: Sig y≈268, Printed Name y≈248, Date y≈248
     # ------------------------------------------------------------------
     8: [
-        ("property_address",  300, 728, 10),
-        ("owner_name__sig",   160, 312, 11),   # Signature (cursive)
-        ("signature_date",    435, 312, 10),
+        ("property_address",     300, 700, 10),   # Full address (top)
+        ("owner_name__sig",      120, 268, 12),   # Owner's Signature (cursive)
+        ("owner_name",           120, 248, 10),   # Printed Name
+        ("signature_date",       370, 248, 10),   # Date
     ],
 
     # ------------------------------------------------------------------
@@ -232,10 +245,18 @@ CHECKBOX_MAP = {
         ("feat_maint_pest",         113, 380, 7),
         ("feat_maint_trash",        151, 380, 7),
     ],
-}
 
-# Pages to SKIP in the base PDF (0-indexed) when entity docs are appended.
-SKIP_PAGES = {11, 12, 13}
+    # P6 (page 5): HUD-52517 p2 — lead paint certification checkbox
+    5: [
+        ("lead_completed_statement", 310, 508, 10),  # 3rd box: "A completed statement is attached..."
+    ],
+
+    # P9 (page 8): Owner Certification — Lead Paint
+    # 3rd checkbox: "Because the described property was constructed prior to Jan 1, 1978..."
+    8: [
+        ("lead_pre1978_ongoing",     48, 482, 10),
+    ],
+}
 
 
 def _create_text_overlay(page_num: int, form_data: dict) -> Optional[bytes]:
@@ -313,11 +334,17 @@ def generate_packet(
 
     total_pages = len(reader.pages)
     logger.info(f"Processing {total_pages}-page blank packet")
+    logger.info(f"Entity W-9 path: {entity_w9_path}")
+    logger.info(f"Entity Payee Auth path: {entity_payee_path}")
 
     for page_num in range(total_pages):
-        # Skip pages replaced by entity uploads
-        if page_num in SKIP_PAGES and (entity_w9_path or entity_payee_path):
-            logger.debug(f"Skipping page {page_num + 1} (replaced by entity doc)")
+        # Skip page 11 (W-9) only if entity W-9 is provided
+        if page_num == 11 and entity_w9_path:
+            logger.info(f"Skipping page 12 (W-9 replaced by entity upload)")
+            continue
+        # Skip pages 12-13 (Payee Auth) only if entity payee auth is provided
+        if page_num in (12, 13) and entity_payee_path:
+            logger.info(f"Skipping page {page_num + 1} (Payee Auth replaced by entity upload)")
             continue
 
         page = reader.pages[page_num]
@@ -333,10 +360,12 @@ def generate_packet(
 
     # Append entity W-9 PDF
     if entity_w9_path:
+        logger.info(f"Appending entity W-9 from: {entity_w9_path}")
         _append_pdf(writer, entity_w9_path, "W-9")
 
     # Append entity Payee Authorization PDF
     if entity_payee_path:
+        logger.info(f"Appending entity Payee Auth from: {entity_payee_path}")
         _append_pdf(writer, entity_payee_path, "Payee Auth")
 
     # Write final PDF to bytes
@@ -377,9 +406,20 @@ def _derive_fields(form_data: dict):
     if "owner_title" not in form_data or not form_data["owner_title"]:
         form_data["owner_title"] = "Partner"
 
+    # Derive owner initials from owner_name (e.g. "Alexander Hatzis" → "AH")
+    owner_name = form_data.get("owner_name", "")
+    if owner_name and ("owner_initials" not in form_data or not form_data["owner_initials"]):
+        form_data["owner_initials"] = "".join(
+            w[0].upper() for w in owner_name.split() if w
+        )
+
     # Always check Initial Occupancy and Barrier-Free Yes
     form_data["initial_occupancy"] = "true"
     form_data["barrier_free_yes"] = "true"
+
+    # Always check lead paint checkboxes
+    form_data["lead_completed_statement"] = "true"   # P6: 3rd box
+    form_data["lead_pre1978_ongoing"] = "true"        # P9: 3rd box
 
     # Map property_type to building type checkbox
     ptype = (form_data.get("property_type") or "").lower().strip()
@@ -392,8 +432,8 @@ def _derive_fields(form_data: dict):
         "high-rise": "btype_highrise",
         "low-rise": "btype_lowrise",
         "manufactured home": "btype_manufactured",
-        "multi-family": "btype_fourplex",  # closest match
-        "apartment": "btype_lowrise",      # closest match
+        "multi-family": "btype_fourplex",
+        "apartment": "btype_lowrise",
     }
     btype_field = btype_map.get(ptype)
     if btype_field:
@@ -404,16 +444,21 @@ def _append_pdf(writer: PdfWriter, pdf_path: str, label: str):
     """Append all pages from an external PDF file to the writer."""
     try:
         if pdf_path.startswith(("http://", "https://")):
-            # Download from URL (R2 or external)
             import urllib.request
-            with urllib.request.urlopen(pdf_path) as resp:
+            logger.info(f"Downloading {label} from URL: {pdf_path[:80]}...")
+            req = urllib.request.Request(pdf_path, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 pdf_bytes = resp.read()
+            logger.info(f"Downloaded {label}: {len(pdf_bytes)} bytes")
             reader = PdfReader(io.BytesIO(pdf_bytes))
         else:
+            if not os.path.exists(pdf_path):
+                logger.error(f"{label} file not found at: {pdf_path}")
+                return
             reader = PdfReader(pdf_path)
 
         for page in reader.pages:
             writer.add_page(page)
         logger.info(f"Appended {len(reader.pages)} {label} pages")
     except Exception as e:
-        logger.error(f"Failed to append {label} from {pdf_path}: {e}")
+        logger.error(f"Failed to append {label} from {pdf_path}: {e}", exc_info=True)
