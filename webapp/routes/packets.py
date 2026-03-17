@@ -218,6 +218,7 @@ async def api_entity_data(request: Request, entity_id: int):
             "owner_name": entity.owner_name or "",
             "email": entity.email or "",
             "phone": entity.phone or "",
+            "ein": getattr(entity, 'ein', '') or "",
             "mailing_address": getattr(entity, 'full_address', '') or entity.mailing_address or "",
             "has_w9": has_w9,
             "has_payee_auth": has_payee,

@@ -19,6 +19,8 @@ from typing import Optional
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas as rl_canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from pypdf import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
@@ -26,24 +28,33 @@ logger = logging.getLogger(__name__)
 # Path to the blank MSHDA packet (20-page scanned PDF)
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 BLANK_PACKET_PATH = STATIC_DIR / "templates" / "mshda_blank_packet.pdf"
+FONTS_DIR = STATIC_DIR / "fonts"
 
 # Letter page dimensions in points (8.5 x 11 inches)
 PAGE_W, PAGE_H = letter  # 612 x 792
+
+# Register cursive font for signatures
+CURSIVE_FONT = "Helvetica-BoldOblique"  # fallback
+try:
+    _cursive_path = FONTS_DIR / "GreatVibes-Regular.ttf"
+    if _cursive_path.exists():
+        pdfmetrics.registerFont(TTFont("GreatVibes", str(_cursive_path)))
+        CURSIVE_FONT = "GreatVibes"
+        logger.info("Registered GreatVibes cursive font for signatures")
+except Exception as e:
+    logger.warning(f"Failed to register cursive font, using fallback: {e}")
 
 # =============================================================================
 # Field coordinate map
 # =============================================================================
 # Each entry: page_number (0-indexed) -> list of (field_name, x, y, font_size)
+# Fields ending with "__sig" render in cursive and look up the base field name.
 # Coordinates are in points from bottom-left (ReportLab convention).
-# These are initial approximations — calibrate with test prints.
-#
-# Pages are 0-indexed to match pypdf page numbering.
 # =============================================================================
 
 FIELD_MAP = {
     # ------------------------------------------------------------------
     # P2 (page 1): Communications notice
-    # Calibrated from grid: fields at y≈340, 300, 222, 187
     # ------------------------------------------------------------------
     1: [
         ("tenant_name",    205, 342, 12),
@@ -54,7 +65,6 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
-    # Calibrated from grid: rows at y≈665, 645, 625, 605, 585, 205, 185, 165
     # ------------------------------------------------------------------
     3: [
         ("tenant_name",         145, 665, 11),
@@ -66,7 +76,9 @@ FIELD_MAP = {
         ("bathrooms",           345, 605, 11),
         ("year_built",          335, 585, 11),
         ("proposed_rent",       515, 585, 11),
+        # Property Owner section
         ("entity_name",        160, 205, 10),
+        ("ein",                475, 205, 10),   # Business SSN/FEIN
         ("owner_name",         145, 185, 11),
         ("owner_phone",        105, 165, 10),
         ("owner_email",        420, 165, 10),
@@ -74,19 +86,20 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P5 (page 4): Property Owner Checklist p2 — owner certification
-    # Calibrated: printed name at y≈260, signature at y≈228
+    # Printed Name row → Title row → Signature | Date row
     # ------------------------------------------------------------------
     4: [
-        ("owner_name",     100, 260, 11),
-        ("signature_date", 400, 228, 11),
+        ("owner_name",          100, 296, 11),   # Printed Name
+        ("owner_title",         100, 277, 11),   # Title ("Partner")
+        ("owner_name__sig",     100, 262, 14),   # Signature (cursive)
+        ("signature_date",      415, 262, 11),   # Date
     ],
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — certifications, signatures at bottom
-    # Calibrated: owner name y≈103, tenant name y≈103, dates y≈50
     # ------------------------------------------------------------------
     5: [
-        ("owner_name",         60, 103, 10),
+        ("owner_name__sig",    60, 103, 11),    # Owner signature (cursive)
         ("tenant_name",       345, 103, 10),
         ("signature_date",    230,  50, 10),
         ("tenant_sign_date",  495,  50, 10),
@@ -94,7 +107,6 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P7 (page 6): HUD-52517 p1 — Request for Tenancy Approval
-    # Calibrated: address y≈420, items 3-8 y≈368, rent fields y≈298
     # ------------------------------------------------------------------
     6: [
         ("unit_address",        325, 420, 10),
@@ -107,38 +119,34 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P8 (page 7): Lead-Based Paint Disclosure
-    # Calibrated: address y≈712, signature y≈203
     # ------------------------------------------------------------------
     7: [
-        ("property_address", 100, 712, 10),
-        ("owner_name",       100, 203, 10),
-        ("signature_date",   370, 203, 10),
+        ("property_address",  100, 712, 10),
+        ("owner_name__sig",   100, 203, 11),   # Signature (cursive)
+        ("signature_date",    370, 203, 10),
     ],
 
     # ------------------------------------------------------------------
     # P9 (page 8): Owner Certification — Lead Paint
-    # Calibrated: address y≈728, printed name y≈312
     # ------------------------------------------------------------------
     8: [
-        ("property_address", 300, 728, 10),
-        ("owner_name",       160, 312, 10),
-        ("signature_date",   435, 312, 10),
+        ("property_address",  300, 728, 10),
+        ("owner_name__sig",   160, 312, 11),   # Signature (cursive)
+        ("signature_date",    435, 312, 10),
     ],
 
     # ------------------------------------------------------------------
     # P11 (page 10): HCV Rules p2 — signatures at very bottom
-    # Calibrated: tenant name y≈92, tenant date y≈77, owner y≈57, date y≈42
     # ------------------------------------------------------------------
     10: [
-        ("tenant_name",       160,  92, 10),
-        ("tenant_sign_date",  490,  77, 10),
-        ("owner_name",        160,  57, 10),
-        ("signature_date",    490,  42, 10),
+        ("tenant_name",          160,  92, 10),
+        ("tenant_sign_date",     490,  77, 10),
+        ("owner_name__sig",      160,  57, 11),   # Signature (cursive)
+        ("signature_date",       490,  42, 10),
     ],
 
     # ------------------------------------------------------------------
     # P13 (page 12): MSHDA Payee Authorization p1
-    # Calibrated: payee name y≈628, address y≈452, phone y≈372, email y≈357
     # ------------------------------------------------------------------
     12: [
         ("tenant_name",            410, 748, 10),
@@ -150,25 +158,83 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P14 (page 13): Payee Authorization p2 — bank info
-    # Calibrated: bank name y≈728, routing y≈672, acct y≈655, sig y≈405
     # ------------------------------------------------------------------
     13: [
-        ("bank_name",           200, 728, 11),
-        ("bank_routing_number", 200, 672, 11),
-        ("bank_account_number", 200, 655, 11),
-        ("owner_name",          255, 422, 11),
-        ("signature_date",      490, 405, 11),
+        ("bank_name",              200, 728, 11),
+        ("bank_routing_number",    200, 672, 11),
+        ("bank_account_number",    200, 655, 11),
+        ("owner_name__sig",        255, 422, 12),   # Signature (cursive)
+        ("signature_date",         490, 405, 11),
     ],
 }
 
-# Checkbox field map: page -> list of (field_name, x, y, size)
-# Checkbox coordinates need per-page calibration — left empty for now.
-# Generate a test packet to identify exact checkbox positions.
-CHECKBOX_MAP = {}
+# =============================================================================
+# Checkbox coordinate map
+# =============================================================================
+# Each entry: page_number -> list of (field_name, x, y, size)
+# An "X" is drawn if form_data[field_name] is truthy.
+# =============================================================================
+
+CHECKBOX_MAP = {
+    3: [
+        # Transaction type (top of page)
+        ("initial_occupancy",        38, 703, 9),    # Always checked
+        # Barrier-Free Unit
+        ("barrier_free_yes",        139, 565, 8),    # Always checked
+        # Building Type (check one based on property_type)
+        ("btype_highrise",           23, 536, 8),
+        ("btype_lowrise",            23, 527, 8),
+        ("btype_townhouse",          23, 517, 8),
+        ("btype_duplex",             23, 507, 8),
+        ("btype_triplex",            23, 497, 8),
+        ("btype_fourplex",           23, 487, 8),
+        ("btype_single_family",      23, 477, 8),
+        ("btype_manufactured",       23, 467, 8),
+        # Features Available — Water
+        ("feat_water_city",          75, 452, 7),
+        ("feat_water_well",         138, 452, 7),
+        # Sewer
+        ("feat_sewer_public",        75, 443, 7),
+        ("feat_sewer_septic",       148, 443, 7),
+        # Cooling System
+        ("feat_cool_central",        95, 434, 7),
+        ("feat_cool_window",        142, 434, 7),
+        ("feat_cool_none",          190, 434, 7),
+        # Heating System
+        ("feat_heat_baseboard",      89, 425, 7),
+        ("feat_heat_boiler",        137, 425, 7),
+        ("feat_heat_central",       166, 425, 7),
+        ("feat_heat_furnace",       199, 425, 7),
+        # Indoor
+        ("feat_indoor_cable",        65, 416, 7),
+        ("feat_indoor_ceiling_fan", 113, 416, 7),
+        ("feat_indoor_dryer",       146, 416, 7),
+        ("feat_indoor_washer",      178, 416, 7),
+        ("feat_indoor_hookups",     209, 416, 7),
+        ("feat_indoor_laundry",     274, 416, 7),
+        # Kitchen
+        ("feat_kitchen_dishwasher",  65, 407, 7),
+        ("feat_kitchen_disposal",   110, 407, 7),
+        ("feat_kitchen_microwave",  163, 407, 7),
+        ("feat_kitchen_fridge",     204, 407, 7),
+        ("feat_kitchen_range",      245, 407, 7),
+        # Outdoor
+        ("feat_outdoor_balcony",     65, 398, 7),
+        ("feat_outdoor_pool",       103, 398, 7),
+        ("feat_outdoor_gated",      132, 398, 7),
+        # Parking
+        ("feat_parking_garage",      58, 389, 7),
+        ("feat_parking_1car",        89, 389, 7),
+        ("feat_parking_2car",       120, 389, 7),
+        ("feat_parking_3car",       147, 389, 7),
+        # Maintenance
+        ("feat_maint_lawn",          82, 380, 7),
+        ("feat_maint_pest",         113, 380, 7),
+        ("feat_maint_trash",        151, 380, 7),
+    ],
+}
 
 # Pages to SKIP in the base PDF (0-indexed) when entity docs are appended.
-# Page 11 = W-9 (replaced by entity upload)
-# Pages 12-13 = Payee Auth (replaced by entity upload)
 SKIP_PAGES = {11, 12, 13}
 
 
@@ -186,12 +252,20 @@ def _create_text_overlay(page_num: int, form_data: dict) -> Optional[bytes]:
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=letter)
 
-    # Draw text fields (bold for visibility on scanned backgrounds)
+    # Draw text fields
     for field_name, x, y, font_size in text_fields:
-        value = form_data.get(field_name, "")
-        if value:
-            c.setFont("Helvetica-Bold", font_size)
-            c.drawString(x, y, str(value))
+        # Fields ending with "__sig" use cursive font and look up the base field
+        if field_name.endswith("__sig"):
+            actual_field = field_name[:-5]  # strip "__sig"
+            value = form_data.get(actual_field, "")
+            if value:
+                c.setFont(CURSIVE_FONT, font_size)
+                c.drawString(x, y, str(value))
+        else:
+            value = form_data.get(field_name, "")
+            if value:
+                c.setFont("Helvetica-Bold", font_size)
+                c.drawString(x, y, str(value))
 
     # Draw checkbox fields
     for field_name, x, y, size in checkbox_fields:
@@ -298,6 +372,32 @@ def _derive_fields(form_data: dict):
 
     if "tenant_sign_date" not in form_data or not form_data["tenant_sign_date"]:
         form_data["tenant_sign_date"] = form_data.get("signature_date", "")
+
+    # Owner title defaults to "Partner"
+    if "owner_title" not in form_data or not form_data["owner_title"]:
+        form_data["owner_title"] = "Partner"
+
+    # Always check Initial Occupancy and Barrier-Free Yes
+    form_data["initial_occupancy"] = "true"
+    form_data["barrier_free_yes"] = "true"
+
+    # Map property_type to building type checkbox
+    ptype = (form_data.get("property_type") or "").lower().strip()
+    btype_map = {
+        "single family": "btype_single_family",
+        "duplex": "btype_duplex",
+        "triplex": "btype_triplex",
+        "fourplex": "btype_fourplex",
+        "townhouse": "btype_townhouse",
+        "high-rise": "btype_highrise",
+        "low-rise": "btype_lowrise",
+        "manufactured home": "btype_manufactured",
+        "multi-family": "btype_fourplex",  # closest match
+        "apartment": "btype_lowrise",      # closest match
+    }
+    btype_field = btype_map.get(ptype)
+    if btype_field:
+        form_data[btype_field] = "true"
 
 
 def _append_pdf(writer: PdfWriter, pdf_path: str, label: str):
