@@ -65,50 +65,52 @@ FIELD_MAP = {
 
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
-    # Grid-calibrated at 300 DPI
+    # Precise coords from 400 DPI crop analysis
     # ------------------------------------------------------------------
     3: [
-        ("tenant_name",         120, 680, 11),
-        ("unit_address",        105, 660, 10),
-        ("city",                 50, 640, 11),
-        ("state",               425, 640, 11),
-        ("zip_code",            482, 640, 11),
-        ("bedrooms",            155, 620, 11),
-        ("bathrooms",           355, 620, 11),
-        ("year_built",          310, 600, 11),
-        ("proposed_rent",       510, 600, 11),
+        ("tenant_name",         120, 667, 11),
+        ("unit_address",        105, 647, 10),
+        ("city",                 50, 627, 11),
+        ("state",               425, 627, 11),
+        ("zip_code",            482, 627, 11),
+        ("bedrooms",            155, 607, 11),
+        ("bathrooms",           355, 607, 11),
+        ("year_built",          310, 587, 11),
+        ("proposed_rent",       510, 587, 11),
         # Property Owner section
         ("entity_name",        155, 212, 10),
         ("ein",                475, 212, 10),   # Business SSN/FEIN
-        ("owner_name",         120, 195, 11),
-        ("owner_phone",        100, 178, 10),
-        ("owner_email",        395, 178, 10),
+        ("owner_name",         120, 190, 11),
+        ("owner_phone",        100, 170, 10),
+        ("owner_email",        395, 170, 10),
     ],
 
     # ------------------------------------------------------------------
     # P5 (page 4): Property Owner Checklist p2 — owner certification
-    # Values go in blank space ABOVE each label row
+    # Precise coords from 400 DPI crop analysis
+    # Labels: Printed Name ~y318, Title ~y303, Signature ~y279
+    # Values placed in blank space ABOVE each label
     # ------------------------------------------------------------------
     4: [
-        ("owner_name",          100, 330, 11),   # Above "Printed Name" label
-        ("owner_title",         100, 308, 11),   # Above "Title" label
-        ("owner_name__sig",     100, 285, 14),   # Above "Signature:" label
-        ("signature_date",      420, 285, 11),   # Date field on Signature row
+        ("owner_name",          100, 324, 11),   # Above "Printed Name" label
+        ("owner_title",         100, 309, 11),   # Above "Title" label
+        ("owner_name__sig",     100, 291, 14),   # Above "Signature:" label
+        ("signature_date",      430, 291, 11),   # Date field on Signature row
     ],
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — certifications, signatures at bottom
-    # Values go in blank space ABOVE each label row
-    # Grid-calibrated: labels at y≈250, 218, 192, 150
+    # Precise coords from 400 DPI crop analysis
+    # Labels: Print Name ~y231, Signature ~y215, Address ~y183, Phone ~y150
     # ------------------------------------------------------------------
     5: [
-        ("owner_name",             60, 260, 10),   # Above "Print or Type Name" label
-        ("tenant_name",           345, 260, 10),   # Right side Print Name
+        ("owner_name",             60, 255, 10),   # Above "Print or Type Name" label
+        ("tenant_name",           345, 255, 10),   # Right side Print Name
         ("owner_name__sig",        60, 232, 12),   # Above "Signature" label
-        ("owner_mailing_address",  60, 205, 9),    # Above "Business Address" label
-        ("owner_phone",            60, 168, 10),   # Above "Telephone Number" label
-        ("signature_date",        260, 168, 10),   # Above "Date" label (left)
-        ("tenant_sign_date",      490, 168, 10),   # Above "Date" label (right)
+        ("owner_mailing_address",  60, 200, 9),    # Above "Business Address" label
+        ("owner_phone",            60, 163, 10),   # Above "Telephone Number" label
+        ("signature_date",        260, 163, 10),   # Above "Date" label (left)
+        ("tenant_sign_date",      490, 163, 10),   # Above "Date" label (right)
     ],
 
     # ------------------------------------------------------------------
@@ -193,44 +195,44 @@ FIELD_MAP = {
 CHECKBOX_MAP = {
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
-    # All coordinates recalibrated from 300 DPI grid overlay
+    # Precise coords from 400 DPI crop analysis
     # ------------------------------------------------------------------
     3: [
         # Transaction type (top of page)
-        ("initial_occupancy",        28, 722, 9),
+        ("initial_occupancy",        31, 709, 9),
         # Barrier-Free Unit — Yes checkbox
-        ("barrier_free_yes",        120, 557, 8),
+        ("barrier_free_yes",        143, 547, 8),
         # Building Type (check one based on property_type)
-        ("btype_highrise",           24, 508, 8),
-        ("btype_lowrise",            24, 492, 8),
-        ("btype_townhouse",          24, 476, 8),
-        ("btype_duplex",             24, 460, 8),
-        ("btype_triplex",            24, 444, 8),
-        ("btype_fourplex",           24, 428, 8),
-        ("btype_single_family",      24, 412, 8),
-        ("btype_manufactured",       24, 396, 8),
+        ("btype_highrise",           31, 499, 8),
+        ("btype_lowrise",            31, 486, 8),
+        ("btype_townhouse",          31, 473, 8),
+        ("btype_duplex",             31, 460, 8),
+        ("btype_triplex",            31, 447, 8),
+        ("btype_fourplex",           31, 434, 8),
+        ("btype_single_family",      31, 421, 8),
+        ("btype_manufactured",       31, 408, 8),
         # Features Available — Water
-        ("feat_water_city",          98, 358, 7),
-        ("feat_water_well",         168, 358, 7),
+        ("feat_water_city",          98, 355, 7),
+        ("feat_water_well",         168, 355, 7),
         # Sewer
-        ("feat_sewer_public",        82, 345, 7),
-        ("feat_sewer_septic",       165, 345, 7),
+        ("feat_sewer_public",        82, 347, 7),
+        ("feat_sewer_septic",       165, 347, 7),
         # Cooling System
-        ("feat_cool_central",       105, 332, 7),
-        ("feat_cool_window",        160, 332, 7),
-        ("feat_cool_none",          218, 332, 7),
+        ("feat_cool_central",       105, 338, 7),
+        ("feat_cool_window",        160, 338, 7),
+        ("feat_cool_none",          218, 338, 7),
         # Heating System
-        ("feat_heat_baseboard",     105, 320, 7),
-        ("feat_heat_boiler",        165, 320, 7),
-        ("feat_heat_central",       210, 320, 7),
-        ("feat_heat_furnace",       262, 320, 7),
+        ("feat_heat_baseboard",     105, 329, 7),
+        ("feat_heat_boiler",        165, 329, 7),
+        ("feat_heat_central",       210, 329, 7),
+        ("feat_heat_furnace",       262, 329, 7),
         # Indoor
-        ("feat_indoor_cable",        62, 307, 7),
-        ("feat_indoor_ceiling_fan", 128, 307, 7),
-        ("feat_indoor_dryer",       178, 307, 7),
-        ("feat_indoor_washer",      218, 307, 7),
-        ("feat_indoor_hookups",     268, 307, 7),
-        ("feat_indoor_laundry",     382, 307, 7),
+        ("feat_indoor_cable",        62, 314, 7),
+        ("feat_indoor_ceiling_fan", 128, 314, 7),
+        ("feat_indoor_dryer",       178, 314, 7),
+        ("feat_indoor_washer",      218, 314, 7),
+        ("feat_indoor_hookups",     268, 314, 7),
+        ("feat_indoor_laundry",     382, 314, 7),
         # Kitchen
         ("feat_kitchen_dishwasher",  82, 295, 7),
         ("feat_kitchen_disposal",   150, 295, 7),
@@ -238,26 +240,26 @@ CHECKBOX_MAP = {
         ("feat_kitchen_fridge",     310, 295, 7),
         ("feat_kitchen_range",      388, 295, 7),
         # Outdoor
-        ("feat_outdoor_balcony",     82, 282, 7),
-        ("feat_outdoor_pool",       138, 282, 7),
-        ("feat_outdoor_gated",      186, 282, 7),
+        ("feat_outdoor_balcony",     82, 279, 7),
+        ("feat_outdoor_pool",       138, 279, 7),
+        ("feat_outdoor_gated",      186, 279, 7),
         # Parking
-        ("feat_parking_garage",      78, 270, 7),
-        ("feat_parking_1car",       115, 270, 7),
-        ("feat_parking_2car",       152, 270, 7),
-        ("feat_parking_3car",       192, 270, 7),
+        ("feat_parking_garage",      78, 267, 7),
+        ("feat_parking_1car",       115, 267, 7),
+        ("feat_parking_2car",       152, 267, 7),
+        ("feat_parking_3car",       192, 267, 7),
         # Maintenance
-        ("feat_maint_lawn",          82, 257, 7),
-        ("feat_maint_pest",         125, 257, 7),
-        ("feat_maint_trash",        192, 257, 7),
+        ("feat_maint_lawn",          82, 255, 7),
+        ("feat_maint_pest",         125, 255, 7),
+        ("feat_maint_trash",        192, 255, 7),
     ],
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — "c. Check one of the following:"
-    # 3rd checkbox is on the RIGHT side of page at x≈477
+    # 3rd checkbox precise from 400 DPI crop
     # ------------------------------------------------------------------
     5: [
-        ("lead_completed_statement", 477, 598, 8),
+        ("lead_completed_statement", 477, 597, 8),
     ],
 
     # P9 (page 8): Owner Certification — Lead Paint
