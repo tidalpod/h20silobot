@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -49,6 +49,9 @@ def _normalize_phone(phone):
 
 def _lead_time_text(minutes):
     """Human-readable lead time string."""
+    if minutes >= 1440:
+        days = minutes // 1440
+        return f"in {days} day{'s' if days > 1 else ''}"
     if minutes >= 60:
         hrs = minutes // 60
         return f"in {hrs} hour{'s' if hrs > 1 else ''}"
@@ -211,18 +214,24 @@ async def check_and_send_inspection_reminders():
             )
             properties = result.scalars().all()
 
+            # Look ahead enough days to cover the lead time window
+            max_lookahead_days = (lead_time_minutes // 1440) + 1
+
             for prop in properties:
                 for insp_type, (date_field, time_field) in INSPECTION_FIELDS.items():
                     insp_date = getattr(prop, date_field)
                     insp_time = getattr(prop, time_field)
 
-                    if not insp_date or insp_date != today or not insp_time:
+                    if not insp_date or not insp_time:
+                        continue
+                    days_away = (insp_date - today).days
+                    if days_away < 0 or days_away > max_lookahead_days:
                         continue
 
                     # Parse time (format "HH:MM")
                     try:
                         hour, minute = map(int, insp_time.split(":"))
-                        insp_dt = datetime.combine(today, datetime.min.time().replace(hour=hour, minute=minute))
+                        insp_dt = datetime.combine(insp_date, datetime.min.time().replace(hour=hour, minute=minute))
                     except (ValueError, AttributeError):
                         continue
 

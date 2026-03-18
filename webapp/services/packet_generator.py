@@ -113,7 +113,20 @@ FIELD_MAP = {
         ("bedrooms",            188, 272, 10),   # exact
         ("year_built",          276, 272, 10),   # exact
         ("proposed_rent",       354, 272, 10),   # exact
-        ("utility_allowance",   430, 272, 10),   # exact (security deposit position)
+        ("security_deposit",    430, 272, 10),   # exact
+        ("date_available",      517, 272, 10),   # exact
+        # Utility responsibilities — T (tenant) or O (owner)
+        ("util_heating_paid",   525, 512, 10),   # exact
+        ("util_cooking_paid",   525, 538, 10),   # exact
+        ("util_water_heat_paid", 525, 562, 10),  # exact
+        ("util_other_elec_paid", 525, 583, 10),  # exact
+        ("util_water_paid",     525, 601, 10),   # exact
+        ("util_sewer_paid",     525, 620, 10),   # exact
+        ("util_trash_paid",     525, 640, 10),   # exact
+        ("util_ac_paid",        525, 658, 10),   # exact
+        ("util_other_paid",     525, 680, 10),   # exact
+        ("util_fridge_paid",    524, 717, 10),   # exact
+        ("util_range_paid",     524, 740, 10),   # exact
     ],
 
     # ------------------------------------------------------------------
@@ -226,6 +239,23 @@ CHECKBOX_MAP = {
     ],
 
     # ------------------------------------------------------------------
+    # P7 (page 6): HUD-52517 p1 — Structure type (section 9) & fuel type
+    # Exact from user-filled PDF
+    # ------------------------------------------------------------------
+    6: [
+        # Structure type — section 9, Single Family exact at (37, 315)
+        ("stype_single_family",   37, 315, 8),   # exact
+        ("stype_duplex",          37, 335, 8),
+        ("stype_townhouse",       37, 355, 8),
+        ("stype_lowrise",         37, 375, 8),
+        ("stype_highrise",        37, 395, 8),
+        ("stype_manufactured",    37, 415, 8),
+        # Fuel type — Natural gas checkboxes (x=129)
+        ("fuel_heating_gas",     129, 512, 7),   # exact row as Heating
+        ("fuel_cooking_gas",     129, 538, 7),   # exact row as Cooking
+        ("fuel_water_heat_gas",  129, 562, 7),   # exact row as Water Heating
+    ],
+
     # P6 (page 5): HUD-52517 p2 — "c. Check one of the following:"
     # Exact from user-filled PDF (321, 209)
     # ------------------------------------------------------------------
@@ -433,6 +463,46 @@ def _derive_fields(form_data: dict):
     btype_field = btype_map.get(ptype)
     if btype_field:
         form_data[btype_field] = "true"
+
+    # Structure type on page 7 (HUD-52517 p1, section 9) — same logic, stype_ prefix
+    stype_map = {
+        "single family": "stype_single_family",
+        "duplex": "stype_duplex",
+        "townhouse": "stype_townhouse",
+        "high-rise": "stype_highrise",
+        "low-rise": "stype_lowrise",
+        "manufactured home": "stype_manufactured",
+        "multi-family": "stype_lowrise",
+        "apartment": "stype_lowrise",
+        "triplex": "stype_townhouse",
+        "fourplex": "stype_townhouse",
+    }
+    stype_field = stype_map.get(ptype)
+    if stype_field:
+        form_data[stype_field] = "true"
+
+    # Default utility responsibilities: T for all, O for Refrigerator & Range
+    util_defaults = {
+        "util_heating_paid": "T",
+        "util_cooking_paid": "T",
+        "util_water_heat_paid": "T",
+        "util_other_elec_paid": "T",
+        "util_water_paid": "T",
+        "util_sewer_paid": "T",
+        "util_trash_paid": "T",
+        "util_ac_paid": "T",
+        "util_other_paid": "T",
+        "util_fridge_paid": "O",
+        "util_range_paid": "O",
+    }
+    for field, default in util_defaults.items():
+        if field not in form_data or not form_data[field]:
+            form_data[field] = default
+
+    # Natural gas fuel type for Heating, Cooking, Water Heating
+    form_data["fuel_heating_gas"] = "true"
+    form_data["fuel_cooking_gas"] = "true"
+    form_data["fuel_water_heat_gas"] = "true"
 
 
 def _append_pdf(writer: PdfWriter, pdf_path: str, label: str):

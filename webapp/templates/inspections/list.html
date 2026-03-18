@@ -16,9 +16,9 @@
                 <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
                     {{ total_upcoming }} Upcoming
                 </span>
-                <button onclick="document.getElementById('insp-reminder-settings').classList.toggle('hidden')" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors" title="Reminder Settings">
+                <button onclick="document.getElementById('insp-reminder-settings').classList.toggle('hidden')" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors" title="Automation Settings">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
-                    <span class="hidden sm:inline">Reminders</span>
+                    <span class="hidden sm:inline">Automation Settings</span>
                 </button>
                 <button onclick="openScheduleModal()" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
                     <span>+</span> Schedule Inspection
@@ -35,7 +35,7 @@
     <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-5">
         <h3 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-            Inspection Reminder Settings
+            Automation Settings
         </h3>
         <form method="POST" action="/inspections/reminder-settings" class="flex flex-wrap items-end gap-5">
             <label class="flex items-center gap-2 cursor-pointer">
@@ -55,6 +55,7 @@
                     <option value="120" {% if current_lead == 120 %}selected{% endif %}>2 hours</option>
                     <option value="240" {% if current_lead == 240 %}selected{% endif %}>4 hours</option>
                     <option value="1440" {% if current_lead == 1440 %}selected{% endif %}>24 hours</option>
+                    <option value="2880" {% if current_lead == 2880 %}selected{% endif %}>48 hours</option>
                 </select>
             </div>
             <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Save</button>

@@ -345,11 +345,52 @@
             </div>
         </div>
 
-        <!-- Section 4: Tenant & Lease Terms -->
+        <!-- Section 4: Utilities Paid By -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
                 <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
                     <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">4</span>
+                    Utilities Paid By
+                </h2>
+            </div>
+            <div class="px-5 py-4">
+                <p class="text-xs text-gray-500 mb-3">Select who pays for each utility — T (Tenant) or O (Owner)</p>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2">
+                    {% set utilities = [
+                        ("util_heating_paid", "Heating", "T"),
+                        ("util_cooking_paid", "Cooking", "T"),
+                        ("util_water_heat_paid", "Water Heating", "T"),
+                        ("util_other_elec_paid", "Other Electric", "T"),
+                        ("util_water_paid", "Water", "T"),
+                        ("util_sewer_paid", "Sewer", "T"),
+                        ("util_trash_paid", "Trash Collection", "T"),
+                        ("util_ac_paid", "Air Conditioning", "T"),
+                        ("util_other_paid", "Other", "T"),
+                        ("util_fridge_paid", "Refrigerator", "O"),
+                        ("util_range_paid", "Range/Microwave", "O"),
+                    ] %}
+                    {% for field, label, default in utilities %}
+                    <div class="flex items-center justify-between py-1">
+                        <span class="text-xs font-medium text-gray-700">{{ label }}</span>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-1 text-xs text-gray-600">
+                                <input type="radio" name="{{ field }}" value="T" {% if default == 'T' %}checked{% endif %} class="border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"> T
+                            </label>
+                            <label class="flex items-center gap-1 text-xs text-gray-600">
+                                <input type="radio" name="{{ field }}" value="O" {% if default == 'O' %}checked{% endif %} class="border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"> O
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: Tenant & Lease Terms -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">5</span>
                     Tenant & Lease Terms
                 </h2>
             </div>
@@ -364,7 +405,7 @@
                         <input type="email" name="tenant_email" id="tenant_email" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1">Lease Start</label>
                         <input type="date" name="lease_start_date" id="lease_start_date" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
@@ -377,19 +418,26 @@
                         <label class="block text-xs font-medium text-gray-700 mb-1">Proposed Rent</label>
                         <input type="text" name="proposed_rent" id="proposed_rent" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="$0.00">
                     </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Utility Allowance</label>
-                        <input type="text" name="utility_allowance" id="utility_allowance" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="$0.00">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Security Deposit</label>
+                        <input type="text" name="security_deposit" id="security_deposit" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="$0.00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Date Available for Inspection</label>
+                        <input type="date" name="date_available_input" id="date_available_input" class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <input type="hidden" name="date_available" id="date_available">
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Section 5: Lead Paint -->
+        <!-- Section 6: Lead Paint -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
                 <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">5</span>
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">6</span>
                     Lead-Based Paint
                 </h2>
             </div>
@@ -434,11 +482,11 @@
             </div>
         </div>
 
-        <!-- Section 6: Bank Info -->
+        <!-- Section 7: Bank Info -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
                 <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">6</span>
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">7</span>
                     Bank Information (Payee Auth)
                 </h2>
             </div>
@@ -460,11 +508,11 @@
             </div>
         </div>
 
-        <!-- Section 7: Signature Date -->
+        <!-- Section 8: Signature Date -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
                 <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">7</span>
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">8</span>
                     Review & Generate
                 </h2>
             </div>
@@ -625,12 +673,19 @@ function updateLeadCheckboxes(value) {
     }
 }
 
-// ── Signature date formatting ──
+// ── Date formatting (MM/DD/YYYY for PDF overlay) ──
 document.getElementById('signature_date_input').addEventListener('change', function() {
     const val = this.value;
     if (val) {
         const parts = val.split('-');
         document.getElementById('signature_date').value = `${parts[1]}/${parts[2]}/${parts[0]}`;
+    }
+});
+document.getElementById('date_available_input').addEventListener('change', function() {
+    const val = this.value;
+    if (val) {
+        const parts = val.split('-');
+        document.getElementById('date_available').value = `${parts[1]}/${parts[2]}/${parts[0]}`;
     }
 });
 // Default to today
