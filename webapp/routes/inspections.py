@@ -16,6 +16,7 @@ from database.connection import get_session
 from database.models import (
     Property, Tenant, SMSMessage, MessageDirection,
     Vendor, COInspectionDocument, COInspectionVendor,
+    InspectionReminderSettings,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services.storage_service import storage
@@ -224,6 +225,12 @@ async def inspections_list(request: Request):
         upcoming_section8 = [i for i in section8_inspections if not i["is_past"]]
         past_section8 = [i for i in section8_inspections if i["is_past"]]
 
+        # Load inspection reminder settings
+        rs_result = await session.execute(
+            select(InspectionReminderSettings).limit(1)
+        )
+        reminder_settings = rs_result.scalar_one_or_none()
+
     return templates.TemplateResponse(
         "inspections/list.html",
         {
@@ -243,8 +250,45 @@ async def inspections_list(request: Request):
             "past_section8": past_section8[:10],
             # Counts
             "total_upcoming": len(upcoming_co) + len(upcoming_rental) + len(upcoming_section8),
+            # Reminder settings
+            "reminder_settings": reminder_settings,
         }
     )
+
+
+@router.post("/reminder-settings")
+async def save_inspection_reminder_settings(request: Request):
+    """Save inspection reminder settings"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(InspectionReminderSettings).limit(1)
+        )
+        settings = result.scalar_one_or_none()
+
+        remind_tenant = form.get("remind_tenant") == "on"
+        remind_vendor = form.get("remind_vendor") == "on"
+        lead_time_minutes = int(form.get("lead_time_minutes", 120))
+
+        if settings:
+            settings.remind_tenant = remind_tenant
+            settings.remind_vendor = remind_vendor
+            settings.lead_time_minutes = lead_time_minutes
+            settings.updated_at = datetime.utcnow()
+        else:
+            settings = InspectionReminderSettings(
+                remind_tenant=remind_tenant,
+                remind_vendor=remind_vendor,
+                lead_time_minutes=lead_time_minutes,
+            )
+            session.add(settings)
+
+    return RedirectResponse(url="/inspections", status_code=303)
 
 
 @router.post("/co/update")

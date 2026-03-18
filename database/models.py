@@ -1584,6 +1584,37 @@ class ShowingReminderSettings(Base):
         return f"<ShowingReminderSettings tenant={self.remind_tenant} vendor={self.remind_vendor} lead={self.lead_time_minutes}m>"
 
 
+class InspectionReminderSettings(Base):
+    """Admin-configurable settings for inspection reminder SMS alerts."""
+    __tablename__ = "inspection_reminder_settings"
+
+    id = Column(Integer, primary_key=True)
+    remind_tenant = Column(Boolean, default=True, nullable=False)
+    remind_vendor = Column(Boolean, default=False, nullable=False)
+    lead_time_minutes = Column(Integer, default=120, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<InspectionReminderSettings tenant={self.remind_tenant} vendor={self.remind_vendor} lead={self.lead_time_minutes}m>"
+
+
+class InspectionReminderLog(Base):
+    """Tracks which inspection reminders have been sent to avoid double-sending."""
+    __tablename__ = "inspection_reminder_log"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    inspection_type = Column(String(30), nullable=False)  # "rental", "section8", "co_mechanical", etc.
+    inspection_date = Column(Date, nullable=False)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+    property = relationship("Property")
+
+    __table_args__ = (
+        Index("ix_insp_reminder_log_unique", "property_id", "inspection_type", "inspection_date", unique=True),
+    )
+
+
 class ESignEnvelope(Base):
     """E-signature envelope tracking (in-house or legacy DocuSign)."""
     __tablename__ = "esign_envelopes"

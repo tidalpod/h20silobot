@@ -76,6 +76,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Showing reminder migration skipped: {e}")
 
+    # Run inspection reminder migration
+    try:
+        from database.migrations.add_inspection_reminder import run_migration as run_inspection_migration
+        await run_inspection_migration()
+    except Exception as e:
+        logger.warning(f"Inspection reminder migration skipped: {e}")
+
     # Auto-cleanup orphaned photo records (files lost between deploys)
     # Skip when using R2 — files persist independently of deploys
     if db_success:
@@ -118,20 +125,26 @@ async def lifespan(app: FastAPI):
 
     # Start background showing reminder service
     reminder_task = None
+    inspection_reminder_task = None
     if db_success and web_config.has_twilio:
         from webapp.services.showing_reminders import reminder_loop
         reminder_task = asyncio.create_task(reminder_loop())
         logger.info("Showing reminder service started")
 
+        from webapp.services.inspection_reminders import inspection_reminder_loop
+        inspection_reminder_task = asyncio.create_task(inspection_reminder_loop())
+        logger.info("Inspection reminder service started")
+
     yield
 
-    # Cancel reminder task on shutdown
-    if reminder_task:
-        reminder_task.cancel()
-        try:
-            await reminder_task
-        except asyncio.CancelledError:
-            pass
+    # Cancel reminder tasks on shutdown
+    for task in [reminder_task, inspection_reminder_task]:
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     logger.info("Shutting down Blue Deer Web App...")
 
