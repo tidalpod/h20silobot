@@ -46,103 +46,106 @@ if CURSIVE_FONT_AVAILABLE:
 FIELD_MAP = {
     # ------------------------------------------------------------------
     # P2 (page 1): Communications notice
+    # Exact from user-filled PDF annotations
     # ------------------------------------------------------------------
     1: [
-        ("tenant_name",    205, 450, 12),
-        ("tenant_email",   205, 490, 12),
-        ("owner_name",     205, 568, 12),
-        ("owner_email",    215, 605, 12),
+        ("tenant_name",    187, 450, 12),
+        ("tenant_email",   181, 490, 12),
+        ("owner_name",     187, 573, 12),    # exact
+        ("owner_email",    181, 610, 12),    # exact
     ],
 
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
-    # Measured from 400 DPI grid analysis (fitz coords)
+    # All coordinates exact from user-filled PDF
     # ------------------------------------------------------------------
     3: [
-        ("tenant_name",         120, 130, 11),
-        ("unit_address",        105, 150, 10),
-        ("city",                 50, 170, 11),
-        ("state",               425, 170, 11),
-        ("zip_code",            482, 170, 11),
-        ("bedrooms",            155, 190, 11),
-        ("bathrooms",           355, 190, 11),
-        ("year_built",          310, 210, 11),
-        ("proposed_rent",       510, 210, 11),
-        # Property Owner section — baselines aligned with label text
-        ("entity_name",        155, 584, 10),
-        ("ein",                490, 584, 10),
-        ("owner_name",         120, 606, 11),
-        ("owner_phone",        100, 628, 10),
-        ("owner_email",        395, 628, 10),
+        ("tenant_name",         113, 130, 11),   # exact
+        ("unit_address",        108, 154, 10),   # exact
+        ("city",                 71, 178, 11),   # exact
+        ("state",               418, 175, 11),   # exact
+        ("zip_code",            491, 175, 11),   # exact
+        ("bedrooms",            150, 200, 11),   # exact
+        ("bathrooms",           341, 200, 11),   # exact
+        ("year_built",          271, 226, 11),   # exact
+        ("proposed_rent",       507, 226, 11),   # exact
+        ("county",              430, 247, 10),   # exact
+        # Property Owner section
+        ("entity_name",         124, 589, 10),   # exact
+        ("ein",                 510, 589, 10),   # exact
+        ("owner_name",          115, 611, 11),   # exact
+        ("owner_phone",          84, 637, 10),   # exact
+        ("owner_email",         354, 634, 10),   # exact
     ],
 
     # ------------------------------------------------------------------
     # P5 (page 4): Property Owner Checklist p2 — owner certification
-    # Measured: Printed Name label ~fitz 475, Title ~498, Signature ~523
-    # Text placed in blank space ABOVE each label
+    # Exact from user-filled PDF
     # ------------------------------------------------------------------
     4: [
-        ("owner_name",          100, 466, 11),   # Above "Printed Name" label
-        ("owner_title",         100, 489, 11),   # Above "Title" label
-        ("owner_name__sig",     100, 514, 14),   # Above "Signature:" label
-        ("signature_date",      430, 514, 11),   # Date field on Signature row
+        ("owner_name",          262, 480, 11),   # exact
+        ("owner_title",         215, 503, 11),   # exact
+        ("owner_name__sig",     100, 519, 14),   # signature between title and date
+        ("signature_date",      477, 529, 11),   # exact
     ],
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — certifications, signatures at bottom
+    # Exact from user-filled PDF
     # ------------------------------------------------------------------
     5: [
-        ("owner_name",             60, 537, 10),
-        ("tenant_name",           345, 537, 10),
-        ("owner_name__sig",        60, 560, 12),
-        ("owner_mailing_address",  60, 592, 9),
-        ("owner_phone",            60, 629, 10),
-        ("signature_date",        260, 629, 10),
-        ("tenant_sign_date",      490, 629, 10),
+        ("owner_name",             48, 544, 10),   # exact
+        ("tenant_name",           345, 544, 10),   # same y, right column
+        ("owner_name__sig",        48, 570, 12),   # between name and address
+        ("owner_mailing_address",  40, 637, 9),    # exact
+        ("owner_phone",            56, 683, 10),   # exact
+        ("signature_date",        229, 683, 10),   # exact
+        ("tenant_sign_date",      490, 683, 10),   # same y, right column
     ],
 
     # ------------------------------------------------------------------
     # P7 (page 6): HUD-52517 p1 — Request for Tenancy Approval
+    # Exact from user-filled PDF
     # ------------------------------------------------------------------
     6: [
-        ("unit_address",        325, 372, 10),
-        ("lease_start_date",     60, 424, 10),
-        ("bedrooms",            200, 424, 10),
-        ("year_built",          265, 424, 10),
-        ("proposed_rent",       350, 424, 10),
-        ("utility_allowance",   430, 424, 10),
+        ("unit_address",        325, 236, 10),   # same row as PHA name
+        ("lease_start_date",     67, 272, 10),   # exact
+        ("bedrooms",            188, 272, 10),   # exact
+        ("year_built",          276, 272, 10),   # exact
+        ("proposed_rent",       354, 272, 10),   # exact
+        ("utility_allowance",   430, 272, 10),   # exact (security deposit position)
     ],
 
     # ------------------------------------------------------------------
     # P8 (page 7): Lead-Based Paint Disclosure
+    # Exact from user-filled PDF
     # ------------------------------------------------------------------
     7: [
         ("property_address",     100, 80, 10),
-        ("owner_initials",        55, 174, 10),
-        ("owner_initials",        55, 272, 10),
-        ("owner_initials",        55, 414, 10),
-        ("owner_name__sig",      120, 554, 12),
-        ("signature_date",       460, 554, 10),
+        ("signature_date",       462, 605, 10),   # exact — owner date
+        ("tenant_sign_date",     462, 629, 10),   # exact — tenant date
     ],
 
     # ------------------------------------------------------------------
     # P9 (page 8): Owner Certification — Lead Paint
+    # Exact from user-filled PDF
     # ------------------------------------------------------------------
     8: [
-        ("property_address",     300, 92, 10),
-        ("owner_name__sig",      120, 524, 12),
-        ("owner_name",           120, 544, 10),
-        ("signature_date",       370, 544, 10),
+        ("property_address",     105, 113, 10),   # exact
+        ("owner_name__sig",      164, 547, 12),   # signature above name line
+        ("owner_name",           164, 557, 10),   # exact
+        ("signature_date",       433, 557, 10),   # exact
     ],
 
     # ------------------------------------------------------------------
     # P11 (page 10): HCV Rules p2 — signatures at very bottom
+    # Owner fields exact from user-filled PDF
     # ------------------------------------------------------------------
     10: [
-        ("tenant_name",          160, 700, 10),
-        ("tenant_sign_date",     490, 715, 10),
-        ("owner_name__sig",      160, 735, 11),
-        ("signature_date",       490, 750, 10),
+        ("tenant_name",          183, 650, 10),   # estimated above owner
+        ("tenant_sign_date",     486, 665, 10),   # estimated
+        ("owner_name__sig",      183, 681, 11),   # exact
+        ("signature_date",       486, 703, 10),   # exact
     ],
 
     # ------------------------------------------------------------------
@@ -178,75 +181,86 @@ FIELD_MAP = {
 CHECKBOX_MAP = {
     # ------------------------------------------------------------------
     # P4 (page 3): Property Owner Checklist p1
-    # Measured from 400 DPI grid analysis
+    # Y values exact from user-filled PDF, X values for unchecked
+    # options estimated from form layout
     # ------------------------------------------------------------------
     3: [
-        # Transaction type (top of page)
-        ("initial_occupancy",        31, 83, 9),
-        # Barrier-Free Unit — Yes checkbox
-        ("barrier_free_yes",        143, 245, 8),
-        # Building Type (check one based on property_type)
-        ("btype_highrise",           31, 293, 8),
-        ("btype_lowrise",            31, 306, 8),
-        ("btype_townhouse",          31, 319, 8),
-        ("btype_duplex",             31, 332, 8),
-        ("btype_triplex",            31, 345, 8),
-        ("btype_fourplex",           31, 358, 8),
-        ("btype_single_family",      31, 371, 8),
-        ("btype_manufactured",       31, 384, 8),
-        # Features Available — Water
-        ("feat_water_city",          98, 437, 7),
-        ("feat_water_well",         168, 437, 7),
-        # Sewer
-        ("feat_sewer_public",        82, 445, 7),
-        ("feat_sewer_septic",       165, 445, 7),
-        # Cooling System
-        ("feat_cool_central",       105, 454, 7),
-        ("feat_cool_window",        160, 454, 7),
-        ("feat_cool_none",          218, 454, 7),
-        # Heating System
-        ("feat_heat_baseboard",     105, 463, 7),
-        ("feat_heat_boiler",        165, 463, 7),
-        ("feat_heat_central",       210, 463, 7),
-        ("feat_heat_furnace",       262, 463, 7),
-        # Indoor
-        ("feat_indoor_cable",        62, 478, 7),
-        ("feat_indoor_ceiling_fan", 128, 478, 7),
-        ("feat_indoor_dryer",       178, 478, 7),
-        ("feat_indoor_washer",      218, 478, 7),
-        ("feat_indoor_hookups",     268, 478, 7),
-        ("feat_indoor_laundry",     382, 478, 7),
-        # Kitchen
-        ("feat_kitchen_dishwasher",  82, 497, 7),
-        ("feat_kitchen_disposal",   150, 497, 7),
-        ("feat_kitchen_microwave",  243, 497, 7),
-        ("feat_kitchen_fridge",     310, 497, 7),
-        ("feat_kitchen_range",      388, 497, 7),
-        # Outdoor
-        ("feat_outdoor_balcony",     82, 513, 7),
-        ("feat_outdoor_pool",       138, 513, 7),
-        ("feat_outdoor_gated",      186, 513, 7),
-        # Parking
-        ("feat_parking_garage",      78, 525, 7),
-        ("feat_parking_1car",       115, 525, 7),
-        ("feat_parking_2car",       152, 525, 7),
-        ("feat_parking_3car",       192, 525, 7),
-        # Maintenance
-        ("feat_maint_lawn",          82, 537, 7),
-        ("feat_maint_pest",         125, 537, 7),
-        ("feat_maint_trash",        192, 537, 7),
+        # Transaction type — exact (44, 87)
+        ("initial_occupancy",        44, 87, 9),
+        # Barrier-Free Unit — Yes — exact (131, 252)
+        ("barrier_free_yes",        131, 252, 8),
+        # Building Type — Single Family exact (49, 379), others spaced ~14pt
+        ("btype_highrise",           49, 295, 8),
+        ("btype_lowrise",            49, 309, 8),
+        ("btype_townhouse",          49, 323, 8),
+        ("btype_duplex",             49, 337, 8),
+        ("btype_triplex",            49, 351, 8),
+        ("btype_fourplex",           49, 365, 8),
+        ("btype_single_family",      49, 379, 8),   # exact
+        ("btype_manufactured",       49, 393, 8),
+        # Features — Y values exact from user-filled PDF
+        # Water row y=421
+        ("feat_water_city",         131, 421, 7),   # exact
+        ("feat_water_well",         200, 421, 7),
+        # Sewer row y=436
+        ("feat_sewer_public",       131, 436, 7),   # exact
+        ("feat_sewer_septic",       200, 436, 7),
+        # Cooling System row y=451
+        ("feat_cool_central",       131, 451, 7),   # exact
+        ("feat_cool_window",        195, 451, 7),
+        ("feat_cool_none",          260, 451, 7),
+        # Heating System row y=465
+        ("feat_heat_baseboard",     131, 465, 7),
+        ("feat_heat_boiler",        195, 465, 7),
+        ("feat_heat_central",       250, 465, 7),
+        ("feat_heat_furnace",       321, 465, 7),   # exact
+        # Indoor row y=485
+        ("feat_indoor_cable",        62, 485, 7),
+        ("feat_indoor_ceiling_fan", 128, 485, 7),
+        ("feat_indoor_dryer",       178, 485, 7),
+        ("feat_indoor_washer",      218, 485, 7),
+        ("feat_indoor_hookups",     268, 485, 7),
+        ("feat_indoor_laundry",     390, 485, 7),   # exact x from user
+        # Kitchen row y=504
+        ("feat_kitchen_dishwasher",  82, 504, 7),
+        ("feat_kitchen_disposal",   150, 504, 7),
+        ("feat_kitchen_microwave",  243, 504, 7),
+        ("feat_kitchen_fridge",     399, 504, 7),   # exact x from user
+        ("feat_kitchen_range",      486, 504, 7),   # exact x from user
+        # Outdoor row y=519 (estimated)
+        ("feat_outdoor_balcony",     82, 519, 7),
+        ("feat_outdoor_pool",       138, 519, 7),
+        ("feat_outdoor_gated",      186, 519, 7),
+        # Parking row y=533 (estimated)
+        ("feat_parking_garage",      78, 533, 7),
+        ("feat_parking_1car",       115, 533, 7),
+        ("feat_parking_2car",       152, 533, 7),
+        ("feat_parking_3car",       192, 533, 7),
+        # Maintenance row y=547 (estimated)
+        ("feat_maint_lawn",          82, 547, 7),
+        ("feat_maint_pest",         125, 547, 7),
+        ("feat_maint_trash",        192, 547, 7),
+        # Check Here if Same as Property Owner — exact (216, 665)
+        ("mgmt_same_as_owner",      216, 665, 8),
     ],
 
     # ------------------------------------------------------------------
     # P6 (page 5): HUD-52517 p2 — "c. Check one of the following:"
+    # Exact from user-filled PDF (321, 209)
     # ------------------------------------------------------------------
     5: [
-        ("lead_completed_statement", 477, 195, 8),
+        ("lead_completed_statement", 321, 209, 8),   # exact
+    ],
+
+    # P8 (page 7): Lead-Based Paint Disclosure — checkboxes
+    7: [
+        ("lead_paint_known",         95, 274, 9),    # exact
+        ("lead_paint_records",       95, 387, 9),    # exact
     ],
 
     # P9 (page 8): Owner Certification — Lead Paint
     8: [
-        ("lead_pre1978_ongoing",     48, 310, 10),
+        ("lead_pre1978_ongoing",     60, 312, 10),   # exact
     ],
 }
 
@@ -418,6 +432,9 @@ def _derive_fields(form_data: dict):
     form_data["barrier_free_yes"] = "true"
     form_data["lead_completed_statement"] = "true"
     form_data["lead_pre1978_ongoing"] = "true"
+    form_data["lead_paint_known"] = "true"
+    form_data["lead_paint_records"] = "true"
+    form_data["mgmt_same_as_owner"] = "true"
 
     ptype = (form_data.get("property_type") or "").lower().strip()
     btype_map = {
