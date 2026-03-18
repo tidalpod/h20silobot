@@ -142,10 +142,11 @@ FIELD_MAP = {
     # Owner fields exact from user-filled PDF
     # ------------------------------------------------------------------
     10: [
-        ("tenant_name",          183, 650, 10),   # estimated above owner
+        ("tenant_name",          183, 650, 10),   # estimated
         ("tenant_sign_date",     486, 665, 10),   # estimated
-        ("owner_name__sig",      183, 681, 11),   # exact
-        ("signature_date",       486, 703, 10),   # exact
+        ("owner_name",           280, 695, 10),   # Landlord/Owner Printed Name row
+        ("owner_name__sig",      183, 718, 11),   # Landlord/Owner Signature row
+        ("signature_date",       486, 718, 10),   # same row as signature
     ],
 
     # Pages 12-14 (W-9, Payee Auth) are always replaced by entity uploads — no field mapping needed.
