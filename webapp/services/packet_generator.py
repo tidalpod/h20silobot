@@ -135,6 +135,11 @@ FIELD_MAP = {
     # ------------------------------------------------------------------
     7: [
         ("property_address",     100, 80, 10),
+        # Owner/Landlord initials on lines (a) and (b)
+        ("owner_initials",        55, 210, 10),   # line (a) — lead paint presence
+        ("owner_initials",        55, 348, 10),   # line (b) — records available
+        # Certification signatures at bottom
+        ("owner_name__sig",       48, 600, 12),   # Owner/Landlord Signature line
         ("signature_date",       462, 605, 10),   # exact — owner date
         ("tenant_sign_date",     462, 629, 10),   # exact — tenant date
     ],
