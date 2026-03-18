@@ -148,27 +148,7 @@ FIELD_MAP = {
         ("signature_date",       486, 703, 10),   # exact
     ],
 
-    # ------------------------------------------------------------------
-    # P13 (page 12): MSHDA Payee Authorization p1
-    # ------------------------------------------------------------------
-    12: [
-        ("tenant_name",            410, 44, 10),
-        ("entity_name",             55, 164, 10),
-        ("owner_mailing_address",   55, 340, 10),
-        ("owner_phone",            100, 420, 10),
-        ("owner_email",            100, 435, 10),
-    ],
-
-    # ------------------------------------------------------------------
-    # P14 (page 13): Payee Authorization p2 — bank info
-    # ------------------------------------------------------------------
-    13: [
-        ("bank_name",              200, 64, 11),
-        ("bank_routing_number",    200, 120, 11),
-        ("bank_account_number",    200, 137, 11),
-        ("owner_name__sig",        255, 370, 12),
-        ("signature_date",         490, 387, 11),
-    ],
+    # Pages 12-14 (W-9, Payee Auth) are always replaced by entity uploads — no field mapping needed.
 }
 
 # =============================================================================
