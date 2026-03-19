@@ -148,6 +148,33 @@
                         <input type="date" name="dob" class="w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
+                    <!-- Background/Credit Check Authorization -->
+                    <div class="border border-gray-200 rounded-lg p-4 mb-5 bg-gray-50">
+                        <h3 class="text-sm font-bold text-gray-900 mb-2">Authorization for Background & Credit Check</h3>
+                        <p class="text-xs text-gray-700 leading-relaxed mb-3">
+                            I hereby authorize Blue Deer Property Management and its agents to obtain consumer reports, including but not limited to credit reports, criminal background checks, eviction history, and rental history, for the purpose of evaluating my rental application. I understand this authorization remains valid for the duration of my tenancy, if approved. I acknowledge that I have the right to request disclosure of the nature and scope of any investigation and that a copy of any consumer report obtained may be requested in writing.
+                        </p>
+                        <label class="flex items-start gap-2 cursor-pointer">
+                            <input type="checkbox" name="screening_consent" id="screening-consent" required class="rounded text-blue-600 mt-0.5 border-gray-300 focus:ring-blue-500">
+                            <span class="text-xs text-gray-700">I authorize Blue Deer Property Management to run a background and credit check on me. <span class="text-red-500">*</span></span>
+                        </label>
+                    </div>
+
+                    <!-- Electronic Signature & Date -->
+                    <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                        <h3 class="text-sm font-bold text-gray-900 mb-2">Applicant Signature</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Full Legal Name (Electronic Signature) <span class="text-red-500">*</span></label>
+                                <input type="text" name="applicant_signature" id="applicant-signature" required placeholder="Type your full name" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" style="font-family: 'Georgia', serif; font-style: italic;">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                                <input type="text" name="applicant_signature_date" id="applicant-signature-date" readonly class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-xs text-gray-500 mb-5">
                         By clicking the button below you are agreeing to our
                         <a href="/terms" class="text-blue-600 hover:underline">Terms of Use</a> &
@@ -521,7 +548,9 @@
             const val = input.value.trim();
             let isInvalid = false;
 
-            if (!val) {
+            if (input.type === 'checkbox') {
+                isInvalid = !input.checked;
+            } else if (!val) {
                 isInvalid = true;
             } else if (input.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
                 isInvalid = true;
@@ -532,11 +561,12 @@
                 input.classList.add('border-red-400', 'ring-2', 'ring-red-400');
                 if (!firstInvalid) firstInvalid = input;
 
-                if (!input.parentElement.querySelector('.field-error')) {
+                const container = input.type === 'checkbox' ? input.closest('label') || input.parentElement : input.parentElement;
+                if (!container.querySelector('.field-error')) {
                     const msg = document.createElement('p');
                     msg.className = 'field-error text-xs text-red-500 mt-1';
-                    msg.textContent = input.type === 'email' && val ? 'Please enter a valid email' : 'This field is required';
-                    input.parentElement.appendChild(msg);
+                    msg.textContent = input.type === 'checkbox' ? 'You must agree to proceed' : (input.type === 'email' && val ? 'Please enter a valid email' : 'This field is required');
+                    container.appendChild(msg);
                 }
             }
         });
@@ -587,6 +617,10 @@
             : 'px-5 py-2 text-sm cursor-pointer border-l border-gray-300 transition-colors text-gray-600';
     }
     updateTypeToggle();
+
+    // Auto-fill signature date with today
+    const sigDate = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    document.getElementById('applicant-signature-date').value = sigDate;
 
     let occupantCount = 0;
     function addOccupant() {
