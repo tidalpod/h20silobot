@@ -178,11 +178,9 @@
                         <select name="entity" id="entity"
                                 class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5">
                             <option value="">Select Entity...</option>
-                            <option value="Silo Capital LLC" {% if property and property.entity == 'Silo Capital LLC' %}selected{% endif %}>Silo Capital LLC</option>
-                            <option value="Silo Partners LLC" {% if property and property.entity == 'Silo Partners LLC' %}selected{% endif %}>Silo Partners LLC</option>
-                            <option value="Homes for America LLC" {% if property and property.entity == 'Homes for America LLC' %}selected{% endif %}>Homes for America LLC</option>
-                            <option value="Casa Sicura LLC" {% if property and property.entity == 'Casa Sicura LLC' %}selected{% endif %}>Casa Sicura LLC</option>
-                            <option value="Chulo Apartments LLC" {% if property and property.entity == 'Chulo Apartments LLC' %}selected{% endif %}>Chulo Apartments LLC</option>
+                            {% for entity in entities|default([]) %}
+                            <option value="{{ entity.entity_name }}" {% if property and property.entity == entity.entity_name %}selected{% endif %}>{{ entity.entity_name }}</option>
+                            {% endfor %}
                         </select>
                         <p class="mt-1 text-xs text-gray-500">The LLC or entity that owns this property</p>
                     </div>

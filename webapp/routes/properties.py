@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation
+from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation, EntityConfig
 from webapp.auth.dependencies import get_current_user
 from webapp.services.storage_service import storage
 
@@ -92,14 +92,13 @@ async def list_properties(
                 if prop.is_active:
                     properties.append({"property": prop, "status": bill_status})
 
-    # Entity list — (full_name, short_label)
-    entities = [
-        ("Silo Capital LLC", "Silo Capital"),
-        ("Silo Partners LLC", "Silo P"),
-        ("Homes for America LLC", "HFA"),
-        ("Casa Sicura LLC", "Casa Sicura"),
-        ("Chulo Apartments LLC", "Chulo"),
-    ]
+    # Load entities from database
+    async with get_session() as session:
+        ent_result = await session.execute(
+            select(EntityConfig).order_by(EntityConfig.entity_name)
+        )
+        entity_rows = ent_result.scalars().all()
+    entities = [(e.entity_name, e.entity_name) for e in entity_rows]
 
     return templates.TemplateResponse(
         "properties/list.html",
@@ -123,6 +122,12 @@ async def new_property_form(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    async with get_session() as session:
+        ent_result = await session.execute(
+            select(EntityConfig).order_by(EntityConfig.entity_name)
+        )
+        entity_rows = ent_result.scalars().all()
+
     return templates.TemplateResponse(
         "properties/form.html",
         {
@@ -130,6 +135,7 @@ async def new_property_form(request: Request):
             "user": user,
             "property": None,
             "error": None,
+            "entities": entity_rows,
         }
     )
 
@@ -418,6 +424,11 @@ async def edit_property_form(request: Request, property_id: int):
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
+        ent_result = await session.execute(
+            select(EntityConfig).order_by(EntityConfig.entity_name)
+        )
+        entity_rows = ent_result.scalars().all()
+
     return templates.TemplateResponse(
         "properties/form.html",
         {
@@ -425,6 +436,7 @@ async def edit_property_form(request: Request, property_id: int):
             "user": user,
             "property": prop,
             "error": None,
+            "entities": entity_rows,
         }
     )
 
