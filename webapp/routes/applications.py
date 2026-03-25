@@ -78,6 +78,7 @@ async def apply_standalone(request: Request):
     return templates.TemplateResponse("public/applications.html", {
         "request": request,
         "properties_json": json.dumps(listings),
+        "screening_fee": web_config.tenantreportx_applicant_fee,
     })
 
 

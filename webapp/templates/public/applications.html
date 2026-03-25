@@ -166,7 +166,7 @@
                         <a href="https://buy.stripe.com/00w28tfdM9K18ey2F00kE00" target="_blank"
                            class="inline-flex items-center gap-1.5 text-sm text-white bg-blue-600 hover:bg-blue-500 border border-blue-600 hover:border-blue-500 rounded-lg px-4 py-2 transition-colors shadow-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                            Pay Screening Fee Only ($35)
+                            Pay Screening Fee Only (${{ screening_fee|int }})
                         </a>
                     </div>
                 </div>
@@ -535,10 +535,10 @@
                     <hr class="my-6 border-gray-200">
 
                     <p class="text-sm text-gray-600 mb-4">
-                        A non-refundable <strong>$35.00</strong> application & screening fee will be collected via Stripe after you click submit.
+                        A non-refundable <strong>${{ screening_fee }}</strong> application & screening fee will be collected via Stripe after you click submit.
                     </p>
 
-                    <button type="submit" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">SUBMIT &amp; PAY $35.00</button>
+                    <button type="submit" class="btn-next w-full max-w-xs mx-auto block text-white py-3.5 rounded-full text-sm font-bold tracking-wide">SUBMIT &amp; PAY ${{ screening_fee }}</button>
                 </div>
             </div>
         </form>
