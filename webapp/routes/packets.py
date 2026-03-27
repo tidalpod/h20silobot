@@ -251,6 +251,19 @@ async def generate_packet_post(request: Request):
     if not property_id:
         return RedirectResponse(url="/packets/generate?error=property_required", status_code=303)
 
+    # Check for uploaded tenant-signed packet
+    tenant_packet_bytes = None
+    packet_source = form_data.get("packet_source", "blank")
+    if packet_source == "upload":
+        tenant_file = form.get("tenant_packet_file")
+        if tenant_file and hasattr(tenant_file, "read"):
+            tenant_packet_bytes = await tenant_file.read()
+            if not tenant_packet_bytes or len(tenant_packet_bytes) < 100:
+                return RedirectResponse(
+                    url="/packets/generate?error=Please+upload+a+valid+PDF+file",
+                    status_code=303,
+                )
+
     # Look up entity documents
     entity_w9_path = None
     entity_payee_path = None
@@ -274,6 +287,7 @@ async def generate_packet_post(request: Request):
             form_data=form_data,
             entity_w9_path=entity_w9_path,
             entity_payee_path=entity_payee_path,
+            tenant_packet_bytes=tenant_packet_bytes,
         )
     except FileNotFoundError as e:
         logger.error(f"Packet generation failed: {e}")

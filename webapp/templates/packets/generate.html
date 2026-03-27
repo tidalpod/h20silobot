@@ -29,7 +29,43 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="/packets/generate" id="packet-form">
+    <form method="POST" action="/packets/generate" id="packet-form" enctype="multipart/form-data">
+        <!-- Section 0: Packet Source -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h2 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                    Packet Source
+                </h2>
+            </div>
+            <div class="px-5 py-4">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <label class="flex-1 flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors border-blue-500 bg-blue-50" id="source-blank-label">
+                        <input type="radio" name="packet_source" value="blank" checked onchange="togglePacketSource()" class="mt-0.5 border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-medium text-gray-900">Start from blank packet</span>
+                            <p class="text-xs text-gray-500 mt-0.5">Generate from the blank MSHDA template — fill out everything</p>
+                        </div>
+                    </label>
+                    <label class="flex-1 flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors border-gray-200" id="source-upload-label">
+                        <input type="radio" name="packet_source" value="upload" onchange="togglePacketSource()" class="mt-0.5 border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-medium text-gray-900">Upload tenant-signed packet</span>
+                            <p class="text-xs text-gray-500 mt-0.5">Tenant already filled out their portion — overlay your landlord info on their signed PDF</p>
+                        </div>
+                    </label>
+                </div>
+                <div id="tenant-upload-section" class="hidden mt-4 p-4 rounded-lg border border-dashed border-gray-300 bg-gray-50">
+                    <label class="block text-xs font-medium text-gray-700 mb-2">Upload Tenant-Signed Packet PDF</label>
+                    <input type="file" name="tenant_packet_file" accept=".pdf" id="tenant-packet-file"
+                           class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-400 mt-2">The tenant's handwriting and signatures will be preserved. Your landlord fields will be overlaid on top.</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Section 1: Property & Tenant Selection -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
@@ -705,6 +741,28 @@ function setSelectVal(id, val) {
     if (!el) return;
     for (const opt of el.options) {
         if (opt.value === val) { el.value = val; return; }
+    }
+}
+
+// ── Packet source toggle ──
+function togglePacketSource() {
+    const isUpload = document.querySelector('input[name="packet_source"][value="upload"]').checked;
+    const uploadSection = document.getElementById('tenant-upload-section');
+    const blankLabel = document.getElementById('source-blank-label');
+    const uploadLabel = document.getElementById('source-upload-label');
+
+    if (isUpload) {
+        uploadSection.classList.remove('hidden');
+        blankLabel.classList.remove('border-blue-500', 'bg-blue-50');
+        blankLabel.classList.add('border-gray-200');
+        uploadLabel.classList.remove('border-gray-200');
+        uploadLabel.classList.add('border-blue-500', 'bg-blue-50');
+    } else {
+        uploadSection.classList.add('hidden');
+        uploadLabel.classList.remove('border-blue-500', 'bg-blue-50');
+        uploadLabel.classList.add('border-gray-200');
+        blankLabel.classList.remove('border-gray-200');
+        blankLabel.classList.add('border-blue-500', 'bg-blue-50');
     }
 }
 </script>

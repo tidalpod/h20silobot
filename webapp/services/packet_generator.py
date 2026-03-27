@@ -342,6 +342,7 @@ def generate_packet(
     entity_w9_path: Optional[str] = None,
     entity_payee_path: Optional[str] = None,
     blank_pdf_path: Optional[str] = None,
+    tenant_packet_bytes: Optional[bytes] = None,
 ) -> bytes:
     """Generate a filled MSHDA landlord packet PDF.
 
@@ -350,22 +351,26 @@ def generate_packet(
         entity_w9_path: Path or URL to the entity's W-9 PDF.
         entity_payee_path: Path or URL to the entity's Payee Authorization PDF.
         blank_pdf_path: Override path to the blank packet PDF (for testing).
+        tenant_packet_bytes: If provided, use this tenant-signed PDF as the base
+            instead of the blank template. Landlord fields are overlaid on top.
 
     Returns:
         bytes: The generated PDF file contents.
     """
-    template_path = blank_pdf_path or str(BLANK_PACKET_PATH)
-
-    if not os.path.exists(template_path):
-        raise FileNotFoundError(
-            f"Blank MSHDA packet not found at {template_path}. "
-            "Place the scanned PDF at webapp/static/templates/mshda_blank_packet.pdf"
-        )
+    if tenant_packet_bytes:
+        logger.info("Using uploaded tenant-signed packet as base")
+        doc = fitz.open(stream=tenant_packet_bytes, filetype="pdf")
+    else:
+        template_path = blank_pdf_path or str(BLANK_PACKET_PATH)
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(
+                f"Blank MSHDA packet not found at {template_path}. "
+                "Place the scanned PDF at webapp/static/templates/mshda_blank_packet.pdf"
+            )
+        doc = fitz.open(template_path)
 
     _derive_fields(form_data)
 
-    # Open with fitz and insert text directly onto pages
-    doc = fitz.open(template_path)
     total_pages = len(doc)
     logger.info(f"Processing {total_pages}-page blank packet")
 
