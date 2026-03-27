@@ -29,7 +29,7 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="/packets/generate" id="packet-form" enctype="multipart/form-data">
+    <form method="POST" action="/packets/generate" id="packet-form">
         <!-- Section 0: Packet Source -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
@@ -750,19 +750,22 @@ function togglePacketSource() {
     const uploadSection = document.getElementById('tenant-upload-section');
     const blankLabel = document.getElementById('source-blank-label');
     const uploadLabel = document.getElementById('source-upload-label');
+    const form = document.getElementById('packet-form');
 
     if (isUpload) {
         uploadSection.classList.remove('hidden');
+        form.enctype = 'multipart/form-data';
         blankLabel.classList.remove('border-blue-500', 'bg-blue-50');
         blankLabel.classList.add('border-gray-200');
         uploadLabel.classList.remove('border-gray-200');
         uploadLabel.classList.add('border-blue-500', 'bg-blue-50');
     } else {
         uploadSection.classList.add('hidden');
-        uploadLabel.classList.remove('border-blue-500', 'bg-blue-50');
-        uploadLabel.classList.add('border-gray-200');
+        form.removeAttribute('enctype');
         blankLabel.classList.remove('border-gray-200');
         blankLabel.classList.add('border-blue-500', 'bg-blue-50');
+        uploadLabel.classList.remove('border-blue-500', 'bg-blue-50');
+        uploadLabel.classList.add('border-gray-200');
     }
 }
 </script>
