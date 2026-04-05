@@ -18,6 +18,9 @@ from jinja2 import Environment, FileSystemLoader
 from webapp.services.lease_templates import (
     SECTION_2_PROVISIONS,
     SECTION_3_GENERAL_PROVISIONS,
+    COMPREHENSIVE_SECTION_2_PROVISIONS,
+    COMPREHENSIVE_SECTION_3_PROVISIONS,
+    SECTION_4_TENANT_RESPONSIBILITIES,
     MICHIGAN_TRUTH_IN_RENTING,
     MICHIGAN_SECURITY_DEPOSIT_LAW,
     MICHIGAN_LEAD_PAINT_DISCLOSURE,
@@ -57,12 +60,15 @@ def _ordinal_suffix(n) -> str:
     return ordinal(n)
 
 
-def _build_section_2(data: dict) -> list:
+def _build_section_2(data: dict, provision_templates: list = None) -> list:
     """Build Section 2 (Special Provisions) from lease data + templates.
 
     Returns a list of dicts with 'key', 'title', 'text' for each provision.
     Some provisions have variable data interpolated.
     """
+    if provision_templates is None:
+        provision_templates = SECTION_2_PROVISIONS
+
     provisions = []
 
     due_day = data.get("rent_due_day", 1)
@@ -77,7 +83,7 @@ def _build_section_2(data: dict) -> list:
     }
     method_str = ", ".join(method_labels.get(m, m) for m in maintenance_methods) if maintenance_methods else "As agreed"
 
-    for template in SECTION_2_PROVISIONS:
+    for template in provision_templates:
         key = template.get("key", "")
         title = template["title"]
         text = template["text"]
@@ -91,6 +97,13 @@ def _build_section_2(data: dict) -> list:
                 late_fee_grace_days=data.get("late_fee_grace_days", 5),
                 late_fee_max_days=data.get("late_fee_max_days", 5),
             )
+        elif key == "nsf_fees":
+            nsf_fee = data.get("nsf_fee", 20)
+            nsf_display = _format_currency(nsf_fee) if isinstance(nsf_fee, (int, float)) else f"${nsf_fee}"
+            try:
+                text = text.format(nsf_fee=nsf_display)
+            except (KeyError, IndexError):
+                pass
         elif key == "security_deposit_provisions":
             bank_name = data.get("deposit_bank_name", "___________")
             bank_addr = data.get("deposit_bank_address", "___________")
@@ -117,6 +130,31 @@ def _build_section_2(data: dict) -> list:
             continue
         elif key == "maintenance_communication":
             text = text.format(maintenance_methods=method_str)
+        elif key == "alterations_repairs_by_tenant":
+            max_amt = data.get("max_repair_amount", 100)
+            text = text.format(max_repair_amount=_format_currency(max_amt))
+
+        provisions.append({"key": key, "title": title, "text": text})
+
+    return provisions
+
+
+def _build_section_4(data: dict) -> list:
+    """Build Section 4 (Tenant Responsibilities) for comprehensive lease."""
+    provisions = []
+    water_method = data.get("water_bill_method", "direct")
+    water_method_text = (
+        "directly to the Tenant" if water_method == "direct"
+        else "reimbursed to the Landlord"
+    )
+
+    for template in SECTION_4_TENANT_RESPONSIBILITIES:
+        key = template.get("key", "")
+        title = template["title"]
+        text = template["text"]
+
+        if key == "water_bill_payment":
+            text = text.format(water_bill_method=water_method_text)
 
         provisions.append({"key": key, "title": title, "text": text})
 
@@ -161,7 +199,16 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
         {"name", "role", "image_path", "signed_at", "ip_address"}
     """
     import base64
-    section_2 = _build_section_2(data)
+    is_comprehensive = data.get("template_type") == "comprehensive"
+
+    if is_comprehensive:
+        section_2 = _build_section_2(data, COMPREHENSIVE_SECTION_2_PROVISIONS)
+        section_3 = COMPREHENSIVE_SECTION_3_PROVISIONS
+        section_4 = _build_section_4(data)
+    else:
+        section_2 = _build_section_2(data, SECTION_2_PROVISIONS)
+        section_3 = SECTION_3_GENERAL_PROVISIONS
+        section_4 = None
 
     # Build tenant list
     tenants = data.get("tenants", [])
@@ -233,7 +280,9 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
         landlord=landlord_info,
         lease_data=data,
         section_2_provisions=section_2,
-        section_3_provisions=SECTION_3_GENERAL_PROVISIONS,
+        section_3_provisions=section_3,
+        section_4_provisions=section_4,
+        is_comprehensive=is_comprehensive,
         michigan_truth_in_renting=MICHIGAN_TRUTH_IN_RENTING,
         michigan_security_deposit=MICHIGAN_SECURITY_DEPOSIT_LAW,
         michigan_lead_paint=MICHIGAN_LEAD_PAINT_DISCLOSURE if data.get("lead_paint_disclosure") else None,
@@ -242,6 +291,8 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
         total_monthly_rent=total_monthly_rent,
         total_deposits=total_deposits,
         move_in_fee_total=move_in_fee_total,
+        nonrefundable_fees=data.get("nonrefundable_fees", {}),
+        furnishings_included=data.get("furnishings_included", ""),
         utilities_display=utilities_display,
         format_date=_format_date,
         format_currency=_format_currency,

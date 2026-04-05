@@ -65,9 +65,19 @@ async def builder_list(request: Request):
         )
         builders = result.scalars().all()
 
+        # Parse template_type for display
+        builder_types = {}
+        for b in builders:
+            try:
+                d = json.loads(b.lease_data) if b.lease_data else {}
+                builder_types[b.id] = d.get("template_type", "standard")
+            except (json.JSONDecodeError, TypeError):
+                builder_types[b.id] = "standard"
+
     return templates.TemplateResponse(
         "leases/builder_list.html",
-        {"request": request, "user": user, "builders": builders, "total_steps": TOTAL_STEPS},
+        {"request": request, "user": user, "builders": builders, "total_steps": TOTAL_STEPS,
+         "builder_types": builder_types},
     )
 
 
@@ -108,6 +118,7 @@ async def builder_create(request: Request):
     form = await request.form()
     property_id = int(form.get("property_id", 0))
     tenant_id = int(form.get("tenant_id", 0)) if form.get("tenant_id") else None
+    template_type = form.get("template_type", "standard")
 
     if not property_id:
         return RedirectResponse(url="/leases/builder/new?error=no_property", status_code=303)
@@ -152,6 +163,7 @@ async def builder_create(request: Request):
 
         # Initial lease data with auto-fill
         initial_data = {
+            "template_type": template_type,
             "tenants": [tenant_data] if tenant_data else [],
             "landlord": landlord,
             "monthly_rent": float(prop.monthly_rent) if prop and prop.monthly_rent else 0,
@@ -165,6 +177,23 @@ async def builder_create(request: Request):
             "maintenance_communication": ["bluedeer_portal", "email", "text"],
             "lead_paint_disclosure": bool(prop and prop.year_built and prop.year_built < 1978),
         }
+
+        # Comprehensive template defaults
+        if template_type == "comprehensive":
+            initial_data.update({
+                "nsf_fee": 20,
+                "max_repair_amount": 100,
+                "pet_fine_per_animal": 125,
+                "pet_fine_per_day": 10,
+                "water_bill_method": "direct",
+                "nonrefundable_fees": {
+                    "admin_fee": 0,
+                    "application_fee": 0,
+                    "other_fee": 0,
+                    "other_fee_description": "",
+                },
+                "payment_methods": ["ach", "bluedeer", "cash", "cashiers_check"],
+            })
 
         # Pre-fill additional_terms from active default terms
         terms_result = await session.execute(
@@ -266,6 +295,9 @@ async def save_step(request: Request, builder_id: int, step: int):
             data["start_date"] = form.get("start_date", "")
             data["end_date"] = form.get("end_date", "")
             data["expiration_action"] = form.get("expiration_action", "continue_mtm")
+            # Comprehensive fields
+            if data.get("template_type") == "comprehensive":
+                data["furnishings_included"] = form.get("furnishings_included", "")
 
         elif step == 2:
             data["monthly_rent"] = float(form.get("monthly_rent", 0) or 0)
@@ -281,6 +313,16 @@ async def save_step(request: Request, builder_id: int, step: int):
             data["deposit_bank_name"] = form.get("deposit_bank_name", "")
             data["deposit_bank_address"] = form.get("deposit_bank_address", "")
             data["payment_methods"] = form.getlist("payment_methods")
+
+            # Comprehensive fields
+            if data.get("template_type") == "comprehensive":
+                data["nsf_fee"] = float(form.get("nsf_fee", 20) or 20)
+                data["nonrefundable_fees"] = {
+                    "admin_fee": float(form.get("admin_fee", 0) or 0),
+                    "application_fee": float(form.get("application_fee", 0) or 0),
+                    "other_fee": float(form.get("other_fee", 0) or 0),
+                    "other_fee_description": form.get("other_fee_description", ""),
+                }
 
             # Move-in fees (dynamic rows)
             fees = []
@@ -345,6 +387,10 @@ async def save_step(request: Request, builder_id: int, step: int):
             data["smoking_policy"] = form.get("smoking_policy", "not_permitted")
             data["parking_rules"] = form.get("parking_rules", "")
             data["renters_insurance_required"] = form.get("renters_insurance_required") == "true"
+            # Comprehensive fields
+            if data.get("template_type") == "comprehensive":
+                data["pet_fine_per_animal"] = float(form.get("pet_fine_per_animal", 125) or 125)
+                data["pet_fine_per_day"] = float(form.get("pet_fine_per_day", 10) or 10)
 
         elif step == 5:
             # Utilities (expanded to match TurboTenant format)
@@ -358,6 +404,11 @@ async def save_step(request: Request, builder_id: int, step: int):
                 utilities[name] = form.get(f"utility_{name}", "tenant")
             data["utilities"] = utilities
             data["maintenance_communication"] = form.getlist("maintenance_communication")
+
+            # Comprehensive fields
+            if data.get("template_type") == "comprehensive":
+                data["water_bill_method"] = form.get("water_bill_method", "direct")
+                data["max_repair_amount"] = float(form.get("max_repair_amount", 100) or 100)
 
             # Keys
             key_types = form.getlist("key_type")
@@ -482,10 +533,17 @@ async def builder_generate(request: Request, builder_id: int):
             except ValueError:
                 pass
 
+        is_comprehensive = data.get("template_type") == "comprehensive"
+        lease_title = (
+            f"Michigan Master Lease - {prop.address if prop else 'Unknown'}"
+            if is_comprehensive
+            else f"Michigan Lease - {prop.address if prop else 'Unknown'}"
+        )
+
         lease_doc = LeaseDocument(
             property_id=builder.property_id,
             tenant_id=builder.tenant_id,
-            title=f"Michigan Lease - {prop.address if prop else 'Unknown'}",
+            title=lease_title,
             file_url=pdf_result["file_url"],
             file_type="pdf",
             file_size=pdf_result["file_size"],

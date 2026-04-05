@@ -22,6 +22,16 @@
 {% endif %}
 
 <div class="max-w-3xl space-y-6">
+    {% if data.get('template_type') == 'comprehensive' %}
+    <div class="flex items-center gap-2">
+        <span class="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800">Comprehensive Michigan Master Lease</span>
+    </div>
+    {% else %}
+    <div class="flex items-center gap-2">
+        <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">Standard Michigan Lease</span>
+    </div>
+    {% endif %}
+
     <!-- Step 1: Lease Specifics -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-4">
@@ -48,6 +58,12 @@
             </div>
             {% endif %}
         </dl>
+        {% if data.get('template_type') == 'comprehensive' and data.get('furnishings_included') %}
+        <div class="mt-3 pt-3 border-t border-gray-100">
+            <p class="text-xs text-gray-500 mb-1">Furnishings & Appliances:</p>
+            <p class="text-sm text-gray-700">{{ data.get('furnishings_included') }}</p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Step 2: Rent & Deposits -->
@@ -76,6 +92,29 @@
             {% for fee in data.get('move_in_fees', []) %}
             <span class="text-sm text-gray-700">{{ fee.description }}: ${{ "{:,.2f}".format(fee.amount) }}{% if not loop.last %}, {% endif %}</span>
             {% endfor %}
+        </div>
+        {% endif %}
+        {% if data.get('template_type') == 'comprehensive' %}
+        <div class="mt-3 pt-3 border-t border-gray-100">
+            <dl class="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">NSF Fee</dt>
+                    <dd class="font-medium text-gray-900">${{ data.get('nsf_fee', 20) }}</dd>
+                </div>
+                {% set nrf = data.get('nonrefundable_fees', {}) %}
+                {% if nrf.get('admin_fee') %}
+                <div>
+                    <dt class="text-gray-500">Admin Fee</dt>
+                    <dd class="font-medium text-gray-900">${{ "{:,.2f}".format(nrf.get('admin_fee', 0)) }}</dd>
+                </div>
+                {% endif %}
+                {% if nrf.get('application_fee') %}
+                <div>
+                    <dt class="text-gray-500">Application Fee</dt>
+                    <dd class="font-medium text-gray-900">${{ "{:,.2f}".format(nrf.get('application_fee', 0)) }}</dd>
+                </div>
+                {% endif %}
+            </dl>
         </div>
         {% endif %}
     </div>
@@ -124,13 +163,27 @@
             </div>
             <div>
                 <dt class="text-gray-500">Smoking</dt>
-                <dd class="font-medium text-gray-900">{{ 'Not Permitted' if data.get('smoking_policy', 'not_permitted') == 'not_permitted' else 'Designated Areas' }}</dd>
+                <dd class="font-medium text-gray-900">{% if data.get('smoking_policy', 'not_permitted') == 'not_permitted' %}Not Permitted{% elif data.get('smoking_policy') == 'outdoors_only' %}Outdoors Only{% else %}Designated Areas{% endif %}</dd>
             </div>
             <div>
                 <dt class="text-gray-500">Renters Insurance</dt>
                 <dd class="font-medium text-gray-900">{{ 'Required' if data.get('renters_insurance_required') else 'Not Required' }}</dd>
             </div>
         </dl>
+        {% if data.get('template_type') == 'comprehensive' %}
+        <div class="mt-3 pt-3 border-t border-gray-100">
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">Pet Fine (per animal)</dt>
+                    <dd class="font-medium text-gray-900">${{ data.get('pet_fine_per_animal', 125) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Pet Fine (per day)</dt>
+                    <dd class="font-medium text-gray-900">${{ data.get('pet_fine_per_day', 10) }}/day</dd>
+                </div>
+            </dl>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Step 5: Utilities -->
@@ -147,6 +200,20 @@
                 <span class="block font-medium text-gray-900">{{ resp.title() }}</span>
             </div>
             {% endfor %}
+        </div>
+        {% endif %}
+        {% if data.get('template_type') == 'comprehensive' %}
+        <div class="mt-3 pt-3 border-t border-gray-100">
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">Water Bill Method</dt>
+                    <dd class="font-medium text-gray-900">{{ 'Direct to Tenant' if data.get('water_bill_method', 'direct') == 'direct' else 'Reimbursed to Landlord' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Max Repair Amount</dt>
+                    <dd class="font-medium text-gray-900">${{ data.get('max_repair_amount', 100) }}</dd>
+                </div>
+            </dl>
         </div>
         {% endif %}
     </div>
@@ -179,7 +246,7 @@
     <div class="flex justify-between items-center bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div>
             <h3 class="font-semibold text-gray-900">Ready to generate?</h3>
-            <p class="text-sm text-gray-500">This will create a Michigan Residential Rental Agreement PDF</p>
+            <p class="text-sm text-gray-500">This will create a {% if data.get('template_type') == 'comprehensive' %}Michigan Comprehensive Residential Rental Agreement{% else %}Michigan Residential Rental Agreement{% endif %} PDF</p>
         </div>
         <form method="POST" action="/leases/builder/{{ builder.id }}/generate">
             <button type="submit" class="px-8 py-3 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-500 shadow-sm transition-colors">

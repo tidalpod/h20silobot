@@ -29,6 +29,27 @@
                 </select>
             </div>
 
+            <!-- Template Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Lease Template *</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex items-start gap-3 p-4 rounded-lg border cursor-pointer hover:bg-gray-50 border-blue-300 bg-blue-50" id="label-standard">
+                        <input type="radio" name="template_type" value="standard" checked onchange="updateTemplateLabels()" class="mt-0.5">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Standard</p>
+                            <p class="text-xs text-gray-500">Basic Michigan lease (~12 pages)</p>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 p-4 rounded-lg border cursor-pointer hover:bg-gray-50 border-gray-200" id="label-comprehensive">
+                        <input type="radio" name="template_type" value="comprehensive" onchange="updateTemplateLabels()" class="mt-0.5">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Comprehensive Michigan</p>
+                            <p class="text-xs text-gray-500">Full master lease with tenant responsibilities (~29 pages)</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <!-- Tenant -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Primary Tenant</label>
@@ -50,4 +71,14 @@
         </div>
     </form>
 </div>
+
+<script>
+function updateTemplateLabels() {
+    const std = document.getElementById('label-standard');
+    const comp = document.getElementById('label-comprehensive');
+    const isStd = document.querySelector('input[name="template_type"][value="standard"]').checked;
+    std.className = std.className.replace(/border-\S+\s*bg-\S+/g, '').trim() + (isStd ? ' border-blue-300 bg-blue-50' : ' border-gray-200');
+    comp.className = comp.className.replace(/border-\S+\s*bg-\S+/g, '').trim() + (!isStd ? ' border-blue-300 bg-blue-50' : ' border-gray-200');
+}
+</script>
 {% endblock %}

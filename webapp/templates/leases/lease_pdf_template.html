@@ -253,6 +253,16 @@
             <td class="see-ref">See section 1.9</td>
         </tr>
         {% endif %}
+        {% if is_comprehensive and nonrefundable_fees %}
+        {% set nrf_total = (nonrefundable_fees.get('admin_fee', 0) or 0) + (nonrefundable_fees.get('application_fee', 0) or 0) + (nonrefundable_fees.get('other_fee', 0) or 0) %}
+        {% if nrf_total > 0 %}
+        <tr>
+            <td class="label">Nonrefundable Fees:</td>
+            <td>{{ format_currency(nrf_total) }}</td>
+            <td class="see-ref">See section 1.9</td>
+        </tr>
+        {% endif %}
+        {% endif %}
         <tr>
             <td class="label">Late Fee:</td>
             <td>Applied</td>
@@ -266,7 +276,11 @@
 <!-- ==================== SECTION 1: GENERAL INFORMATION ==================== -->
 <div class="page-break"></div>
 
+{% if is_comprehensive %}
+<h1>Michigan Comprehensive Residential Rental Agreement<br>("Agreement")</h1>
+{% else %}
 <h1>Michigan Residential Rental Agreement<br>("Agreement")</h1>
+{% endif %}
 
 <h2>1. GENERAL INFORMATION</h2>
 
@@ -353,6 +367,10 @@
         <td>{{ property_info.get('zip_code', '') }}</td>
     </tr>
 </table>
+
+{% if is_comprehensive and furnishings_included %}
+<p class="provision">Together with the following furnishings and appliances: <strong>{{ furnishings_included }}</strong></p>
+{% endif %}
 
 <!-- 1.5 TERM -->
 <h3>1.5 TERM</h3>
@@ -463,7 +481,37 @@
     Upon the due execution of this Agreement, Tenant shall pay to Landlord the following non-refundable fee(s):
 </p>
 
+{% if is_comprehensive %}
+<table class="data-table">
+    <tr>
+        <td style="width: 50%;">Admin Fee:</td>
+        <td>{% if nonrefundable_fees.get('admin_fee') %}{{ format_currency(nonrefundable_fees.get('admin_fee', 0)) }}{% else %}N/A{% endif %}</td>
+    </tr>
+    <tr>
+        <td>Application Fee:</td>
+        <td>{% if nonrefundable_fees.get('application_fee') %}{{ format_currency(nonrefundable_fees.get('application_fee', 0)) }}{% else %}N/A{% endif %}</td>
+    </tr>
+    <tr>
+        <td>Other Nonrefundable Fee(s){% if nonrefundable_fees.get('other_fee_description') %} ({{ nonrefundable_fees.get('other_fee_description') }}){% endif %}:</td>
+        <td>{% if nonrefundable_fees.get('other_fee') %}{{ format_currency(nonrefundable_fees.get('other_fee', 0)) }}{% else %}N/A{% endif %}</td>
+    </tr>
+</table>
 {% if lease_data.get('move_in_fees') %}
+<p class="provision" style="margin-top: 8pt;">Additional move-in fees:</p>
+<table class="data-table">
+    <tr>
+        <th>Fee Description</th>
+        <th>Amount</th>
+    </tr>
+    {% for fee in lease_data.get('move_in_fees', []) %}
+    <tr>
+        <td>{{ fee.get('description', '') }}</td>
+        <td>{{ format_currency(fee.get('amount', 0)) }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+{% elif lease_data.get('move_in_fees') %}
 <table class="data-table">
     <tr>
         <th>Fee Description</th>
@@ -599,6 +647,18 @@
     on the Premises.
 </p>
 
+{% if is_comprehensive %}
+<p class="provision">
+    No animal, bird, reptile or other pet will be kept on the premises, except properly trained
+    dogs needed by blind, deaf or disabled persons. The Landlord has the right to fine Tenant
+    {{ format_currency(lease_data.get('pet_fine_per_animal', 125)) }} for any animal found in the
+    premises or on the property unless a separate pet lease has been established for said animal.
+    Tenant will be fined {{ format_currency(lease_data.get('pet_fine_per_day', 10)) }} for every
+    additional day the animal remains on the property after written or verbal notification. The
+    Tenant will also be responsible for a mandatory flea inspection or extermination fee.
+</p>
+{% endif %}
+
 <!-- 1.14 SMOKING -->
 <h3>1.14 SMOKING</h3>
 <p class="provision">The Premises are designated as a property where smoking is:</p>
@@ -726,9 +786,30 @@
 <p class="provision">{{ gp.text }}</p>
 {% endfor %}
 
+{% if section_4_provisions %}
+<!-- ==================== SECTION 4: TENANT RESPONSIBILITIES ADDENDUM ==================== -->
+<div class="page-break"></div>
+<h2>4. TENANT RESPONSIBILITIES ADDENDUM</h2>
+<p class="provision" style="text-align: justify; margin-bottom: 16pt;">
+    This Tenant Responsibilities Addendum is incorporated into and made part of the lease
+    agreement between Landlord and Tenant for the premises identified in the lease. Tenant agrees
+    to the following conditions:
+</p>
+
+<p class="provision" style="font-weight: bold; margin-bottom: 8pt;">TENANT-CAUSED MAINTENANCE & REPAIRS</p>
+
+{% for prov in section_4_provisions %}
+<h3>4.{{ loop.index }} {{ prov.title|upper }}</h3>
+<p class="provision" style="white-space: pre-wrap;">{{ prov.text }}</p>
+{% if loop.index == 5 %}
+<p class="provision" style="font-weight: bold; margin-top: 16pt; margin-bottom: 8pt;">PROPERTY CARE & DAMAGE RESPONSIBILITY</p>
+{% endif %}
+{% endfor %}
+{% endif %}
+
 <!-- ==================== SIGNATURE PAGE ==================== -->
 <div class="page-break"></div>
-<h2>4. SIGNATURES</h2>
+<h2>{% if is_comprehensive %}5{% else %}4{% endif %}. SIGNATURES</h2>
 
 <p class="provision" style="text-align: center; text-transform: uppercase; font-size: 9pt; line-height: 1.6;">
     THE TENANT UNDERSTANDS THAT THE EXECUTION OF THIS AGREEMENT ENTAILS AN
@@ -743,6 +824,14 @@
 </p>
 
 <p class="provision" style="font-weight: bold;">WITNESS THE SIGNATURES OF THE PARTIES TO THIS AGREEMENT:</p>
+
+{% if is_comprehensive %}
+<div class="bold-notice" style="margin-top: 24pt;">
+    YOU MUST STAY AS AGREED, AND GIVE 60 DAYS NOTICE BEFORE MOVING, AND
+    LEAVE THE PROPERTY CLEAN AND IN GOOD ORDER, OR YOU WILL LOSE YOUR
+    DEPOSIT. Rent is not refundable.
+</div>
+{% endif %}
 
 {% if signatures %}
 {# ── E-Signed: render cursive name signatures ── #}

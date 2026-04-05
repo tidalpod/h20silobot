@@ -43,7 +43,12 @@
         <tbody class="divide-y divide-gray-100">
             {% for b in builders %}
             <tr class="hover:bg-gray-50 transition-colors">
-                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ b.property_ref.address if b.property_ref else '—' }}</td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                    {{ b.property_ref.address if b.property_ref else '—' }}
+                    {% if builder_types.get(b.id) == 'comprehensive' %}
+                    <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Master</span>
+                    {% endif %}
+                </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ b.tenant_ref.name if b.tenant_ref else '—' }}</td>
                 <td class="px-6 py-4">
                     <div class="flex items-center gap-2">
