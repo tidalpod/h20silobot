@@ -6,17 +6,35 @@
 <header class="bg-white shadow">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
         <h1 class="text-3xl font-bold tracking-tight text-gray-900">Bill History</h1>
-        <a href="/bills/refresh" class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
+        <button id="refreshAllBtn" onclick="refreshAllBills()" class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
             <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            Refresh Bills
-        </a>
+            Refresh All Bills
+        </button>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
+<!-- Refresh All Progress Banner (hidden by default) -->
+<div id="refreshProgress" class="hidden mb-6 bg-white shadow rounded-lg p-4">
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+            <svg id="refreshSpinner" class="h-5 w-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="refreshLabel" class="text-sm font-medium text-gray-900">Refreshing all bills...</span>
+        </div>
+        <span id="refreshCount" class="text-sm text-gray-500">0 / 0</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div id="refreshBar" class="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+    </div>
+    <p id="refreshCurrentProp" class="text-xs text-gray-400 mt-1"></p>
+</div>
+
 <!-- Filters -->
 <div class="bg-white shadow rounded-lg mb-6 p-4">
     <form method="GET" class="flex flex-wrap gap-4 items-end">
@@ -106,7 +124,7 @@
             {% else %}
                 {% set days_ago = 999 %}
             {% endif %}
-            <tr class="hover:bg-gray-50 {% if days_ago > 30 %}bg-orange-50/40{% endif %}">
+            <tr class="hover:bg-gray-50 {% if days_ago > 30 %}bg-orange-50/40{% endif %}" data-property-id="{{ bill.property.id }}">
                 <td class="px-6 py-4 whitespace-nowrap">
                     <a href="/properties/{{ bill.property.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                         {{ bill.property.address }}
@@ -212,12 +230,11 @@ function sortTable(colIndex, type) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
+// ── Single property refresh ──
 async function refreshProperty(propertyId, btn) {
     const row = btn.closest('tr');
-    const originalText = btn.innerHTML;
     const cell = btn.closest('td');
 
-    // Replace button with progress bar
     cell.innerHTML = `
         <div class="w-32 ml-auto">
             <div class="flex items-center gap-2 mb-1">
@@ -235,7 +252,6 @@ async function refreshProperty(propertyId, btn) {
     const bar = cell.querySelector('.refresh-bar');
     const status = cell.querySelector('.refresh-status');
 
-    // Animate progress bar over ~15s
     const steps = [
         { t: 300,  w: '15%', s: 'Solving CAPTCHA...' },
         { t: 3000, w: '30%', s: 'Solving CAPTCHA...' },
@@ -264,21 +280,9 @@ async function refreshProperty(propertyId, btn) {
                     </svg>
                     <span class="text-sm font-medium">${data.message || 'Updated!'}</span>
                 </div>`;
-            // Update the row data
-            if (data.message) {
-                const amountCell = row.cells[3];
-                const match = data.message.match(/\$[\d.]+/);
-                if (match) amountCell.innerHTML = `<span class="font-medium text-gray-900">${match[0]}</span>`;
-            }
-            const scrapedCell = row.cells[5];
-            const now = new Date();
-            scrapedCell.textContent = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) + ', ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-            // Restore refresh button after 3s
-            setTimeout(() => {
-                cell.innerHTML = `<button onclick="refreshProperty(${propertyId}, this)" class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 font-medium">
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                    <span>Refresh</span></button>`;
-            }, 3000);
+            updateRowFromResult(row, data);
+            moveRowToTop(row);
+            restoreRefreshBtn(cell, propertyId, 3000);
         } else {
             const msg = data?.message || 'Not found';
             cell.innerHTML = `
@@ -288,11 +292,7 @@ async function refreshProperty(propertyId, btn) {
                     </svg>
                     <span class="text-xs font-medium">${msg}</span>
                 </div>`;
-            setTimeout(() => {
-                cell.innerHTML = `<button onclick="refreshProperty(${propertyId}, this)" class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 font-medium">
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                    <span>Refresh</span></button>`;
-            }, 3000);
+            restoreRefreshBtn(cell, propertyId, 3000);
         }
     } catch (e) {
         timers.forEach(clearTimeout);
@@ -303,13 +303,165 @@ async function refreshProperty(propertyId, btn) {
                 </svg>
                 <span class="text-xs font-medium">Connection error</span>
             </div>`;
-        setTimeout(() => {
-            cell.innerHTML = `<button onclick="refreshProperty(${propertyId}, this)" class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 font-medium">
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                <span>Refresh</span></button>`;
-        }, 3000);
+        restoreRefreshBtn(cell, propertyId, 3000);
     }
 }
+
+function restoreRefreshBtn(cell, propertyId, delay) {
+    setTimeout(() => {
+        cell.innerHTML = `<button onclick="refreshProperty(${propertyId}, this)" class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 font-medium">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+            <span>Refresh</span></button>`;
+    }, delay);
+}
+
+// ── Update a row's amount + scraped_at from API result ──
+function updateRowFromResult(row, data) {
+    if (data.amount_due !== undefined) {
+        row.cells[3].innerHTML = `<span class="font-medium text-gray-900">$${data.amount_due.toFixed(2)}</span>`;
+    }
+    if (data.scraped_at) {
+        row.cells[5].innerHTML = `<span class="text-green-600 font-medium">${data.scraped_at}</span>`;
+    }
+    // Flash green highlight
+    row.classList.add('bg-green-50');
+    setTimeout(() => row.classList.remove('bg-green-50'), 2000);
+}
+
+// ── Move a row to the top of the table body ──
+function moveRowToTop(row) {
+    const tbody = row.closest('tbody');
+    if (tbody && tbody.firstElementChild !== row) {
+        tbody.insertBefore(row, tbody.firstElementChild);
+    }
+}
+
+// ── Refresh All Bills ──
+let _pollInterval = null;
+let _seenResults = 0;
+
+async function refreshAllBills() {
+    const btn = document.getElementById('refreshAllBtn');
+    const banner = document.getElementById('refreshProgress');
+    const barEl = document.getElementById('refreshBar');
+    const countEl = document.getElementById('refreshCount');
+    const labelEl = document.getElementById('refreshLabel');
+    const propEl = document.getElementById('refreshCurrentProp');
+    const spinnerEl = document.getElementById('refreshSpinner');
+
+    // Disable button
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = `<svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Refreshing...`;
+
+    // Show progress banner
+    banner.classList.remove('hidden');
+    barEl.style.width = '0%';
+    barEl.classList.remove('bg-green-500');
+    barEl.classList.add('bg-blue-500');
+    countEl.textContent = '0 / 0';
+    labelEl.textContent = 'Refreshing all bills...';
+    propEl.textContent = 'Starting...';
+    spinnerEl.classList.remove('hidden');
+    _seenResults = 0;
+
+    try {
+        const resp = await fetch('/api/refresh-bills', { method: 'POST' });
+        const data = await resp.json();
+
+        if (data.status === 'already_running') {
+            labelEl.textContent = 'Refresh already in progress, tracking...';
+        }
+
+        // Start polling
+        if (_pollInterval) clearInterval(_pollInterval);
+        _pollInterval = setInterval(pollRefreshStatus, 2000);
+    } catch (e) {
+        labelEl.textContent = 'Failed to start refresh';
+        barEl.classList.remove('bg-blue-500');
+        barEl.classList.add('bg-red-500');
+        resetRefreshBtn();
+    }
+}
+
+async function pollRefreshStatus() {
+    try {
+        const resp = await fetch('/api/refresh-bills/status');
+        const data = await resp.json();
+
+        const banner = document.getElementById('refreshProgress');
+        const barEl = document.getElementById('refreshBar');
+        const countEl = document.getElementById('refreshCount');
+        const labelEl = document.getElementById('refreshLabel');
+        const propEl = document.getElementById('refreshCurrentProp');
+        const spinnerEl = document.getElementById('refreshSpinner');
+
+        const total = data.total || 1;
+        const completed = data.completed || 0;
+        const pct = Math.round((completed / total) * 100);
+
+        barEl.style.width = pct + '%';
+        countEl.textContent = `${completed} / ${total}`;
+        if (data.last_property) {
+            propEl.textContent = data.last_property;
+        }
+
+        // Process new results — update rows as they come in
+        const results = data.results || [];
+        while (_seenResults < results.length) {
+            const r = results[_seenResults];
+            _seenResults++;
+            const row = document.querySelector(`tr[data-property-id="${r.property_id}"]`);
+            if (row && r.status === 'success') {
+                updateRowFromResult(row, r);
+                moveRowToTop(row);
+            }
+        }
+
+        // Done?
+        if (!data.running && completed >= total && total > 0) {
+            clearInterval(_pollInterval);
+            _pollInterval = null;
+            barEl.style.width = '100%';
+            barEl.classList.remove('bg-blue-500');
+            barEl.classList.add('bg-green-500');
+            labelEl.textContent = `Done! ${completed} properties refreshed`;
+            propEl.textContent = '';
+            spinnerEl.classList.add('hidden');
+            resetRefreshBtn();
+            // Hide banner after 5s
+            setTimeout(() => banner.classList.add('hidden'), 5000);
+        }
+    } catch (e) {
+        // Ignore transient poll errors
+    }
+}
+
+function resetRefreshBtn() {
+    const btn = document.getElementById('refreshAllBtn');
+    btn.disabled = false;
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = `<svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg> Refresh All Bills`;
+}
+
+// On page load, check if a refresh is already running
+(async function checkExistingRefresh() {
+    try {
+        const resp = await fetch('/api/refresh-bills/status');
+        const data = await resp.json();
+        if (data.running) {
+            _seenResults = 0;
+            const btn = document.getElementById('refreshAllBtn');
+            const banner = document.getElementById('refreshProgress');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = `<svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Refreshing...`;
+            banner.classList.remove('hidden');
+            document.getElementById('refreshLabel').textContent = 'Refresh in progress...';
+            _pollInterval = setInterval(pollRefreshStatus, 2000);
+        }
+    } catch (e) {}
+})();
 </script>
 
     {% else %}

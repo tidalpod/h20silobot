@@ -8,7 +8,7 @@ from typing import List
 import aiohttp
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
@@ -18,7 +18,7 @@ router = APIRouter(tags=["api"])
 logger = logging.getLogger(__name__)
 
 # Track refresh-all progress
-_refresh_status = {"running": False, "total": 0, "completed": 0, "last_property": ""}
+_refresh_status = {"running": False, "total": 0, "completed": 0, "last_property": "", "results": []}
 
 
 @router.get("/properties")
@@ -156,20 +156,43 @@ async def api_refresh_property(property_id: int):
                 bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
             if bill_data:
-                bill = WaterBill(
-                    property_id=prop.id,
-                    amount_due=bill_data.amount_due,
-                    previous_balance=bill_data.previous_balance,
-                    current_charges=bill_data.current_charges,
-                    late_fees=bill_data.late_fees,
-                    payments_received=bill_data.payments_received,
-                    statement_date=bill_data.statement_date,
-                    due_date=bill_data.due_date,
-                    water_usage_gallons=bill_data.water_usage,
-                    raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
-                )
+                # Check for existing bill with same statement_date to update
+                existing_bill = None
+                if bill_data.statement_date:
+                    existing_result = await session.execute(
+                        select(WaterBill).where(and_(
+                            WaterBill.property_id == prop.id,
+                            WaterBill.statement_date == bill_data.statement_date,
+                        ))
+                    )
+                    existing_bill = existing_result.scalar_one_or_none()
+
+                if existing_bill:
+                    bill = existing_bill
+                    bill.amount_due = bill_data.amount_due
+                    bill.previous_balance = bill_data.previous_balance
+                    bill.current_charges = bill_data.current_charges
+                    bill.late_fees = bill_data.late_fees
+                    bill.payments_received = bill_data.payments_received
+                    bill.due_date = bill_data.due_date
+                    bill.water_usage_gallons = bill_data.water_usage
+                    bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                    bill.scraped_at = datetime.utcnow()
+                else:
+                    bill = WaterBill(
+                        property_id=prop.id,
+                        amount_due=bill_data.amount_due,
+                        previous_balance=bill_data.previous_balance,
+                        current_charges=bill_data.current_charges,
+                        late_fees=bill_data.late_fees,
+                        payments_received=bill_data.payments_received,
+                        statement_date=bill_data.statement_date,
+                        due_date=bill_data.due_date,
+                        water_usage_gallons=bill_data.water_usage,
+                        raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                    )
+                    session.add(bill)
                 bill.status = bill.calculate_status()
-                session.add(bill)
 
                 if bill_data.owner_name and not prop.owner_name:
                     prop.owner_name = bill_data.owner_name
@@ -184,14 +207,21 @@ async def api_refresh_property(property_id: int):
 
                 await session.commit()
                 logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
-                return {"status": "success", "message": f"Found bill: ${bill_data.amount_due}"}
+                scraped_at = bill.scraped_at or datetime.utcnow()
+                return {
+                    "status": "success",
+                    "message": f"Found bill: ${bill_data.amount_due}",
+                    "property_id": prop.id,
+                    "amount_due": float(bill_data.amount_due),
+                    "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
+                }
             else:
                 logger.warning(f"No bill data found for {prop.address}")
-                return {"status": "not_found", "message": "No bill data found on BSA Online"}
+                return {"status": "not_found", "message": "No bill data found on BSA Online", "property_id": prop.id}
 
         except Exception as e:
             logger.error(f"Error refreshing {prop.address}: {e}")
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": str(e), "property_id": prop.id}
 
 
 @router.post("/refresh-bills")
@@ -281,21 +311,43 @@ async def refresh_single_property(property_id: int):
                     bill_data = await scraper.search_by_address(street_address)
 
                 if bill_data:
-                    # Create new bill record
-                    bill = WaterBill(
-                        property_id=prop.id,
-                        amount_due=bill_data.amount_due,
-                        previous_balance=bill_data.previous_balance,
-                        current_charges=bill_data.current_charges,
-                        late_fees=bill_data.late_fees,
-                        payments_received=bill_data.payments_received,
-                        statement_date=bill_data.statement_date,
-                        due_date=bill_data.due_date,
-                        water_usage_gallons=bill_data.water_usage,
-                        raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
-                    )
+                    # Update existing bill or create new one
+                    existing_bill = None
+                    if bill_data.statement_date:
+                        existing_result = await session.execute(
+                            select(WaterBill).where(and_(
+                                WaterBill.property_id == prop.id,
+                                WaterBill.statement_date == bill_data.statement_date,
+                            ))
+                        )
+                        existing_bill = existing_result.scalar_one_or_none()
+
+                    if existing_bill:
+                        bill = existing_bill
+                        bill.amount_due = bill_data.amount_due
+                        bill.previous_balance = bill_data.previous_balance
+                        bill.current_charges = bill_data.current_charges
+                        bill.late_fees = bill_data.late_fees
+                        bill.payments_received = bill_data.payments_received
+                        bill.due_date = bill_data.due_date
+                        bill.water_usage_gallons = bill_data.water_usage
+                        bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                        bill.scraped_at = datetime.utcnow()
+                    else:
+                        bill = WaterBill(
+                            property_id=prop.id,
+                            amount_due=bill_data.amount_due,
+                            previous_balance=bill_data.previous_balance,
+                            current_charges=bill_data.current_charges,
+                            late_fees=bill_data.late_fees,
+                            payments_received=bill_data.payments_received,
+                            statement_date=bill_data.statement_date,
+                            due_date=bill_data.due_date,
+                            water_usage_gallons=bill_data.water_usage,
+                            raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                        )
+                        session.add(bill)
                     bill.status = bill.calculate_status()
-                    session.add(bill)
 
                     # Update property info if available
                     if bill_data.owner_name and not prop.owner_name:
@@ -327,6 +379,7 @@ async def refresh_all_properties():
     _refresh_status["running"] = True
     _refresh_status["completed"] = 0
     _refresh_status["last_property"] = ""
+    _refresh_status["results"] = []
     try:
         from scraper.bsa_scraper import BSAScraper
         from collections import defaultdict
@@ -369,20 +422,43 @@ async def refresh_all_properties():
                             bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
                         if bill_data:
-                            bill = WaterBill(
-                                property_id=prop.id,
-                                amount_due=bill_data.amount_due,
-                                previous_balance=bill_data.previous_balance,
-                                current_charges=bill_data.current_charges,
-                                late_fees=bill_data.late_fees,
-                                payments_received=bill_data.payments_received,
-                                statement_date=bill_data.statement_date,
-                                due_date=bill_data.due_date,
-                                water_usage_gallons=bill_data.water_usage,
-                                raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
-                            )
+                            # Update existing bill or create new one
+                            existing_bill = None
+                            if bill_data.statement_date:
+                                existing_result = await session.execute(
+                                    select(WaterBill).where(and_(
+                                        WaterBill.property_id == prop.id,
+                                        WaterBill.statement_date == bill_data.statement_date,
+                                    ))
+                                )
+                                existing_bill = existing_result.scalar_one_or_none()
+
+                            if existing_bill:
+                                bill = existing_bill
+                                bill.amount_due = bill_data.amount_due
+                                bill.previous_balance = bill_data.previous_balance
+                                bill.current_charges = bill_data.current_charges
+                                bill.late_fees = bill_data.late_fees
+                                bill.payments_received = bill_data.payments_received
+                                bill.due_date = bill_data.due_date
+                                bill.water_usage_gallons = bill_data.water_usage
+                                bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                                bill.scraped_at = datetime.utcnow()
+                            else:
+                                bill = WaterBill(
+                                    property_id=prop.id,
+                                    amount_due=bill_data.amount_due,
+                                    previous_balance=bill_data.previous_balance,
+                                    current_charges=bill_data.current_charges,
+                                    late_fees=bill_data.late_fees,
+                                    payments_received=bill_data.payments_received,
+                                    statement_date=bill_data.statement_date,
+                                    due_date=bill_data.due_date,
+                                    water_usage_gallons=bill_data.water_usage,
+                                    raw_data=str(bill_data.raw_data) if bill_data.raw_data else None,
+                                )
+                                session.add(bill)
                             bill.status = bill.calculate_status()
-                            session.add(bill)
 
                             if bill_data.owner_name and not prop.owner_name:
                                 prop.owner_name = bill_data.owner_name
@@ -393,19 +469,34 @@ async def refresh_all_properties():
                             if hasattr(bill_data, 'record_key') and bill_data.record_key and not prop.bsa_record_key:
                                 prop.bsa_record_key = bill_data.record_key
 
+                            await session.commit()
+                            scraped_at = bill.scraped_at or datetime.utcnow()
+                            _refresh_status["results"].append({
+                                "property_id": prop.id,
+                                "status": "success",
+                                "amount_due": float(bill_data.amount_due),
+                                "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
+                            })
                             scraped_count += 1
                             logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
                         else:
+                            _refresh_status["results"].append({
+                                "property_id": prop.id,
+                                "status": "not_found",
+                            })
                             logger.warning(f"No bill data found for {prop.address}")
 
                     except Exception as e:
+                        _refresh_status["results"].append({
+                            "property_id": prop.id,
+                            "status": "error",
+                            "message": str(e),
+                        })
                         logger.error(f"Error refreshing {prop.address}: {e}")
                         continue
                     finally:
                         _refresh_status["completed"] += 1
                         _refresh_status["last_property"] = prop.address
-
-            await session.commit()
             logger.info(f"Completed refresh: {scraped_count}/{len(properties)} properties scraped")
 
     except ImportError:
