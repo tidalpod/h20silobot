@@ -169,14 +169,17 @@ async def api_refresh_property(property_id: int):
 
                 if existing_bill:
                     bill = existing_bill
-                    bill.amount_due = bill_data.amount_due
-                    bill.previous_balance = bill_data.previous_balance
-                    bill.current_charges = bill_data.current_charges
-                    bill.late_fees = bill_data.late_fees
-                    bill.payments_received = bill_data.payments_received
-                    bill.due_date = bill_data.due_date
-                    bill.water_usage_gallons = bill_data.water_usage
-                    bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                    # Only overwrite financial fields if scraper returned a real amount
+                    # (scraper defaults to $0 on parse failure — don't clobber good data)
+                    if bill_data.amount_due and float(bill_data.amount_due) > 0:
+                        bill.amount_due = bill_data.amount_due
+                        bill.previous_balance = bill_data.previous_balance
+                        bill.current_charges = bill_data.current_charges
+                        bill.late_fees = bill_data.late_fees
+                        bill.payments_received = bill_data.payments_received
+                    bill.due_date = bill_data.due_date or bill.due_date
+                    bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
+                    bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                     bill.scraped_at = datetime.utcnow()
                 else:
                     bill = WaterBill(
@@ -206,13 +209,15 @@ async def api_refresh_property(property_id: int):
                     prop.bsa_record_key = bill_data.record_key
 
                 await session.commit()
-                logger.info(f"Successfully saved bill for {prop.address}: ${bill_data.amount_due}")
+                # Return the actual bill amount (may be preserved from DB if scraper returned $0)
+                actual_amount = float(bill.amount_due)
+                logger.info(f"Successfully saved bill for {prop.address}: ${actual_amount}")
                 scraped_at = bill.scraped_at or datetime.utcnow()
                 return {
                     "status": "success",
-                    "message": f"Found bill: ${bill_data.amount_due}",
+                    "message": f"Found bill: ${actual_amount}",
                     "property_id": prop.id,
-                    "amount_due": float(bill_data.amount_due),
+                    "amount_due": actual_amount,
                     "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
                 }
             else:
@@ -435,14 +440,16 @@ async def refresh_all_properties():
 
                             if existing_bill:
                                 bill = existing_bill
-                                bill.amount_due = bill_data.amount_due
-                                bill.previous_balance = bill_data.previous_balance
-                                bill.current_charges = bill_data.current_charges
-                                bill.late_fees = bill_data.late_fees
-                                bill.payments_received = bill_data.payments_received
-                                bill.due_date = bill_data.due_date
-                                bill.water_usage_gallons = bill_data.water_usage
-                                bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                                # Only overwrite financial fields if scraper returned a real amount
+                                if bill_data.amount_due and float(bill_data.amount_due) > 0:
+                                    bill.amount_due = bill_data.amount_due
+                                    bill.previous_balance = bill_data.previous_balance
+                                    bill.current_charges = bill_data.current_charges
+                                    bill.late_fees = bill_data.late_fees
+                                    bill.payments_received = bill_data.payments_received
+                                bill.due_date = bill_data.due_date or bill.due_date
+                                bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
+                                bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                                 bill.scraped_at = datetime.utcnow()
                             else:
                                 bill = WaterBill(
@@ -470,15 +477,16 @@ async def refresh_all_properties():
                                 prop.bsa_record_key = bill_data.record_key
 
                             await session.commit()
+                            actual_amount = float(bill.amount_due)
                             scraped_at = bill.scraped_at or datetime.utcnow()
                             _refresh_status["results"].append({
                                 "property_id": prop.id,
                                 "status": "success",
-                                "amount_due": float(bill_data.amount_due),
+                                "amount_due": actual_amount,
                                 "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
                             })
                             scraped_count += 1
-                            logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
+                            logger.info(f"Scraped: {prop.address} - ${actual_amount}")
                         else:
                             _refresh_status["results"].append({
                                 "property_id": prop.id,
