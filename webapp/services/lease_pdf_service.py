@@ -362,19 +362,16 @@ def generate_signed_lease_pdf(data: dict, property_info: dict, tenant_info: dict
     try:
         HTML(string=html).write_pdf(tmp_path)
         file_size = Path(tmp_path).stat().st_size
-        file_url = storage.upload_from_path(key, tmp_path, "application/pdf")
+        # Don't upload to R2 yet — caller may append audit trail first
     except Exception as e:
         logger.error(f"Signed PDF generation failed: {e}")
+        Path(tmp_path).unlink(missing_ok=True)
         return {"error": f"Signed PDF generation failed: {str(e)}"}
-    finally:
-        if storage.using_r2:
-            Path(tmp_path).unlink(missing_ok=True)
-
-    local_path = storage.resolve_local_path(file_url)
 
     return {
-        "file_url": file_url,
-        "file_path": str(local_path) if local_path else tmp_path,
+        "file_url": None,  # Will be set after audit trail is appended
+        "file_path": tmp_path,
         "file_name": filename,
         "file_size": file_size,
+        "storage_key": key,
     }

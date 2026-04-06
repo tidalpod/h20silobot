@@ -498,6 +498,23 @@ async def generate_signed_pdf(envelope_id: int, session=None) -> dict:
         except Exception as e:
             logger.error(f"[ESIGN] Failed to append audit trail: {e}", exc_info=True)
 
+        # Upload final PDF (with audit trail) to storage
+        tmp_path = pdf_result["file_path"]
+        storage_key = pdf_result.get("storage_key")
+        if storage_key and Path(tmp_path).exists():
+            file_url = storage.upload_from_path(storage_key, tmp_path, "application/pdf")
+            pdf_result["file_url"] = file_url
+            pdf_result["file_size"] = Path(tmp_path).stat().st_size
+            local_path = storage.resolve_local_path(file_url)
+            if local_path:
+                pdf_result["file_path"] = str(local_path)
+            # Clean up temp file if using R2 (local storage keeps the file)
+            if storage.using_r2:
+                Path(tmp_path).unlink(missing_ok=True)
+        elif not pdf_result.get("file_url"):
+            # Fallback: file_url not set and no storage_key (shouldn't happen)
+            pdf_result["file_url"] = pdf_result["file_path"]
+
         return pdf_result
 
     finally:
@@ -636,19 +653,15 @@ def _generate_signature_page_pdf(lease, envelope, signatures: dict) -> dict:
         if original_tmp != str(Path(UPLOAD_BASE) / lease.file_url.removeprefix("/uploads/")):
             Path(original_tmp).unlink(missing_ok=True)
 
-    # Upload merged PDF to storage
+    # Don't upload yet — caller will append audit trail first, then upload
     key = f"leases/signed/{output_filename}"
     file_size = Path(output_tmp_path).stat().st_size
-    file_url = storage.upload_from_path(key, output_tmp_path, "application/pdf")
-
-    # Resolve local path for audit trail append
-    local_path = storage.resolve_local_path(file_url)
-    final_path = str(local_path) if local_path else output_tmp_path
 
     return {
-        "file_url": file_url,
-        "file_path": final_path,
+        "file_url": None,
+        "file_path": output_tmp_path,
         "file_size": file_size,
+        "storage_key": key,
     }
 
 
