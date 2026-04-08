@@ -306,11 +306,11 @@ async def tenant_detail(request: Request, tenant_id: int):
             )
             active_lease = lease_result.scalar_one_or_none()
 
-        # Water bills
+        # Water bills (ordered by scrape time — statement_date may be null)
         bill_result = await session.execute(
             select(WaterBill)
             .where(WaterBill.property_id == tenant.property_id)
-            .order_by(desc(WaterBill.statement_date))
+            .order_by(desc(WaterBill.scraped_at))
             .limit(6)
         )
         water_bills = bill_result.scalars().all()
@@ -323,8 +323,8 @@ async def tenant_detail(request: Request, tenant_id: int):
         )
         bank_accounts = bank_result.scalars().all()
 
-    # Water bill balance (sum of unpaid bills)
-    water_balance = sum(float(b.amount_due or 0) for b in water_bills if b.amount_due and b.amount_due > 0)
+    # Water bill balance = latest bill amount only (each bill is a scrape snapshot, not a separate charge)
+    water_balance = float(water_bills[0].amount_due or 0) if water_bills and water_bills[0].amount_due else 0.0
 
     return templates.TemplateResponse(
         "tenants/detail.html",

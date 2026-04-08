@@ -310,6 +310,46 @@ async def send_notification(
     return RedirectResponse(url="/notifications", status_code=303)
 
 
+@router.post("/resend/{notification_id}")
+async def resend_notification(request: Request, notification_id: int):
+    """Resend a failed notification"""
+    from fastapi.responses import JSONResponse
+
+    user = await get_current_user(request)
+    if not user:
+        return JSONResponse({"status": "error", "error": "Not authenticated"}, status_code=401)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Notification).where(Notification.id == notification_id)
+        )
+        notification = result.scalar_one_or_none()
+        if not notification:
+            return JSONResponse({"status": "error", "error": "Not found"}, status_code=404)
+
+        if notification.channel == NotificationChannel.SMS:
+            send_result = await twilio_service.send_sms(notification.recipient, notification.message)
+        else:
+            send_result = await email_service.send_email(
+                notification.recipient,
+                notification.subject or "Water Bill Notice",
+                notification.message,
+                html_body=notification.message.replace('\n', '<br>')
+            )
+
+        if send_result.success:
+            notification.status = NotificationStatus.SENT
+            notification.external_id = send_result.message_sid if hasattr(send_result, 'message_sid') else send_result.message_id
+            notification.sent_at = datetime.utcnow()
+            notification.error_message = None
+            await session.commit()
+            return JSONResponse({"status": "sent"})
+        else:
+            notification.error_message = send_result.error_message
+            await session.commit()
+            return JSONResponse({"status": "failed", "error": send_result.error_message})
+
+
 @router.get("/bulk", response_class=HTMLResponse)
 async def bulk_notification_form(request: Request, type: str = "overdue"):
     """Show bulk notification form for overdue/due soon properties"""

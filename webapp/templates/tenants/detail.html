@@ -69,6 +69,12 @@
                 <span class="text-sm text-gray-600">Move-in: {{ tenant.move_in_date.strftime('%b %d, %Y') }}</span>
             </div>
             {% endif %}
+            {% if tenant.current_rent %}
+            <div class="flex items-center gap-3">
+                <span class="text-gray-400">&#128176;</span>
+                <span class="text-sm text-gray-600">Rent: <span class="font-semibold text-gray-900">${{ "{:,.2f}".format(tenant.current_rent) }}</span>/mo</span>
+            </div>
+            {% endif %}
             {% if tenant.is_section8 %}
             <div class="mt-3 pt-3 border-t border-gray-100">
                 <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700 mb-2">Section 8</span>
@@ -82,10 +88,6 @@
                 <p class="text-xs text-gray-500">Tenant Portion: ${{ "{:,.2f}".format(tenant.tenant_portion) }}</p>
                 {% endif %}
             </div>
-            {% elif tenant.current_rent %}
-            <div class="mt-3 pt-3 border-t border-gray-100">
-                <p class="text-xs text-gray-500">Monthly Rent: <span class="font-medium text-gray-900">${{ "{:,.2f}".format(tenant.current_rent) }}</span></p>
-            </div>
             {% endif %}
         </div>
     </div>
@@ -96,24 +98,15 @@
         <div class="text-center">
             {% if water_balance > 0 %}
             <p class="text-3xl font-bold text-red-600">${{ "{:,.2f}".format(water_balance) }}</p>
-            <p class="text-sm text-gray-500 mt-1">Unpaid water bills</p>
+            <p class="text-sm text-gray-500 mt-1">Current balance</p>
             {% else %}
             <p class="text-3xl font-bold text-green-600">$0.00</p>
             <span class="inline-flex items-center mt-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">All paid</span>
             {% endif %}
-        </div>
-        {% if water_bills %}
-        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
-            {% for bill in water_bills[:3] %}
-            {% if bill.amount_due and bill.amount_due > 0 %}
-            <div class="flex justify-between text-sm">
-                <span class="text-gray-500">{{ bill.statement_date.strftime('%b %Y') if bill.statement_date else 'Bill' }}</span>
-                <span class="font-medium text-red-600">${{ "{:,.2f}".format(bill.amount_due) }}</span>
-            </div>
+            {% if water_bills %}
+            <p class="text-xs text-gray-400 mt-2">Last scraped: {{ water_bills[0].scraped_at.strftime('%b %d, %H:%M') if water_bills[0].scraped_at else 'N/A' }}</p>
             {% endif %}
-            {% endfor %}
         </div>
-        {% endif %}
     </div>
 
     <!-- Payment Stats -->
