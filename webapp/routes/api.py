@@ -231,7 +231,8 @@ async def api_refresh_property(property_id: int):
                 await session.commit()
                 # Return the actual bill amount (may be preserved from DB if scraper returned $0)
                 actual_amount = float(bill.amount_due)
-                logger.info(f"Successfully saved bill for {prop.address}: ${actual_amount}")
+                scraped_amount = float(bill_data.amount_due) if bill_data.amount_due else 0
+                logger.info(f"Successfully saved bill for {prop.address}: ${actual_amount} (scraped=${scraped_amount})")
                 scraped_at = bill.scraped_at or datetime.utcnow()
                 return {
                     "status": "success",
@@ -239,6 +240,8 @@ async def api_refresh_property(property_id: int):
                     "property_id": prop.id,
                     "amount_due": actual_amount,
                     "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
+                    "_debug_scraped": scraped_amount,
+                    "_debug_raw": str(bill_data.raw_data)[:500] if bill_data.raw_data else None,
                 }
             else:
                 logger.warning(f"No bill data found for {prop.address}")
