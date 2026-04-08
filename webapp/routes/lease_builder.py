@@ -540,9 +540,16 @@ async def builder_generate(request: Request, builder_id: int):
             else f"Michigan Lease - {prop.address if prop else 'Unknown'}"
         )
 
+        # Resolve tenant_id — prefer builder selection, fall back to first tenant in step 3
+        resolved_tenant_id = builder.tenant_id
+        if not resolved_tenant_id:
+            tenants_in_data = data.get("tenants", [])
+            if tenants_in_data and tenants_in_data[0].get("id"):
+                resolved_tenant_id = int(tenants_in_data[0]["id"])
+
         lease_doc = LeaseDocument(
             property_id=builder.property_id,
-            tenant_id=builder.tenant_id,
+            tenant_id=resolved_tenant_id,
             title=lease_title,
             file_url=pdf_result["file_url"],
             file_type="pdf",

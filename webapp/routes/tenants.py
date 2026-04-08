@@ -283,17 +283,28 @@ async def tenant_detail(request: Request, tenant_id: int):
             WorkOrderStatus.NEW, WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS
         ))
 
-        # Active lease
+        # Active lease — prefer lease assigned to this tenant, fall back to property match
         lease_result = await session.execute(
             select(LeaseDocument)
             .where(
-                LeaseDocument.property_id == tenant.property_id,
+                LeaseDocument.tenant_id == tenant_id,
                 LeaseDocument.status != LeaseStatus.TERMINATED,
             )
             .order_by(desc(LeaseDocument.created_at))
             .limit(1)
         )
         active_lease = lease_result.scalar_one_or_none()
+        if not active_lease and tenant.property_id:
+            lease_result = await session.execute(
+                select(LeaseDocument)
+                .where(
+                    LeaseDocument.property_id == tenant.property_id,
+                    LeaseDocument.status != LeaseStatus.TERMINATED,
+                )
+                .order_by(desc(LeaseDocument.created_at))
+                .limit(1)
+            )
+            active_lease = lease_result.scalar_one_or_none()
 
         # Water bills
         bill_result = await session.execute(
