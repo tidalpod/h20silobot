@@ -30,6 +30,14 @@ from webapp.services.storage_service import storage
 
 logger = logging.getLogger(__name__)
 
+
+def _slugify(text: str, max_len: int = 40) -> str:
+    """Convert text to a safe filename slug."""
+    import re as _re
+    slug = _re.sub(r'[^\w\s-]', '', text.strip()).strip()
+    slug = _re.sub(r'[\s_-]+', '_', slug)
+    return slug[:max_len].rstrip('_').lower()
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
@@ -312,7 +320,13 @@ def generate_lease_pdf(data: dict, property_info: dict, tenant_info: dict, landl
 
     html = generate_lease_html(data, property_info, tenant_info, landlord_info)
 
-    filename = f"lease_{uuid.uuid4().hex[:12]}.pdf"
+    # Build descriptive filename from address and tenant name
+    addr_slug = _slugify(property_info.get("address", "").split(",")[0])
+    tenants = data.get("tenants", [])
+    tenant_name = tenants[0].get("name", "") if tenants else (tenant_info.get("name", "") if tenant_info else "")
+    name_slug = _slugify(tenant_name)
+    label = f"lease_{addr_slug}_{name_slug}" if addr_slug and name_slug else f"lease_{uuid.uuid4().hex[:12]}"
+    filename = f"{label}.pdf"
     key = f"leases/{filename}"
 
     # Write to temp file first (WeasyPrint needs a path)
@@ -353,7 +367,13 @@ def generate_signed_lease_pdf(data: dict, property_info: dict, tenant_info: dict
 
     html = generate_lease_html(data, property_info, tenant_info, landlord_info, signatures=signatures)
 
-    filename = f"signed_{uuid.uuid4().hex[:12]}.pdf"
+    # Build descriptive filename from address and tenant name
+    addr_slug = _slugify(property_info.get("address", "").split(",")[0])
+    tenants = data.get("tenants", [])
+    tenant_name = tenants[0].get("name", "") if tenants else (tenant_info.get("name", "") if tenant_info else "")
+    name_slug = _slugify(tenant_name)
+    label = f"signed_{addr_slug}_{name_slug}" if addr_slug and name_slug else f"signed_{uuid.uuid4().hex[:12]}"
+    filename = f"{label}.pdf"
     key = f"leases/signed/{filename}"
 
     fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
