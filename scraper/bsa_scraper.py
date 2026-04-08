@@ -461,6 +461,12 @@ class BSAScraper:
         text = re.sub(r'\n\s*\n', '\n', text)
         lines = [l.strip() for l in text.split('\n') if l.strip()]
 
+        # Debug: log lines containing dollar amounts or payment-related keywords
+        debug_lines = [(i, l) for i, l in enumerate(lines)
+                       if any(w in l.lower() for w in ('balance', 'amount', 'due', 'pay', 'total', 'current'))
+                       or re.search(r'\$[\d,]+', l)]
+        logger.info(f"BSA detail page lines ({len(lines)} total), key lines: {debug_lines[:30]}")
+
         # Extract account number
         account_number = ""
         for line in lines:
