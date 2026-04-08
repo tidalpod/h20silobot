@@ -19,12 +19,21 @@
                 {% if tenant.is_active %}
                 <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Active</span>
                 {% else %}
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Archived</span>
                 {% endif %}
             </div>
             <div class="flex gap-2">
                 <a href="/tenants/{{ tenant.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Edit</a>
                 <a href="/notifications/compose?tenant_id={{ tenant.id }}" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500">Notify</a>
+                {% if tenant.is_active %}
+                <form action="/tenants/{{ tenant.id }}/archive" method="POST" class="inline" onsubmit="return confirm('Archive this tenant? They will be hidden from the active list.');">
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-amber-700 shadow-sm ring-1 ring-inset ring-amber-300 hover:bg-amber-50">Archive</button>
+                </form>
+                {% else %}
+                <form action="/tenants/{{ tenant.id }}/restore" method="POST" class="inline">
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm ring-1 ring-inset ring-green-300 hover:bg-green-50">Restore</button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>

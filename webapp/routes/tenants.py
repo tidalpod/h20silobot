@@ -500,9 +500,9 @@ async def update_tenant(
         return RedirectResponse(url=f"/properties/{property_id}", status_code=303)
 
 
-@router.post("/{tenant_id}/delete")
-async def delete_tenant(request: Request, tenant_id: int):
-    """Delete (deactivate) a tenant"""
+@router.post("/{tenant_id}/archive")
+async def archive_tenant(request: Request, tenant_id: int):
+    """Archive (deactivate) a tenant"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
@@ -518,7 +518,30 @@ async def delete_tenant(request: Request, tenant_id: int):
 
         property_id = tenant.property_id
         tenant.is_active = False
-        tenant.move_out_date = date.today()
+        tenant.move_out_date = tenant.move_out_date or date.today()
         await session.commit()
 
-    return RedirectResponse(url=f"/properties/{property_id}", status_code=303)
+    return RedirectResponse(url=f"/tenants/{tenant_id}", status_code=303)
+
+
+@router.post("/{tenant_id}/restore")
+async def restore_tenant(request: Request, tenant_id: int):
+    """Restore an archived tenant"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Tenant).where(Tenant.id == tenant_id)
+        )
+        tenant = result.scalar_one_or_none()
+
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+
+        tenant.is_active = True
+        tenant.move_out_date = None
+        await session.commit()
+
+    return RedirectResponse(url=f"/tenants/{tenant_id}", status_code=303)

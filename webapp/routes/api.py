@@ -156,7 +156,7 @@ async def api_refresh_property(property_id: int):
                 bill_data = await BSAScraper.http_search_by_address(street_address, municipality_uid)
 
             if bill_data:
-                # Check for existing bill with same statement_date to update
+                # Check for existing bill to update (by statement_date or most recent)
                 existing_bill = None
                 if bill_data.statement_date:
                     existing_result = await session.execute(
@@ -164,6 +164,15 @@ async def api_refresh_property(property_id: int):
                             WaterBill.property_id == prop.id,
                             WaterBill.statement_date == bill_data.statement_date,
                         ))
+                    )
+                    existing_bill = existing_result.scalar_one_or_none()
+                else:
+                    # No statement_date (HTTP path) — find most recent bill for this property
+                    existing_result = await session.execute(
+                        select(WaterBill)
+                        .where(WaterBill.property_id == prop.id)
+                        .order_by(WaterBill.scraped_at.desc())
+                        .limit(1)
                     )
                     existing_bill = existing_result.scalar_one_or_none()
 
@@ -182,6 +191,17 @@ async def api_refresh_property(property_id: int):
                     bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                     bill.scraped_at = datetime.utcnow()
                 else:
+                    # No existing bill — only create new record if we got a real amount
+                    if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
+                        logger.warning(f"Scraper returned $0 for {prop.address} with no existing bill — skipping")
+                        scraped_at = datetime.utcnow()
+                        return {
+                            "status": "warning",
+                            "message": "Could not parse bill amount from BSA",
+                            "property_id": prop.id,
+                            "amount_due": 0,
+                            "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
+                        }
                     bill = WaterBill(
                         property_id=prop.id,
                         amount_due=bill_data.amount_due,
@@ -326,19 +346,31 @@ async def refresh_single_property(property_id: int):
                             ))
                         )
                         existing_bill = existing_result.scalar_one_or_none()
+                    else:
+                        existing_result = await session.execute(
+                            select(WaterBill)
+                            .where(WaterBill.property_id == prop.id)
+                            .order_by(WaterBill.scraped_at.desc())
+                            .limit(1)
+                        )
+                        existing_bill = existing_result.scalar_one_or_none()
 
                     if existing_bill:
                         bill = existing_bill
-                        bill.amount_due = bill_data.amount_due
-                        bill.previous_balance = bill_data.previous_balance
-                        bill.current_charges = bill_data.current_charges
-                        bill.late_fees = bill_data.late_fees
-                        bill.payments_received = bill_data.payments_received
-                        bill.due_date = bill_data.due_date
-                        bill.water_usage_gallons = bill_data.water_usage
-                        bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else None
+                        if bill_data.amount_due and float(bill_data.amount_due) > 0:
+                            bill.amount_due = bill_data.amount_due
+                            bill.previous_balance = bill_data.previous_balance
+                            bill.current_charges = bill_data.current_charges
+                            bill.late_fees = bill_data.late_fees
+                            bill.payments_received = bill_data.payments_received
+                        bill.due_date = bill_data.due_date or bill.due_date
+                        bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
+                        bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                         bill.scraped_at = datetime.utcnow()
                     else:
+                        if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
+                            logger.warning(f"Scraper returned $0 for {prop.address} (Playwright bulk) — skipping")
+                            continue
                         bill = WaterBill(
                             property_id=prop.id,
                             amount_due=bill_data.amount_due,
@@ -437,6 +469,14 @@ async def refresh_all_properties():
                                     ))
                                 )
                                 existing_bill = existing_result.scalar_one_or_none()
+                            else:
+                                existing_result = await session.execute(
+                                    select(WaterBill)
+                                    .where(WaterBill.property_id == prop.id)
+                                    .order_by(WaterBill.scraped_at.desc())
+                                    .limit(1)
+                                )
+                                existing_bill = existing_result.scalar_one_or_none()
 
                             if existing_bill:
                                 bill = existing_bill
@@ -452,6 +492,9 @@ async def refresh_all_properties():
                                 bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                                 bill.scraped_at = datetime.utcnow()
                             else:
+                                if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
+                                    logger.warning(f"Scraper returned $0 for {prop.address} (HTTP bulk) — skipping")
+                                    continue
                                 bill = WaterBill(
                                     property_id=prop.id,
                                     amount_due=bill_data.amount_due,

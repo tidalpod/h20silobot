@@ -518,7 +518,7 @@ class BSAScraper:
         charges = {}
         in_charges = False
         for i, line in enumerate(lines):
-            if line == "Balance":
+            if line.strip().lower() == "balance":
                 in_charges = True
                 continue
             if in_charges:
@@ -537,6 +537,29 @@ class BSAScraper:
                             charges[charge_name] = Decimal(val_match.group(1).replace(',', ''))
                 if "Amount to Pay" in line or "Refresh" in line:
                     break
+
+        # Fallback: scan for "Amount to Pay" or inline balance patterns
+        if amount_due == Decimal("0"):
+            for line in lines:
+                if "Amount to Pay" in line:
+                    match = re.search(r'\$([\d,]+\.?\d*)', line)
+                    if match:
+                        amount_due = Decimal(match.group(1).replace(',', ''))
+                        break
+            # Last resort: regex for "Balance" with dollar amount nearby
+            if amount_due == Decimal("0"):
+                balance_match = re.search(
+                    r'(?:Balance|Amount\s*Due|Total\s*Due)[:\s]*\$?([\d,]+\.\d{2})',
+                    text, re.IGNORECASE
+                )
+                if balance_match:
+                    amount_due = Decimal(balance_match.group(1).replace(',', ''))
+                else:
+                    logger.warning(
+                        f"Failed to parse amount from detail page. "
+                        f"Lines with 'balance'/'amount': "
+                        f"{[l for l in lines if 'balance' in l.lower() or 'amount' in l.lower()]}"
+                    )
 
         # Calculate water usage from charge amounts if available
         water_charges = Decimal("0")

@@ -293,9 +293,9 @@
 
         <div class="mt-6 flex items-center justify-end gap-x-6">
             {% if tenant %}
-            <form action="/tenants/{{ tenant.id }}/delete" method="POST" class="mr-auto" onsubmit="return confirm('Are you sure you want to deactivate this tenant?')">
-                <button type="submit" class="text-sm font-semibold text-red-600 hover:text-red-500">
-                    Deactivate Tenant
+            <form action="/tenants/{{ tenant.id }}/archive" method="POST" class="mr-auto" onsubmit="return confirm('Archive this tenant? They will be hidden from the active list.')">
+                <button type="submit" class="text-sm font-semibold text-amber-600 hover:text-amber-500">
+                    Archive Tenant
                 </button>
             </form>
             {% endif %}
