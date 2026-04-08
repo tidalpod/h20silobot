@@ -369,8 +369,8 @@ async def refresh_single_property(property_id: int):
                         bill.scraped_at = datetime.utcnow()
                     else:
                         if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
-                            logger.warning(f"Scraper returned $0 for {prop.address} (Playwright bulk) — skipping")
-                            continue
+                            logger.warning(f"Scraper returned $0 for {prop.address} (Playwright single) — skipping")
+                            return
                         bill = WaterBill(
                             property_id=prop.id,
                             amount_due=bill_data.amount_due,
