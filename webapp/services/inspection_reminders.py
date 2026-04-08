@@ -2,14 +2,18 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 # All properties are in Michigan (Eastern Time)
-EASTERN = ZoneInfo("America/Detroit")
+try:
+    from zoneinfo import ZoneInfo
+    EASTERN = ZoneInfo("America/Detroit")
+except Exception:
+    # Fallback: use fixed UTC-4 offset (EDT) if timezone data unavailable
+    EASTERN = timezone(timedelta(hours=-4))
 
 from database.connection import get_session
 from database.models import (
