@@ -3,9 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+# All properties are in Michigan (Eastern Time)
+EASTERN = ZoneInfo("America/Detroit")
 
 from database.connection import get_session
 from database.models import Showing, ShowingStatus, ShowingReminderSettings, Vendor
@@ -122,7 +126,7 @@ async def _send_vendor_reminder(showing, prop_addr, lead_minutes, session):
 async def check_and_send_reminders():
     """Check for upcoming showings and send reminders based on admin settings"""
     try:
-        now = datetime.utcnow()
+        now = datetime.now(EASTERN)
         today = now.date()
 
         async with get_session() as session:
@@ -154,7 +158,8 @@ async def check_and_send_reminders():
                 # Parse scheduled_time (format "HH:MM")
                 try:
                     hour, minute = map(int, showing.scheduled_time.split(":"))
-                    showing_dt = datetime.combine(today, datetime.min.time().replace(hour=hour, minute=minute))
+                    naive_dt = datetime.combine(today, datetime.min.time().replace(hour=hour, minute=minute))
+                    showing_dt = naive_dt.replace(tzinfo=EASTERN)
                 except (ValueError, AttributeError):
                     continue
 
@@ -184,5 +189,10 @@ async def reminder_loop():
     """Run the reminder check every 60 seconds"""
     logger.info("Showing reminder service started")
     while True:
-        await check_and_send_reminders()
+        try:
+            await check_and_send_reminders()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Showing reminder loop error (will retry): {e}")
         await asyncio.sleep(60)

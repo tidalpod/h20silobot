@@ -3,9 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+# All properties are in Michigan (Eastern Time)
+EASTERN = ZoneInfo("America/Detroit")
 
 from database.connection import get_session
 from database.models import (
@@ -194,7 +198,7 @@ async def _send_vendor_reminder(property_id, prop_addr, inspection_type, time_st
 async def check_and_send_inspection_reminders():
     """Check for upcoming inspections and send reminders based on admin settings."""
     try:
-        now = datetime.utcnow()
+        now = datetime.now(EASTERN)
         today = now.date()
 
         async with get_session() as session:
@@ -228,10 +232,11 @@ async def check_and_send_inspection_reminders():
                     if days_away < 0 or days_away > max_lookahead_days:
                         continue
 
-                    # Parse time (format "HH:MM")
+                    # Parse time (format "HH:MM") — treat as Eastern
                     try:
                         hour, minute = map(int, insp_time.split(":"))
-                        insp_dt = datetime.combine(insp_date, datetime.min.time().replace(hour=hour, minute=minute))
+                        naive_dt = datetime.combine(insp_date, datetime.min.time().replace(hour=hour, minute=minute))
+                        insp_dt = naive_dt.replace(tzinfo=EASTERN)
                     except (ValueError, AttributeError):
                         continue
 
@@ -269,9 +274,12 @@ async def check_and_send_inspection_reminders():
                             property_id=prop.id,
                             inspection_type=insp_type,
                             inspection_date=insp_date,
-                            sent_at=now,
+                            sent_at=datetime.utcnow(),
                         ))
                         logger.info(f"Inspection {insp_type} @ {prop_addr}: sent {sent} reminder(s)")
+                    else:
+                        logger.warning(f"Inspection {insp_type} @ {prop_addr} on {insp_date}: "
+                                       f"in lead-time window but 0 reminders sent (no tenant phone?)")
 
             await session.commit()
 
@@ -283,5 +291,10 @@ async def inspection_reminder_loop():
     """Run the inspection reminder check every 60 seconds."""
     logger.info("Inspection reminder service started")
     while True:
-        await check_and_send_inspection_reminders()
+        try:
+            await check_and_send_inspection_reminders()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Inspection reminder loop error (will retry): {e}")
         await asyncio.sleep(60)
