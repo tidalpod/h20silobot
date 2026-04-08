@@ -192,16 +192,21 @@
         {% endfor %}
     };
 
+    const billAmount = {{ '%.2f'|format(bill_amount) if bill_amount else 'null' }};
+    const propAddress = {{ selected_property.address|tojson if selected_property else 'null' }};
+    const amountStr = billAmount !== null ? '$' + billAmount.toFixed(2) : '{amount}';
+    const addressStr = propAddress || '{address}';
+
     const templates = {
         overdue: {
             subject: "Water Bill Overdue Notice",
-            sms: "NOTICE: Your water bill for {{ selected_property.address if selected_property else '{address}' }} is OVERDUE. Amount due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}. Please pay immediately to avoid late fees.",
-            email: "Dear {name},\n\nThis is a notice that your water bill for {{ selected_property.address if selected_property else '{address}' }} is currently OVERDUE.\n\nAmount Due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}\nDue Date: {{ latest_bill.due_date.strftime('%B %d, %Y') if latest_bill and latest_bill.due_date else '{due_date}' }}\n\nPlease make your payment as soon as possible.\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nProperty Management"
+            sms: `NOTICE: Your water bill for ${addressStr} is OVERDUE. Amount due: ${amountStr}. Please pay immediately to avoid late fees.`,
+            email: `Dear {name},\n\nThis is a notice that your water bill for ${addressStr} is currently OVERDUE.\n\nAmount Due: ${amountStr}\n\nPlease make your payment as soon as possible.\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nBlue Deer Property Management`
         },
         due_soon: {
             subject: "Water Bill Due Soon",
-            sms: "REMINDER: Your water bill for {{ selected_property.address if selected_property else '{address}' }} is due soon. Amount: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}.",
-            email: "Dear {name},\n\nThis is a friendly reminder that your water bill for {{ selected_property.address if selected_property else '{address}' }} is due soon.\n\nAmount Due: ${{ '%.2f'|format(latest_bill.amount_due) if latest_bill else '{amount}' }}\nDue Date: {{ latest_bill.due_date.strftime('%B %d, %Y') if latest_bill and latest_bill.due_date else '{due_date}' }}\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nProperty Management"
+            sms: `REMINDER: Your water bill for ${addressStr} is due soon. Amount: ${amountStr}.`,
+            email: `Dear {name},\n\nThis is a friendly reminder that your water bill for ${addressStr} is due soon.\n\nAmount Due: ${amountStr}\n\nPay online at: https://bsaonline.com/?uid=305\n\nThank you,\nBlue Deer Property Management`
         },
         custom: {
             subject: "Property Notice",
@@ -293,6 +298,11 @@
 
     {% if selected_tenant %}
     updateRecipient();
+    {% endif %}
+
+    // Auto-apply template if specified in URL
+    {% if template and template != 'custom' %}
+    useTemplate('{{ template }}');
     {% endif %}
 </script>
 {% endblock %}

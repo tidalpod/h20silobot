@@ -152,7 +152,9 @@ async def compose_notification(
     request: Request,
     property_id: int = None,
     tenant_id: int = None,
-    template: str = "custom"
+    template: str = "custom",
+    amount: float = None,
+    property: str = None,
 ):
     """Compose a new notification"""
     user = await get_current_user(request)
@@ -185,16 +187,27 @@ async def compose_notification(
             result = await session.execute(
                 select(Tenant)
                 .where(Tenant.id == tenant_id)
-                .options(selectinload(Tenant.property_ref))
+                .options(selectinload(Tenant.property_ref).selectinload(Property.bills))
             )
             selected_tenant = result.scalar_one_or_none()
             if selected_tenant:
                 selected_property = selected_tenant.property_ref
+                if not latest_bill and selected_property and selected_property.bills:
+                    latest_bill = selected_property.bills[0]
 
         # Get active tenants for selected property
         tenants = []
         if selected_property:
             tenants = [t for t in selected_property.tenants if t.is_active]
+
+        # Map water_bill template to overdue
+        if template == "water_bill":
+            template = "overdue"
+
+        # Use amount from query param if provided (more specific than latest_bill)
+        bill_amount = amount if amount is not None else (
+            latest_bill.amount_due if latest_bill else None
+        )
 
     return templates.TemplateResponse(
         "notifications/compose.html",
@@ -206,6 +219,7 @@ async def compose_notification(
             "selected_property": selected_property,
             "selected_tenant": selected_tenant,
             "latest_bill": latest_bill,
+            "bill_amount": bill_amount,
             "template": template,
             "templates": list(MESSAGE_TEMPLATES.keys()),
             "has_twilio": web_config.has_twilio,
