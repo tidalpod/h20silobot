@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus
+from database.models import Property, WaterBill, BillStatus, Tenant
 from webapp.auth.dependencies import get_current_user
 
 router = APIRouter(tags=["bills"])
@@ -31,7 +31,9 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
             # Show all bills when filtering by property or explicitly requested
             query = (
                 select(WaterBill)
-                .options(selectinload(WaterBill.property))
+                .options(
+                    selectinload(WaterBill.property).selectinload(Property.tenants),
+                )
             )
             if property_id:
                 query = query.where(WaterBill.property_id == property_id)
@@ -56,7 +58,9 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
                     (WaterBill.property_id == latest_subq.c.property_id) &
                     (WaterBill.scraped_at == latest_subq.c.max_scraped)
                 )
-                .options(selectinload(WaterBill.property))
+                .options(
+                    selectinload(WaterBill.property).selectinload(Property.tenants),
+                )
                 .order_by(WaterBill.scraped_at.desc())
             )
             bills = result.scalars().all()
