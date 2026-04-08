@@ -207,7 +207,7 @@
         {# Active state logic #}
         {% set assets_active = '/assets' in request.url.path %}
         {% set portfolio_active = '/properties' in request.url.path or '/tenants' in request.url.path or '/leases' in request.url.path or '/phas' in request.url.path or '/leads' in request.url.path or '/maintenance/vendors' in request.url.path %}
-        {% set fieldwork_active = ('/maintenance' in request.url.path and '/maintenance/vendors' not in request.url.path) or '/showings' in request.url.path or '/inspections' in request.url.path or '/projects' in request.url.path or '/packets' in request.url.path %}
+        {% set fieldwork_active = ('/maintenance' in request.url.path and '/maintenance/vendors' not in request.url.path) or '/showings' in request.url.path or '/inspections' in request.url.path or '/projects' in request.url.path or '/packets' in request.url.path or (request.url.path == '/notifications' or '/notifications/compose' in request.url.path) %}
         {% set operations_active = '/payments' in request.url.path or '/bills' in request.url.path or '/invoices' in request.url.path %}
         {% set messages_active = '/notifications/chat' in request.url.path %}
 
@@ -389,6 +389,18 @@
                                             <div>
                                                 <div class="text-sm font-medium text-gray-900">Packets</div>
                                                 <div class="text-xs text-gray-500">MSHDA landlord packets</div>
+                                            </div>
+                                        </a>
+                                        <div class="border-t border-gray-100 my-1"></div>
+                                        <a href="/notifications" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if request.url.path == '/notifications' else '' }}">
+                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900">Notifications</div>
+                                                <div class="text-xs text-gray-500">SMS & email history</div>
                                             </div>
                                         </a>
                                     </div>
@@ -684,6 +696,10 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
                         Messages
                         <span id="mobile-unread-badge" class="hidden ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center"></span>
+                    </a>
+                    <a href="/notifications" class="text-white flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
+                        Notifications
                     </a>
 
                     <!-- Quick Create -->
