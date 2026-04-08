@@ -68,20 +68,20 @@
                         <label class="block text-sm font-medium leading-6 text-gray-900">Channel *</label>
                         <div class="mt-2 flex gap-4">
                             <label class="flex items-center">
-                                <input type="radio" name="channel" value="sms" checked
+                                <input type="checkbox" name="channel" value="sms" id="ch_sms" checked
                                        {% if not has_twilio %}disabled{% endif %}
-                                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600"
-                                       onchange="toggleChannel('sms')">
+                                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                       onchange="toggleChannels()">
                                 <span class="ml-2 text-sm text-gray-900">SMS</span>
                                 {% if not has_twilio %}
                                 <span class="ml-1 text-xs text-red-500">(Not configured)</span>
                                 {% endif %}
                             </label>
                             <label class="flex items-center">
-                                <input type="radio" name="channel" value="email"
+                                <input type="checkbox" name="channel" value="email" id="ch_email"
                                        {% if not has_email %}disabled{% endif %}
-                                       class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-600"
-                                       onchange="toggleChannel('email')">
+                                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                       onchange="toggleChannels()">
                                 <span class="ml-2 text-sm text-gray-900">Email</span>
                                 {% if not has_email %}
                                 <span class="ml-1 text-xs text-red-500">(Not configured)</span>
@@ -90,18 +90,28 @@
                         </div>
                     </div>
 
-                    <!-- Recipient -->
-                    <div>
-                        <label for="recipient" class="block text-sm font-medium leading-6 text-gray-900">Recipient *</label>
+                    <!-- SMS Recipient -->
+                    <div id="sms-field">
+                        <label for="sms_recipient" class="block text-sm font-medium leading-6 text-gray-900">Phone Number *</label>
                         <div class="mt-2">
-                            <input type="text" name="recipient" id="recipient" required
-                                   placeholder="Phone number or email address"
+                            <input type="text" name="sms_recipient" id="sms_recipient"
+                                   placeholder="Phone number"
+                                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                        </div>
+                    </div>
+
+                    <!-- Email Recipient -->
+                    <div id="email-field" style="display:none">
+                        <label for="email_recipient" class="block text-sm font-medium leading-6 text-gray-900">Email Address *</label>
+                        <div class="mt-2">
+                            <input type="text" name="email_recipient" id="email_recipient"
+                                   placeholder="Email address"
                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
                         </div>
                     </div>
 
                     <!-- Subject (Email only) -->
-                    <div id="subject-field">
+                    <div id="subject-field" style="display:none">
                         <label for="subject" class="block text-sm font-medium leading-6 text-gray-900">Subject</label>
                         <div class="mt-2">
                             <input type="text" name="subject" id="subject"
@@ -215,17 +225,17 @@
         }
     };
 
-    let currentChannel = 'sms';
+    function isSmsChecked() { return document.getElementById('ch_sms').checked; }
+    function isEmailChecked() { return document.getElementById('ch_email').checked; }
 
-    function toggleChannel(channel) {
-        currentChannel = channel;
-        const subjectField = document.getElementById('subject-field');
-        if (channel === 'sms') {
-            subjectField.style.display = 'none';
-        } else {
-            subjectField.style.display = 'block';
-        }
-        updateRecipient();
+    function toggleChannels() {
+        const sms = isSmsChecked();
+        const email = isEmailChecked();
+        document.getElementById('sms-field').style.display = sms ? 'block' : 'none';
+        document.getElementById('email-field').style.display = email ? 'block' : 'none';
+        document.getElementById('subject-field').style.display = email ? 'block' : 'none';
+        document.getElementById('sms_recipient').required = sms;
+        document.getElementById('email_recipient').required = email;
     }
 
     function updateTenants(propertyId) {
@@ -247,14 +257,14 @@
 
     function updateRecipient() {
         const tenantSelect = document.getElementById('tenant_id');
-        const recipientInput = document.getElementById('recipient');
         const selectedOption = tenantSelect.options[tenantSelect.selectedIndex];
 
         if (selectedOption && selectedOption.value) {
-            if (currentChannel === 'sms' && selectedOption.dataset.phone) {
-                recipientInput.value = selectedOption.dataset.phone;
-            } else if (currentChannel === 'email' && selectedOption.dataset.email) {
-                recipientInput.value = selectedOption.dataset.email;
+            if (selectedOption.dataset.phone) {
+                document.getElementById('sms_recipient').value = selectedOption.dataset.phone;
+            }
+            if (selectedOption.dataset.email) {
+                document.getElementById('email_recipient').value = selectedOption.dataset.email;
             }
         }
     }
@@ -264,12 +274,9 @@
         const messageField = document.getElementById('message');
         const subjectField = document.getElementById('subject');
 
-        if (currentChannel === 'sms') {
-            messageField.value = template.sms;
-        } else {
-            messageField.value = template.email;
-            subjectField.value = template.subject;
-        }
+        // Use SMS template for message body (shorter, works for both)
+        messageField.value = template.sms;
+        subjectField.value = template.subject;
 
         // Replace {name} placeholder if tenant selected
         const tenantSelect = document.getElementById('tenant_id');
@@ -285,7 +292,7 @@
         const messageField = document.getElementById('message');
         const charCount = document.getElementById('char-count');
         charCount.textContent = messageField.value.length + ' characters';
-        if (currentChannel === 'sms' && messageField.value.length > 160) {
+        if (isSmsChecked() && messageField.value.length > 160) {
             charCount.classList.add('text-yellow-600');
         } else {
             charCount.classList.remove('text-yellow-600');
@@ -294,7 +301,7 @@
 
     // Initialize
     document.getElementById('message').addEventListener('input', updateCharCount);
-    toggleChannel('sms');
+    toggleChannels();
 
     {% if selected_tenant %}
     updateRecipient();

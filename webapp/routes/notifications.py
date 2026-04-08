@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import List
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -232,21 +233,16 @@ async def send_notification(
     request: Request,
     property_id: int = Form(...),
     tenant_id: int = Form(None),
-    channel: str = Form(...),
-    recipient: str = Form(...),
+    channel: List[str] = Form(...),
+    sms_recipient: str = Form(""),
+    email_recipient: str = Form(""),
     subject: str = Form(""),
     message: str = Form(...)
 ):
-    """Send a notification"""
+    """Send a notification via one or both channels"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-
-    # Validate channel
-    try:
-        channel_enum = NotificationChannel(channel)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid channel")
 
     async with get_session() as session:
         # Get property
@@ -259,56 +255,58 @@ async def send_notification(
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        # Get tenant if specified
-        tenant = None
-        if tenant_id:
-            result = await session.execute(
-                select(Tenant).where(Tenant.id == tenant_id)
-            )
-            tenant = result.scalar_one_or_none()
-
         # Get latest bill
         bill_id = None
         if prop.bills:
             bill_id = prop.bills[0].id
 
-        # Create notification record
-        notification = Notification(
-            tenant_id=tenant_id,
-            property_id=property_id,
-            bill_id=bill_id,
-            channel=channel_enum,
-            recipient=recipient,
-            subject=subject if channel_enum == NotificationChannel.EMAIL else None,
-            message=message,
-            status=NotificationStatus.PENDING,
-        )
-        session.add(notification)
-        await session.flush()
+        # Send via each selected channel
+        for ch in channel:
+            try:
+                channel_enum = NotificationChannel(ch)
+            except ValueError:
+                continue
 
-        # Send notification
-        if channel_enum == NotificationChannel.SMS:
-            result = await twilio_service.send_sms(recipient, message)
-        else:
-            result = await email_service.send_email(
-                recipient,
-                subject,
-                message,
-                html_body=message.replace('\n', '<br>')
+            if channel_enum == NotificationChannel.SMS and sms_recipient:
+                recipient = sms_recipient
+            elif channel_enum == NotificationChannel.EMAIL and email_recipient:
+                recipient = email_recipient
+            else:
+                continue
+
+            notification = Notification(
+                tenant_id=tenant_id,
+                property_id=property_id,
+                bill_id=bill_id,
+                channel=channel_enum,
+                recipient=recipient,
+                subject=subject if channel_enum == NotificationChannel.EMAIL else None,
+                message=message,
+                status=NotificationStatus.PENDING,
             )
+            session.add(notification)
+            await session.flush()
 
-        # Update notification status
-        if result.success:
-            notification.status = NotificationStatus.SENT
-            notification.external_id = result.message_sid if hasattr(result, 'message_sid') else result.message_id
-            notification.sent_at = datetime.utcnow()
-        else:
-            notification.status = NotificationStatus.FAILED
-            notification.error_message = result.error_message
+            if channel_enum == NotificationChannel.SMS:
+                result = await twilio_service.send_sms(recipient, message)
+            else:
+                result = await email_service.send_email(
+                    recipient,
+                    subject,
+                    message,
+                    html_body=message.replace('\n', '<br>')
+                )
+
+            if result.success:
+                notification.status = NotificationStatus.SENT
+                notification.external_id = result.message_sid if hasattr(result, 'message_sid') else result.message_id
+                notification.sent_at = datetime.utcnow()
+            else:
+                notification.status = NotificationStatus.FAILED
+                notification.error_message = result.error_message
 
         await session.commit()
 
-    # Redirect back to notifications with success/error message
     return RedirectResponse(url="/notifications", status_code=303)
 
 
