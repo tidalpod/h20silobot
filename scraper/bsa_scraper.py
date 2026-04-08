@@ -538,27 +538,50 @@ class BSAScraper:
                 if "Amount to Pay" in line or "Refresh" in line:
                     break
 
-        # Fallback: scan for "Amount to Pay" or inline balance patterns
+        # Fallback: scan for amount on the line AFTER a label
         if amount_due == Decimal("0"):
-            for line in lines:
-                if "Amount to Pay" in line:
+            for i, line in enumerate(lines):
+                low = line.lower().strip()
+                # Check for "Amount to Pay" with dollar on same line
+                if "amount to pay" in low:
                     match = re.search(r'\$([\d,]+\.?\d*)', line)
                     if match:
                         amount_due = Decimal(match.group(1).replace(',', ''))
                         break
-            # Last resort: regex for "Balance" with dollar amount nearby
+                # Check for label lines — dollar amount may be on same or next line
+                if low in ("balance", "amount due", "total amount due", "total due"):
+                    # Check same line for dollar amount
+                    match = re.search(r'\$([\d,]+\.?\d*)', line)
+                    if match:
+                        amount_due = Decimal(match.group(1).replace(',', ''))
+                        break
+                    # Check next line
+                    if i + 1 < len(lines):
+                        match = re.search(r'\$?([\d,]+\.\d{2})', lines[i + 1])
+                        if match:
+                            amount_due = Decimal(match.group(1).replace(',', ''))
+                            break
+                # "Current Bill - $663.04 due" pattern
+                if "current bill" in low:
+                    match = re.search(r'\$([\d,]+\.?\d*)', line)
+                    if match:
+                        amount_due = Decimal(match.group(1).replace(',', ''))
+                        break
+
+            # Last resort: regex on raw HTML for inline patterns
             if amount_due == Decimal("0"):
+                # Try matching dollar amounts near known labels in the raw HTML
                 balance_match = re.search(
-                    r'(?:Balance|Amount\s*Due|Total\s*Due)[:\s]*\$?([\d,]+\.\d{2})',
-                    text, re.IGNORECASE
+                    r'(?:Total\s+Amount\s+Due|Amount\s*Due|Balance|Total\s*Due)[^$\d]{0,30}\$?([\d,]+\.\d{2})',
+                    html, re.IGNORECASE
                 )
                 if balance_match:
                     amount_due = Decimal(balance_match.group(1).replace(',', ''))
                 else:
                     logger.warning(
                         f"Failed to parse amount from detail page. "
-                        f"Lines with 'balance'/'amount': "
-                        f"{[l for l in lines if 'balance' in l.lower() or 'amount' in l.lower()]}"
+                        f"Lines with 'balance'/'amount'/'due': "
+                        f"{[l for l in lines if any(w in l.lower() for w in ('balance', 'amount', 'due'))]}"
                     )
 
         # Calculate water usage from charge amounts if available
