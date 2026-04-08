@@ -154,7 +154,6 @@ async def compose_notification(
     tenant_id: int = None,
     template: str = "custom",
     amount: float = None,
-    property: str = None,
 ):
     """Compose a new notification"""
     user = await get_current_user(request)
