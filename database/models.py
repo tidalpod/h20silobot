@@ -1884,3 +1884,35 @@ class StripePayment(Base):
         Index("ix_stripe_payments_status", "status"),
         Index("ix_stripe_payments_type", "payment_type"),
     )
+
+
+class BillAlertSettings(Base):
+    """Admin-configurable settings for auto-notifying tenants when water bill exceeds threshold."""
+    __tablename__ = "bill_alert_settings"
+
+    id = Column(Integer, primary_key=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    threshold_amount = Column(Numeric(10, 2), default=200, nullable=False)
+    notify_sms = Column(Boolean, default=True, nullable=False)
+    notify_email = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<BillAlertSettings enabled={self.enabled} threshold=${self.threshold_amount}>"
+
+
+class BillAlertLog(Base):
+    """Tracks which bill alerts have been sent to prevent double-sending per property per bill."""
+    __tablename__ = "bill_alert_log"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    bill_id = Column(Integer, ForeignKey("water_bills.id", ondelete="CASCADE"), nullable=False)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+    property = relationship("Property")
+    bill = relationship("WaterBill")
+
+    __table_args__ = (
+        Index("ix_bill_alert_log_unique", "property_id", "bill_id", unique=True),
+    )

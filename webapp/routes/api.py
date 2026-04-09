@@ -12,7 +12,10 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant, WorkOrder, SMSMessage, MessageDirection
+from database.models import (
+    Property, WaterBill, BillStatus, Tenant, WorkOrder, SMSMessage, MessageDirection,
+    BillAlertSettings, BillAlertLog, Notification, NotificationChannel, NotificationStatus,
+)
 
 router = APIRouter(tags=["api"])
 logger = logging.getLogger(__name__)
@@ -233,6 +236,10 @@ async def api_refresh_property(property_id: int):
                 actual_amount = float(bill.amount_due)
                 scraped_amount = float(bill_data.amount_due) if bill_data.amount_due else 0
                 logger.info(f"Successfully saved bill for {prop.address}: ${actual_amount} (scraped=${scraped_amount})")
+
+                # Auto-notify tenants if bill exceeds threshold
+                await _check_bill_alert(prop.id, bill, session)
+
                 scraped_at = bill.scraped_at or datetime.utcnow()
                 return {
                     "status": "success",
@@ -302,6 +309,130 @@ async def api_dashboard_stats():
             "total_overdue_amount": total_overdue_amount,
             "total_due_soon_amount": total_due_soon_amount,
         }
+
+
+async def _check_bill_alert(property_id: int, bill, session):
+    """Auto-notify tenants if bill exceeds threshold (per BillAlertSettings).
+
+    Args:
+        property_id: Property ID
+        bill: WaterBill instance (already committed)
+        session: Active async session
+    """
+    try:
+        # 1. Load settings — return if not enabled
+        settings_result = await session.execute(select(BillAlertSettings).limit(1))
+        settings = settings_result.scalar_one_or_none()
+        if not settings or not settings.enabled:
+            return
+
+        # 2. Check threshold
+        amount = float(bill.amount_due or 0)
+        threshold = float(settings.threshold_amount or 0)
+        if amount < threshold:
+            return
+
+        # 3. Check if alert already sent for this property+bill
+        existing = await session.execute(
+            select(BillAlertLog).where(and_(
+                BillAlertLog.property_id == property_id,
+                BillAlertLog.bill_id == bill.id,
+            ))
+        )
+        if existing.scalar_one_or_none():
+            logger.debug(f"Bill alert already sent for property {property_id}, bill {bill.id}")
+            return
+
+        # 4. Find active tenants at this property with contact info
+        tenants_result = await session.execute(
+            select(Tenant).where(and_(
+                Tenant.property_id == property_id,
+                Tenant.is_active == True,
+            ))
+        )
+        tenants = tenants_result.scalars().all()
+        if not tenants:
+            logger.info(f"No active tenants at property {property_id} for bill alert")
+            return
+
+        # 5. Send notifications via configured channels
+        from webapp.services.twilio_service import twilio_service
+        from webapp.services.email_service import email_service
+
+        # Load property address for message
+        prop_result = await session.execute(select(Property).where(Property.id == property_id))
+        prop = prop_result.scalar_one_or_none()
+        prop_address = prop.address if prop else f"Property #{property_id}"
+
+        sent_any = False
+        for tenant in tenants:
+            message = (
+                f"Water Bill Alert: Your water bill at {prop_address} "
+                f"is ${amount:.2f}, which exceeds the ${threshold:.0f} threshold. "
+                f"Due date: {bill.due_date.strftime('%b %d, %Y') if bill.due_date else 'N/A'}. "
+                f"Please arrange payment promptly."
+            )
+
+            # SMS
+            if settings.notify_sms and tenant.phone:
+                try:
+                    sms_result = await twilio_service.send_sms(tenant.phone, message)
+                    notification = Notification(
+                        tenant_id=tenant.id,
+                        property_id=property_id,
+                        bill_id=bill.id,
+                        channel=NotificationChannel.SMS,
+                        recipient=tenant.phone,
+                        message=message,
+                        status=NotificationStatus.SENT if sms_result.success else NotificationStatus.FAILED,
+                        external_id=sms_result.message_sid if sms_result.success else None,
+                        sent_at=datetime.utcnow() if sms_result.success else None,
+                        error_message=sms_result.error_message if not sms_result.success else None,
+                    )
+                    session.add(notification)
+                    if sms_result.success:
+                        sent_any = True
+                    logger.info(f"Bill alert SMS to {tenant.name} ({tenant.phone}): {'sent' if sms_result.success else 'failed'}")
+                except Exception as e:
+                    logger.error(f"Bill alert SMS error for tenant {tenant.id}: {e}")
+
+            # Email
+            if settings.notify_email and tenant.email:
+                subject = f"Water Bill Alert - {prop_address}"
+                try:
+                    email_result = await email_service.send_email(
+                        tenant.email, subject, message,
+                        html_body=message.replace('\n', '<br>')
+                    )
+                    notification = Notification(
+                        tenant_id=tenant.id,
+                        property_id=property_id,
+                        bill_id=bill.id,
+                        channel=NotificationChannel.EMAIL,
+                        recipient=tenant.email,
+                        subject=subject,
+                        message=message,
+                        status=NotificationStatus.SENT if email_result.success else NotificationStatus.FAILED,
+                        external_id=email_result.message_id if email_result.success else None,
+                        sent_at=datetime.utcnow() if email_result.success else None,
+                        error_message=email_result.error_message if not email_result.success else None,
+                    )
+                    session.add(notification)
+                    if email_result.success:
+                        sent_any = True
+                    logger.info(f"Bill alert email to {tenant.name} ({tenant.email}): {'sent' if email_result.success else 'failed'}")
+                except Exception as e:
+                    logger.error(f"Bill alert email error for tenant {tenant.id}: {e}")
+
+        # 6. Create BillAlertLog record to prevent duplicate sends
+        if sent_any:
+            alert_log = BillAlertLog(property_id=property_id, bill_id=bill.id)
+            session.add(alert_log)
+            await session.commit()
+            logger.info(f"Bill alert sent for property {property_id}, bill {bill.id} (${amount:.2f} >= ${threshold:.0f})")
+
+    except Exception as e:
+        logger.error(f"Bill alert check failed for property {property_id}: {e}")
 
 
 async def refresh_single_property(property_id: int):
@@ -405,6 +536,9 @@ async def refresh_single_property(property_id: int):
 
                     await session.commit()
                     logger.info(f"Successfully refreshed bills for {prop.address}")
+
+                    # Auto-notify tenants if bill exceeds threshold
+                    await _check_bill_alert(prop.id, bill, session)
                 else:
                     logger.warning(f"No bill data found for {prop.address}")
 
@@ -533,6 +667,9 @@ async def refresh_all_properties():
                             })
                             scraped_count += 1
                             logger.info(f"Scraped: {prop.address} - ${actual_amount}")
+
+                            # Auto-notify tenants if bill exceeds threshold
+                            await _check_bill_alert(prop.id, bill, session)
                         else:
                             _refresh_status["results"].append({
                                 "property_id": prop.id,

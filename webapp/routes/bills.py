@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant
+from database.models import Property, WaterBill, BillStatus, Tenant, BillAlertSettings
 from webapp.auth.dependencies import get_current_user
 
 router = APIRouter(tags=["bills"])
@@ -73,6 +73,10 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
         )
         properties = result.scalars().all()
 
+        # Load bill alert settings (single-row config)
+        alert_result = await session.execute(select(BillAlertSettings).limit(1))
+        alert_settings = alert_result.scalar_one_or_none()
+
     return templates.TemplateResponse(
         "bills/list.html",
         {
@@ -83,8 +87,46 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
             "property_id": property_id,
             "show_all": show_all,
             "now": datetime.utcnow(),
+            "alert_settings": alert_settings,
         }
     )
+
+
+@router.post("/alert-settings")
+async def save_alert_settings(request: Request):
+    """Save bill alert automation settings"""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    enabled = form.get("enabled") == "on"
+    threshold = float(form.get("threshold_amount", 200))
+    notify_sms = form.get("notify_sms") == "on"
+    notify_email = form.get("notify_email") == "on"
+
+    async with get_session() as session:
+        result = await session.execute(select(BillAlertSettings).limit(1))
+        settings = result.scalar_one_or_none()
+
+        if settings:
+            settings.enabled = enabled
+            settings.threshold_amount = threshold
+            settings.notify_sms = notify_sms
+            settings.notify_email = notify_email
+            settings.updated_at = datetime.utcnow()
+        else:
+            settings = BillAlertSettings(
+                enabled=enabled,
+                threshold_amount=threshold,
+                notify_sms=notify_sms,
+                notify_email=notify_email,
+            )
+            session.add(settings)
+
+        await session.commit()
+
+    return RedirectResponse(url="/bills", status_code=303)
 
 
 @router.get("/refresh", response_class=HTMLResponse)

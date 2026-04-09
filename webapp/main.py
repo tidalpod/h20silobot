@@ -83,6 +83,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Inspection reminder migration skipped: {e}")
 
+    # Run bill alert migration
+    try:
+        from database.migrations.add_bill_alert import run_migration as run_bill_alert_migration
+        await run_bill_alert_migration()
+    except Exception as e:
+        logger.warning(f"Bill alert migration skipped: {e}")
+
     # Auto-cleanup orphaned photo records (files lost between deploys)
     # Skip when using R2 — files persist independently of deploys
     if db_success:

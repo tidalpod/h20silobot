@@ -6,12 +6,18 @@
 <header class="bg-white shadow">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
         <h1 class="text-3xl font-bold tracking-tight text-gray-900">Bill History</h1>
-        <button id="refreshAllBtn" onclick="refreshAllBills()" class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
-            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            Refresh All Bills
-        </button>
+        <div class="flex items-center gap-3">
+            <button onclick="document.getElementById('bill-alert-settings').classList.toggle('hidden')" class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors" title="Automation Settings">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+                <span class="hidden sm:inline">Automation</span>
+            </button>
+            <button id="refreshAllBtn" onclick="refreshAllBills()" class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+                Refresh All Bills
+            </button>
+        </div>
     </div>
 </header>
 {% endblock %}
@@ -33,6 +39,45 @@
         <div id="refreshBar" class="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
     </div>
     <p id="refreshCurrentProp" class="text-xs text-gray-400 mt-1"></p>
+</div>
+
+<!-- Bill Alert Automation Settings (collapsible) -->
+<div id="bill-alert-settings" class="hidden mb-6">
+    <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            Auto-Notify Tenants
+        </h3>
+        <p class="text-xs text-gray-500 mb-4">Automatically send SMS/email to tenants when their water bill exceeds the threshold during bill refresh.</p>
+        <form method="POST" action="/bills/alert-settings" class="flex flex-wrap items-end gap-5">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="enabled" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if alert_settings and alert_settings.enabled %}checked{% endif %}>
+                <span class="text-sm text-gray-700">Enable auto-notify</span>
+            </label>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Threshold ($)</label>
+                <input type="number" name="threshold_amount" step="0.01" min="0"
+                       value="{{ '%.2f'|format(alert_settings.threshold_amount) if alert_settings else '200.00' }}"
+                       class="w-28 rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="notify_sms" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if not alert_settings or alert_settings.notify_sms %}checked{% endif %}>
+                <span class="text-sm text-gray-700">SMS</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="notify_email" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if alert_settings and alert_settings.notify_email %}checked{% endif %}>
+                <span class="text-sm text-gray-700">Email</span>
+            </label>
+            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Save</button>
+        </form>
+        {% if alert_settings and alert_settings.enabled %}
+        <div class="mt-3 text-xs text-green-600 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+            Active — notifying tenants when bill exceeds ${{ '%.0f'|format(alert_settings.threshold_amount) }}
+            via {% if alert_settings.notify_sms %}SMS{% endif %}{% if alert_settings.notify_sms and alert_settings.notify_email %} & {% endif %}{% if alert_settings.notify_email %}Email{% endif %}
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Filters -->
