@@ -127,7 +127,7 @@
         </div>
         <div class="flex items-center justify-between text-xs text-gray-500">
             <span>Scraped: {{ bill.scraped_at.strftime('%b %d, %H:%M') if bill.scraped_at else 'N/A' }}</span>
-            {% if bill.amount_due > 0 %}
+            {% if bill.amount_due|float > 0 %}
             <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Unpaid</span>
             {% else %}
             <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Paid</span>
@@ -188,7 +188,7 @@
                     ${{ "%.2f"|format(bill.amount_due) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                    {% if bill.amount_due > 0 %}
+                    {% if bill.amount_due|float > 0 %}
                     <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">Unpaid</span>
                     {% else %}
                     <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Paid</span>
@@ -202,7 +202,7 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right">
                     <div class="inline-flex items-center gap-3">
-                        {% if primary_tenant and bill.amount_due > 0 %}
+                        {% if primary_tenant and bill.amount_due|float > 0 %}
                         <a href="/notifications/compose?tenant_id={{ primary_tenant.id }}&template=water_bill&amount={{ bill.amount_due }}&property={{ bill.property.address }}"
                            class="inline-flex items-center gap-1 text-sm text-amber-600 hover:text-amber-800 font-medium" title="Notify tenant">
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
