@@ -261,8 +261,17 @@ async def check_and_send_inspection_reminders():
                         continue
 
                     prop_addr = prop.address or "Unknown"
-                    sent = 0
 
+                    # Create log record BEFORE sending to prevent re-sends on retry
+                    session.add(InspectionReminderLog(
+                        property_id=prop.id,
+                        inspection_type=insp_type,
+                        inspection_date=insp_date,
+                        sent_at=datetime.utcnow(),
+                    ))
+                    await session.commit()
+
+                    sent = 0
                     if remind_tenant:
                         sent += await _send_tenant_reminders(
                             prop.id, prop_addr, insp_type, insp_time, lead_time_minutes, session
@@ -274,18 +283,11 @@ async def check_and_send_inspection_reminders():
                         )
 
                     if sent > 0:
-                        session.add(InspectionReminderLog(
-                            property_id=prop.id,
-                            inspection_type=insp_type,
-                            inspection_date=insp_date,
-                            sent_at=datetime.utcnow(),
-                        ))
+                        await session.commit()
                         logger.info(f"Inspection {insp_type} @ {prop_addr}: sent {sent} reminder(s)")
                     else:
                         logger.warning(f"Inspection {insp_type} @ {prop_addr} on {insp_date}: "
                                        f"in lead-time window but 0 reminders sent (no tenant phone?)")
-
-            await session.commit()
 
     except Exception as e:
         logger.error(f"Error in inspection reminder check: {e}")

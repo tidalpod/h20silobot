@@ -170,19 +170,20 @@ async def check_and_send_reminders():
                 time_until = (showing_dt - now).total_seconds()
                 if 0 < time_until <= lead_time_seconds:
                     prop_addr = showing.property_ref.address if showing.property_ref else "Unknown"
-                    sent = 0
 
+                    # Mark as sent BEFORE attempting SMS to prevent re-sending on retry
+                    # Use naive datetime (column is DateTime without timezone)
+                    showing.reminder_sent_at = datetime.utcnow()
+                    await session.commit()
+
+                    sent = 0
                     if remind_tenant:
                         sent += await _send_tenant_reminder(showing, prop_addr, lead_time_minutes)
 
                     if remind_vendor:
                         sent += await _send_vendor_reminder(showing, prop_addr, lead_time_minutes, session)
 
-                    if sent > 0:
-                        showing.reminder_sent_at = now
-                        logger.info(f"Showing #{showing.id}: sent {sent} reminder(s)")
-
-            await session.commit()
+                    logger.info(f"Showing #{showing.id}: sent {sent} reminder(s)")
 
     except Exception as e:
         logger.error(f"Error in showing reminder check: {e}")
