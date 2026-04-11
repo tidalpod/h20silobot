@@ -332,16 +332,24 @@ async def _check_bill_alert(property_id: int, bill, session):
         if amount < threshold:
             return
 
-        # 3. Check if alert already sent for this property+bill
-        existing = await session.execute(
+        # 3. Check if alert already sent — allow re-notify if amount grew by increment
+        renotify_increment = float(settings.renotify_increment or 50)
+        existing_result = await session.execute(
             select(BillAlertLog).where(and_(
                 BillAlertLog.property_id == property_id,
                 BillAlertLog.bill_id == bill.id,
             ))
         )
-        if existing.scalar_one_or_none():
-            logger.debug(f"Bill alert already sent for property {property_id}, bill {bill.id}")
-            return
+        existing_log = existing_result.scalar_one_or_none()
+        if existing_log:
+            last_notified = float(existing_log.notified_amount or 0)
+            if amount - last_notified < renotify_increment:
+                logger.debug(f"Bill alert already sent for property {property_id}, bill {bill.id} "
+                             f"(${last_notified:.2f} -> ${amount:.2f}, increment ${renotify_increment:.0f} not reached)")
+                return
+            logger.info(f"Re-notifying property {property_id}: bill increased ${last_notified:.2f} -> ${amount:.2f} "
+                        f"(increment ${renotify_increment:.0f} exceeded)")
+        is_renotify = existing_log is not None
 
         # 4. Find active tenants at this property with contact info
         tenants_result = await session.execute(
@@ -424,12 +432,16 @@ async def _check_bill_alert(property_id: int, bill, session):
                 except Exception as e:
                     logger.error(f"Bill alert email error for tenant {tenant.id}: {e}")
 
-        # 6. Create BillAlertLog record to prevent duplicate sends
+        # 6. Create or update BillAlertLog record with notified amount
         if sent_any:
-            alert_log = BillAlertLog(property_id=property_id, bill_id=bill.id)
-            session.add(alert_log)
+            if is_renotify and existing_log:
+                existing_log.notified_amount = amount
+                existing_log.sent_at = datetime.utcnow()
+            else:
+                alert_log = BillAlertLog(property_id=property_id, bill_id=bill.id, notified_amount=amount)
+                session.add(alert_log)
             await session.commit()
-            logger.info(f"Bill alert sent for property {property_id}, bill {bill.id} (${amount:.2f} >= ${threshold:.0f})")
+            logger.info(f"Bill alert {'re-' if is_renotify else ''}sent for property {property_id}, bill {bill.id} (${amount:.2f} >= ${threshold:.0f})")
 
     except Exception as e:
         logger.error(f"Bill alert check failed for property {property_id}: {e}")

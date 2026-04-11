@@ -60,6 +60,13 @@
                        value="{{ '%.2f'|format(alert_settings.threshold_amount) if alert_settings else '200.00' }}"
                        class="w-28 rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
             </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Re-notify increment ($)</label>
+                <input type="number" name="renotify_increment" step="1" min="1"
+                       value="{{ '%.0f'|format(alert_settings.renotify_increment) if alert_settings and alert_settings.renotify_increment else '50' }}"
+                       class="w-20 rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 focus:ring-blue-500 focus:border-blue-500"
+                       title="Only re-notify when bill increases by this amount">
+            </div>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="notify_sms" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if not alert_settings or alert_settings.notify_sms %}checked{% endif %}>
                 <span class="text-sm text-gray-700">SMS</span>
@@ -75,6 +82,7 @@
             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
             Active — notifying tenants when bill exceeds ${{ '%.0f'|format(alert_settings.threshold_amount) }}
             via {% if alert_settings.notify_sms %}SMS{% endif %}{% if alert_settings.notify_sms and alert_settings.notify_email %} & {% endif %}{% if alert_settings.notify_email %}Email{% endif %}
+            (re-notifies every ${{ '%.0f'|format(alert_settings.renotify_increment) if alert_settings.renotify_increment else '50' }} increase)
         </div>
         {% endif %}
     </div>

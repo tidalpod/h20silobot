@@ -1895,10 +1895,11 @@ class BillAlertSettings(Base):
     threshold_amount = Column(Numeric(10, 2), default=200, nullable=False)
     notify_sms = Column(Boolean, default=True, nullable=False)
     notify_email = Column(Boolean, default=False, nullable=False)
+    renotify_increment = Column(Numeric(10, 2), default=50, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
-        return f"<BillAlertSettings enabled={self.enabled} threshold=${self.threshold_amount}>"
+        return f"<BillAlertSettings enabled={self.enabled} threshold=${self.threshold_amount} renotify_increment=${self.renotify_increment}>"
 
 
 class BillAlertLog(Base):
@@ -1908,6 +1909,7 @@ class BillAlertLog(Base):
     id = Column(Integer, primary_key=True)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
     bill_id = Column(Integer, ForeignKey("water_bills.id", ondelete="CASCADE"), nullable=False)
+    notified_amount = Column(Numeric(10, 2), nullable=True)
     sent_at = Column(DateTime, default=datetime.utcnow)
 
     property = relationship("Property")

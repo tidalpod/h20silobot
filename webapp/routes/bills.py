@@ -104,6 +104,7 @@ async def save_alert_settings(request: Request):
     threshold = float(form.get("threshold_amount", 200))
     notify_sms = form.get("notify_sms") == "on"
     notify_email = form.get("notify_email") == "on"
+    renotify_increment = float(form.get("renotify_increment", 50))
 
     async with get_session() as session:
         result = await session.execute(select(BillAlertSettings).limit(1))
@@ -114,6 +115,7 @@ async def save_alert_settings(request: Request):
             settings.threshold_amount = threshold
             settings.notify_sms = notify_sms
             settings.notify_email = notify_email
+            settings.renotify_increment = renotify_increment
             settings.updated_at = datetime.utcnow()
         else:
             settings = BillAlertSettings(
@@ -121,6 +123,7 @@ async def save_alert_settings(request: Request):
                 threshold_amount=threshold,
                 notify_sms=notify_sms,
                 notify_email=notify_email,
+                renotify_increment=renotify_increment,
             )
             session.add(settings)
 
