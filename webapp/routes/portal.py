@@ -423,9 +423,17 @@ async def portal_bills(request: Request):
         result = await session.execute(
             select(WaterBill)
             .where(WaterBill.property_id == tenant["property_id"])
-            .order_by(desc(WaterBill.statement_date))
+            .order_by(desc(WaterBill.statement_date), desc(WaterBill.scraped_at))
         )
-        bills = result.scalars().all()
+        all_bills = result.scalars().all()
+        # Deduplicate: keep only the latest-scraped bill per statement date
+        seen_dates = set()
+        bills = []
+        for b in all_bills:
+            key = b.statement_date
+            if key not in seen_dates:
+                seen_dates.add(key)
+                bills.append(b)
 
     return templates.TemplateResponse("portal/bills.html", {
         "request": request,

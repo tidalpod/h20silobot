@@ -162,7 +162,7 @@ class WaterBillBot:
         from database.connection import get_session
         from database.models import Property, WaterBill, ScrapingLog
         from scraper.bsa_scraper import BSAScraper
-        from sqlalchemy import select
+        from sqlalchemy import select, and_
         from collections import defaultdict
 
         scrape_log = ScrapingLog(started_at=datetime.utcnow())
@@ -213,21 +213,43 @@ class WaterBillBot:
                                     prop.parcel_number = bill_data.parcel_number
                                     logger.info(f"Found parcel number for {prop.address}: {bill_data.parcel_number}")
 
-                                new_bill = WaterBill(
-                                    property_id=prop.id,
-                                    amount_due=bill_data.amount_due,
-                                    due_date=bill_data.due_date,
-                                    statement_date=bill_data.statement_date,
-                                    previous_balance=bill_data.previous_balance,
-                                    current_charges=bill_data.current_charges,
-                                    late_fees=bill_data.late_fees,
-                                    payments_received=bill_data.payments_received,
-                                    water_usage_gallons=bill_data.water_usage,
-                                    raw_data=bill_data.raw_data
-                                )
-                                new_bill.status = new_bill.calculate_status()
+                                # Update existing bill or create new one
+                                existing_bill = None
+                                if bill_data.statement_date:
+                                    existing_result = await session.execute(
+                                        select(WaterBill).where(and_(
+                                            WaterBill.property_id == prop.id,
+                                            WaterBill.statement_date == bill_data.statement_date,
+                                        ))
+                                    )
+                                    existing_bill = existing_result.scalar_one_or_none()
 
-                                session.add(new_bill)
+                                if existing_bill:
+                                    new_bill = existing_bill
+                                    new_bill.amount_due = bill_data.amount_due
+                                    new_bill.due_date = bill_data.due_date
+                                    new_bill.previous_balance = bill_data.previous_balance
+                                    new_bill.current_charges = bill_data.current_charges
+                                    new_bill.late_fees = bill_data.late_fees
+                                    new_bill.payments_received = bill_data.payments_received
+                                    new_bill.water_usage_gallons = bill_data.water_usage
+                                    new_bill.raw_data = bill_data.raw_data
+                                    new_bill.scraped_at = datetime.utcnow()
+                                else:
+                                    new_bill = WaterBill(
+                                        property_id=prop.id,
+                                        amount_due=bill_data.amount_due,
+                                        due_date=bill_data.due_date,
+                                        statement_date=bill_data.statement_date,
+                                        previous_balance=bill_data.previous_balance,
+                                        current_charges=bill_data.current_charges,
+                                        late_fees=bill_data.late_fees,
+                                        payments_received=bill_data.payments_received,
+                                        water_usage_gallons=bill_data.water_usage,
+                                        raw_data=bill_data.raw_data
+                                    )
+                                    session.add(new_bill)
+                                new_bill.status = new_bill.calculate_status()
                                 scraped_count += 1
                                 logger.info(f"Scraped: {prop.address} - ${bill_data.amount_due}")
 

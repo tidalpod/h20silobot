@@ -11,8 +11,17 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from sqlalchemy import delete as sa_delete
+
 from database.connection import get_session
-from database.models import Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation, EntityConfig
+from database.models import (
+    Property, WaterBill, BillStatus, Tenant, PropertyPhoto, InspectionViolation, EntityConfig,
+    Notification, Recertification, WorkOrder, WorkOrderPhoto, LeaseDocument, SMSMessage,
+    PropertyTax, COInspectionDocument, COInspectionVendor, TenantApplication, StripePayment,
+    RentPayment, TenantBankAccount, TenantAutopay, TenantVerification, LeaseBuilder,
+    LandlordPacket, Showing, InspectionReminderLog, Lead, Project, Invoice,
+    ESignEnvelope, ESignSigner, ESignAuditLog,
+)
 from webapp.auth.dependencies import get_current_user
 from webapp.services.storage_service import storage
 
@@ -686,18 +695,89 @@ async def delete_property_permanent(request: Request, property_id: int):
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
 
-        # Delete related water bills first (no CASCADE set on this table)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Permanently deleting property {property_id}: {prop.address}")
+
+        # Collect tenant IDs for this property
+        tenant_result = await session.execute(
+            select(Tenant.id).where(Tenant.property_id == property_id)
+        )
+        tenant_ids = [row[0] for row in tenant_result.all()]
+
+        # --- Delete tenant children first ---
+        if tenant_ids:
+            for model in [TenantVerification, RentPayment, StripePayment,
+                          TenantAutopay, TenantBankAccount, Recertification]:
+                await session.execute(
+                    sa_delete(model).where(model.tenant_id.in_(tenant_ids))
+                )
+
+        # --- Delete work order photos (child of work orders) ---
+        wo_result = await session.execute(
+            select(WorkOrder.id).where(WorkOrder.property_id == property_id)
+        )
+        wo_ids = [row[0] for row in wo_result.all()]
+        if wo_ids:
+            await session.execute(
+                sa_delete(WorkOrderPhoto).where(WorkOrderPhoto.work_order_id.in_(wo_ids))
+            )
+
+        # --- Delete project children (child of projects) ---
+        from database.models import ProjectDocument, ProjectDraw
+        proj_result = await session.execute(
+            select(Project.id).where(Project.property_id == property_id)
+        )
+        proj_ids = [row[0] for row in proj_result.all()]
+        if proj_ids:
+            await session.execute(
+                sa_delete(ProjectDocument).where(ProjectDocument.project_id.in_(proj_ids))
+            )
+            await session.execute(
+                sa_delete(ProjectDraw).where(ProjectDraw.project_id.in_(proj_ids))
+            )
+
+        # --- Delete e-sign chain (envelope → signers/audit via lease_documents) ---
+        ld_result = await session.execute(
+            select(LeaseDocument.id).where(LeaseDocument.property_id == property_id)
+        )
+        ld_ids = [row[0] for row in ld_result.all()]
+        if ld_ids:
+            env_result = await session.execute(
+                select(ESignEnvelope.id).where(ESignEnvelope.lease_document_id.in_(ld_ids))
+            )
+            env_ids = [row[0] for row in env_result.all()]
+            if env_ids:
+                await session.execute(
+                    sa_delete(ESignAuditLog).where(ESignAuditLog.envelope_id.in_(env_ids))
+                )
+                await session.execute(
+                    sa_delete(ESignSigner).where(ESignSigner.envelope_id.in_(env_ids))
+                )
+                await session.execute(
+                    sa_delete(ESignEnvelope).where(ESignEnvelope.id.in_(env_ids))
+                )
+
+        # --- Delete all direct property children ---
+        for model in [Notification, SMSMessage, Invoice, RentPayment,
+                      StripePayment, Recertification, WorkOrder, Project,
+                      LeaseDocument, LeaseBuilder, LandlordPacket, PropertyPhoto,
+                      PropertyTax, InspectionViolation, COInspectionDocument,
+                      COInspectionVendor, InspectionReminderLog, Showing,
+                      TenantApplication, WaterBill, Tenant]:
+            await session.execute(
+                sa_delete(model).where(model.property_id == property_id)
+            )
+
+        # Nullify property_id on leads (SET NULL relationship)
         await session.execute(
-            WaterBill.__table__.delete().where(WaterBill.property_id == property_id)
+            sa_delete(Lead).where(Lead.property_id == property_id)
         )
 
-        # Delete related tenants
+        # Finally delete the property itself
         await session.execute(
-            Tenant.__table__.delete().where(Tenant.property_id == property_id)
+            sa_delete(Property).where(Property.id == property_id)
         )
-
-        # Now delete the property
-        await session.delete(prop)
         await session.commit()
 
     return RedirectResponse(url="/properties", status_code=303)
