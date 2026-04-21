@@ -253,6 +253,13 @@ async def edit_lease_form(request: Request, lease_id: int):
         )
         tenants = tenants_result.scalars().all()
 
+        # Find associated LeaseBuilder (if this lease was built, not uploaded)
+        from database.models import LeaseBuilder
+        builder_result = await session.execute(
+            select(LeaseBuilder).where(LeaseBuilder.lease_document_id == lease_id)
+        )
+        builder = builder_result.scalar_one_or_none()
+
     return templates.TemplateResponse(
         "leases/form.html",
         {
@@ -261,6 +268,7 @@ async def edit_lease_form(request: Request, lease_id: int):
             "lease": lease,
             "properties": properties,
             "tenants": tenants,
+            "builder": builder,
         }
     )
 
