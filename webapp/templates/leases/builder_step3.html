@@ -42,6 +42,7 @@
                         {% endif %}
                     </div>
                     <input type="text" name="tenant_name" value="{{ t.get('name', '') }}" placeholder="Full legal name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <input type="text" name="tenant_dba" value="{{ t.get('dba', '') }}" placeholder="DBA / Business name (optional)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                     <div class="grid grid-cols-2 gap-3">
                         <input type="email" name="tenant_email" value="{{ t.get('email', '') }}" placeholder="Email" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                         <input type="tel" name="tenant_phone" value="{{ t.get('phone', '') }}" placeholder="Phone" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -147,6 +148,7 @@ function addTenant() {
             <button type="button" onclick="this.closest('.tenant-row').remove()" class="text-xs text-red-500 hover:text-red-700">Remove</button>
         </div>
         <input type="text" name="tenant_name" placeholder="Full legal name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <input type="text" name="tenant_dba" placeholder="DBA / Business name (optional)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
         <div class="grid grid-cols-2 gap-3">
             <input type="email" name="tenant_email" placeholder="Email" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
             <input type="tel" name="tenant_phone" placeholder="Phone" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">

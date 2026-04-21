@@ -338,10 +338,16 @@ async def save_step(request: Request, builder_id: int, step: int):
             tenant_names = form.getlist("tenant_name")
             tenant_emails = form.getlist("tenant_email")
             tenant_phones = form.getlist("tenant_phone")
+            tenant_dbas = form.getlist("tenant_dba")
             tenants = []
-            for name, email, phone in zip(tenant_names, tenant_emails, tenant_phones):
+            for i, name in enumerate(tenant_names):
                 if name:
-                    tenants.append({"name": name, "email": email, "phone": phone})
+                    tenants.append({
+                        "name": name,
+                        "email": tenant_emails[i] if i < len(tenant_emails) else "",
+                        "phone": tenant_phones[i] if i < len(tenant_phones) else "",
+                        "dba": tenant_dbas[i] if i < len(tenant_dbas) else "",
+                    })
             data["tenants"] = tenants
 
             # Additional occupants
@@ -671,6 +677,7 @@ async def save_quick_edit(request: Request, builder_id: int):
         names = form.getlist("tenant_name")
         emails = form.getlist("tenant_email")
         phones = form.getlist("tenant_phone")
+        dbas = form.getlist("tenant_dba")
         ids = form.getlist("tenant_id")
         tenants = []
         for i, name in enumerate(names):
@@ -679,6 +686,7 @@ async def save_quick_edit(request: Request, builder_id: int):
                     "name": name.strip(),
                     "email": emails[i] if i < len(emails) else "",
                     "phone": phones[i] if i < len(phones) else "",
+                    "dba": dbas[i] if i < len(dbas) else "",
                     "id": ids[i] if i < len(ids) else "",
                 })
         data["tenants"] = tenants

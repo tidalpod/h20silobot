@@ -180,7 +180,7 @@
     <p style="font-size: 11pt;">Rental Agreement between:</p>
     <p class="cover-entity">{{ landlord.get('entity_name', '___________') }}</p>
     <p class="cover-between">and</p>
-    <p class="cover-entity">{% for t in tenants %}{{ t.get('name', '') }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    <p class="cover-entity">{% for t in tenants %}{{ t.get('name', '') }}{% if t.get('dba') %} d/b/a {{ t.get('dba') }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
     <p class="cover-date">Dated: {{ format_date(lease_data.get('start_date', '')) }}</p>
 
     <h2 style="margin-top: 30pt;">Summary of Key Information</h2>
@@ -295,12 +295,14 @@
 <table class="data-table">
     <tr>
         <th>Tenant Name</th>
+        <th>DBA / Business</th>
         <th>Tenant Email</th>
         <th>Tenant Phone</th>
     </tr>
     {% for t in tenants %}
     <tr>
         <td>{{ t.get('name', '') }}</td>
+        <td>{{ t.get('dba', '') or '—' }}</td>
         <td>{{ t.get('email', '') or 'N/A' }}</td>
         <td>{{ t.get('phone', '') or 'N/A' }}</td>
     </tr>

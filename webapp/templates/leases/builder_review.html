@@ -129,7 +129,7 @@
             <div>
                 <p class="text-gray-500 mb-1">Tenants:</p>
                 {% for t in data.get('tenants', []) %}
-                <p class="font-medium text-gray-900">{{ t.name }}{% if t.email %} ({{ t.email }}){% endif %}</p>
+                <p class="font-medium text-gray-900">{{ t.name }}{% if t.get('dba') %} <span class="text-gray-500 font-normal">d/b/a {{ t.dba }}</span>{% endif %}{% if t.email %} ({{ t.email }}){% endif %}</p>
                 {% endfor %}
             </div>
             {% if data.get('additional_occupants') %}
