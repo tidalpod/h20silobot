@@ -334,7 +334,15 @@ def generate_lease_pdf(data: dict, property_info: dict, tenant_info: dict, landl
     os.close(fd)
 
     try:
-        HTML(string=html).write_pdf(tmp_path)
+        from weasyprint import CSS
+        # Disable remote URL fetching to prevent font downloads from hanging the server
+        def url_fetcher(url, timeout=10, ssl_context=None):
+            if url.startswith(('http://', 'https://')):
+                raise ValueError(f"Remote URL fetching disabled: {url}")
+            from weasyprint import default_url_fetcher
+            return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
+
+        HTML(string=html, url_fetcher=url_fetcher).write_pdf(tmp_path)
         file_size = Path(tmp_path).stat().st_size
         file_url = storage.upload_from_path(key, tmp_path, "application/pdf")
     except Exception as e:
@@ -380,7 +388,13 @@ def generate_signed_lease_pdf(data: dict, property_info: dict, tenant_info: dict
     os.close(fd)
 
     try:
-        HTML(string=html).write_pdf(tmp_path)
+        def url_fetcher(url, timeout=10, ssl_context=None):
+            if url.startswith(('http://', 'https://')):
+                raise ValueError(f"Remote URL fetching disabled: {url}")
+            from weasyprint import default_url_fetcher
+            return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
+
+        HTML(string=html, url_fetcher=url_fetcher).write_pdf(tmp_path)
         file_size = Path(tmp_path).stat().st_size
         # Don't upload to R2 yet — caller may append audit trail first
     except Exception as e:
