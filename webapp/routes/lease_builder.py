@@ -601,6 +601,168 @@ async def builder_generate(request: Request, builder_id: int):
     return RedirectResponse(url=f"/leases/{lease_doc.id}", status_code=303)
 
 
+@router.get("/{builder_id}/edit", response_class=HTMLResponse)
+async def builder_quick_edit(request: Request, builder_id: int):
+    """Quick-edit page for key lease fields."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(LeaseBuilder)
+            .where(LeaseBuilder.id == builder_id)
+            .options(
+                selectinload(LeaseBuilder.property_ref),
+                selectinload(LeaseBuilder.tenant_ref),
+            )
+        )
+        builder = result.scalar_one_or_none()
+        if not builder:
+            return RedirectResponse(url="/leases/builder", status_code=303)
+
+        data = _get_lease_data(builder)
+
+    return templates.TemplateResponse(
+        "leases/builder_quick_edit.html",
+        {
+            "request": request,
+            "user": user,
+            "builder": builder,
+            "data": data,
+            "property": builder.property_ref,
+        },
+    )
+
+
+@router.post("/{builder_id}/quick-edit")
+async def save_quick_edit(request: Request, builder_id: int):
+    """Save quick-edit fields and regenerate PDF."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(LeaseBuilder)
+            .where(LeaseBuilder.id == builder_id)
+            .options(
+                selectinload(LeaseBuilder.property_ref),
+                selectinload(LeaseBuilder.tenant_ref),
+            )
+        )
+        builder = result.scalar_one_or_none()
+        if not builder:
+            return RedirectResponse(url="/leases/builder", status_code=303)
+
+        data = _get_lease_data(builder)
+
+        # Update lease terms
+        data["start_date"] = form.get("start_date", data.get("start_date", ""))
+        data["end_date"] = form.get("end_date", data.get("end_date", ""))
+        data["monthly_rent"] = float(form.get("monthly_rent", 0) or 0)
+        data["security_deposit"] = float(form.get("security_deposit", 0) or 0)
+        data["late_fee_daily"] = float(form.get("late_fee_daily", 15) or 15)
+        data["rent_due_day"] = int(form.get("rent_due_day", 1) or 1)
+
+        # Update tenants
+        names = form.getlist("tenant_name")
+        emails = form.getlist("tenant_email")
+        phones = form.getlist("tenant_phone")
+        ids = form.getlist("tenant_id")
+        tenants = []
+        for i, name in enumerate(names):
+            if name.strip():
+                tenants.append({
+                    "name": name.strip(),
+                    "email": emails[i] if i < len(emails) else "",
+                    "phone": phones[i] if i < len(phones) else "",
+                    "id": ids[i] if i < len(ids) else "",
+                })
+        data["tenants"] = tenants
+
+        # Update landlord
+        landlord = data.get("landlord", {})
+        landlord["entity_name"] = form.get("landlord_entity_name", landlord.get("entity_name", ""))
+        landlord["owner_name"] = form.get("landlord_owner_name", landlord.get("owner_name", ""))
+        landlord["email"] = form.get("landlord_email", landlord.get("email", ""))
+        landlord["phone"] = form.get("landlord_phone", landlord.get("phone", ""))
+        data["landlord"] = landlord
+
+        _save_lease_data(builder, data)
+
+        # Regenerate PDF if already generated
+        if builder.status == LeaseBuilderStatus.GENERATED and builder.lease_document_id:
+            prop = builder.property_ref
+            property_info = {
+                "address": prop.address if prop else "",
+                "city": prop.city if prop else "",
+                "state": prop.state or "MI",
+                "zip_code": prop.zip_code if prop else "",
+                "year_built": prop.year_built if prop else None,
+            }
+            tenant_info = {
+                "name": tenants[0]["name"] if tenants else "",
+                "email": tenants[0].get("email", "") if tenants else "",
+                "phone": tenants[0].get("phone", "") if tenants else "",
+            }
+            landlord_info = data.get("landlord", {})
+
+            pdf_result = generate_lease_pdf(data, property_info, tenant_info, landlord_info)
+            if "error" in pdf_result:
+                return RedirectResponse(
+                    url=f"/leases/builder/{builder_id}/edit?error={pdf_result['error']}",
+                    status_code=303,
+                )
+
+            # Parse dates for LeaseDocument
+            lease_start = None
+            lease_end = None
+            if data.get("start_date"):
+                try:
+                    lease_start = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+            if data.get("end_date"):
+                try:
+                    lease_end = datetime.strptime(data["end_date"], "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+
+            is_comprehensive = data.get("template_type") == "comprehensive"
+            lease_title = (
+                f"Michigan Master Lease - {prop.address if prop else 'Unknown'}"
+                if is_comprehensive
+                else f"Michigan Lease - {prop.address if prop else 'Unknown'}"
+            )
+
+            resolved_tenant_id = builder.tenant_id
+            if not resolved_tenant_id and tenants and tenants[0].get("id"):
+                resolved_tenant_id = int(tenants[0]["id"])
+
+            doc_result = await session.execute(
+                select(LeaseDocument).where(LeaseDocument.id == builder.lease_document_id)
+            )
+            lease_doc = doc_result.scalar_one_or_none()
+            if lease_doc:
+                lease_doc.tenant_id = resolved_tenant_id
+                lease_doc.title = lease_title
+                lease_doc.file_url = pdf_result["file_url"]
+                lease_doc.file_size = pdf_result["file_size"]
+                lease_doc.lease_start = lease_start
+                lease_doc.lease_end = lease_end
+                lease_doc.monthly_rent = data.get("monthly_rent")
+
+            builder.generated_at = datetime.utcnow()
+
+    return RedirectResponse(
+        url=f"/leases/builder/{builder_id}/edit?success=1",
+        status_code=303,
+    )
+
+
 @router.post("/{builder_id}/delete")
 async def builder_delete(request: Request, builder_id: int):
     """Delete draft."""
