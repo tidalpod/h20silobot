@@ -547,22 +547,54 @@ async def builder_generate(request: Request, builder_id: int):
             if tenants_in_data and tenants_in_data[0].get("id"):
                 resolved_tenant_id = int(tenants_in_data[0]["id"])
 
-        lease_doc = LeaseDocument(
-            property_id=builder.property_id,
-            tenant_id=resolved_tenant_id,
-            title=lease_title,
-            file_url=pdf_result["file_url"],
-            file_type="pdf",
-            file_size=pdf_result["file_size"],
-            lease_start=lease_start,
-            lease_end=lease_end,
-            monthly_rent=data.get("monthly_rent"),
-            status=LeaseStatus.ACTIVE,
-        )
-        session.add(lease_doc)
-        await session.flush()
+        # Regenerate: update existing LeaseDocument if already generated
+        if builder.lease_document_id:
+            doc_result = await session.execute(
+                select(LeaseDocument).where(LeaseDocument.id == builder.lease_document_id)
+            )
+            lease_doc = doc_result.scalar_one_or_none()
+            if lease_doc:
+                lease_doc.tenant_id = resolved_tenant_id
+                lease_doc.title = lease_title
+                lease_doc.file_url = pdf_result["file_url"]
+                lease_doc.file_size = pdf_result["file_size"]
+                lease_doc.lease_start = lease_start
+                lease_doc.lease_end = lease_end
+                lease_doc.monthly_rent = data.get("monthly_rent")
+            else:
+                # LeaseDocument was deleted — create fresh
+                lease_doc = LeaseDocument(
+                    property_id=builder.property_id,
+                    tenant_id=resolved_tenant_id,
+                    title=lease_title,
+                    file_url=pdf_result["file_url"],
+                    file_type="pdf",
+                    file_size=pdf_result["file_size"],
+                    lease_start=lease_start,
+                    lease_end=lease_end,
+                    monthly_rent=data.get("monthly_rent"),
+                    status=LeaseStatus.ACTIVE,
+                )
+                session.add(lease_doc)
+                await session.flush()
+                builder.lease_document_id = lease_doc.id
+        else:
+            lease_doc = LeaseDocument(
+                property_id=builder.property_id,
+                tenant_id=resolved_tenant_id,
+                title=lease_title,
+                file_url=pdf_result["file_url"],
+                file_type="pdf",
+                file_size=pdf_result["file_size"],
+                lease_start=lease_start,
+                lease_end=lease_end,
+                monthly_rent=data.get("monthly_rent"),
+                status=LeaseStatus.ACTIVE,
+            )
+            session.add(lease_doc)
+            await session.flush()
+            builder.lease_document_id = lease_doc.id
 
-        builder.lease_document_id = lease_doc.id
         builder.status = LeaseBuilderStatus.GENERATED
         builder.generated_at = datetime.utcnow()
 

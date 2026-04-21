@@ -73,6 +73,7 @@
                     <a href="/leases/builder/{{ b.id }}/step/{{ b.current_step }}" class="text-sm text-blue-600 hover:text-blue-500 font-medium">Continue</a>
                     {% elif b.status.value == 'generated' and b.lease_document_id %}
                     <a href="/leases/{{ b.lease_document_id }}" class="text-sm text-blue-600 hover:text-blue-500 font-medium">View Lease</a>
+                    <a href="/leases/builder/{{ b.id }}/review" class="ml-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Edit</a>
                     {% endif %}
                     <form method="POST" action="/leases/builder/{{ b.id }}/delete" class="inline ml-3" onsubmit="return confirm('Delete this draft?')">
                         <button type="submit" class="text-sm text-red-500 hover:text-red-700">Delete</button>

@@ -245,12 +245,17 @@
     <!-- Generate Button -->
     <div class="flex justify-between items-center bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div>
+            {% if builder.status.value == 'generated' %}
+            <h3 class="font-semibold text-gray-900">Regenerate lease?</h3>
+            <p class="text-sm text-gray-500">This will replace the existing PDF with an updated version</p>
+            {% else %}
             <h3 class="font-semibold text-gray-900">Ready to generate?</h3>
             <p class="text-sm text-gray-500">This will create a {% if data.get('template_type') == 'comprehensive' %}Michigan Comprehensive Residential Rental Agreement{% else %}Michigan Residential Rental Agreement{% endif %} PDF</p>
+            {% endif %}
         </div>
         <form method="POST" action="/leases/builder/{{ builder.id }}/generate">
-            <button type="submit" class="px-8 py-3 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-500 shadow-sm transition-colors">
-                Generate Lease PDF
+            <button type="submit" class="px-8 py-3 rounded-lg text-sm font-medium text-white {{ 'bg-blue-600 hover:bg-blue-500' if builder.status.value == 'generated' else 'bg-green-600 hover:bg-green-500' }} shadow-sm transition-colors">
+                {{ 'Regenerate Lease PDF' if builder.status.value == 'generated' else 'Generate Lease PDF' }}
             </button>
         </form>
     </div>
