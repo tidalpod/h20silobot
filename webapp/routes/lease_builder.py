@@ -426,6 +426,7 @@ async def save_step(request: Request, builder_id: int, step: int):
             data["keys"] = keys
 
         elif step == 6:
+            data["subletting_policy"] = form.get("subletting_policy", "consent")
             data["early_termination"] = form.get("early_termination") == "true"
             data["additional_terms"] = form.get("additional_terms", "")
             data["lead_paint_disclosure"] = form.get("lead_paint_disclosure") == "true"

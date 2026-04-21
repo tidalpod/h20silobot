@@ -224,7 +224,11 @@
             <h2 class="text-lg font-semibold text-gray-900">6. Provisions</h2>
             <a href="/leases/builder/{{ builder.id }}/step/6" class="text-sm text-blue-600 hover:text-blue-500">Edit</a>
         </div>
-        <dl class="grid grid-cols-2 gap-4 text-sm">
+        <dl class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+                <dt class="text-gray-500">Subletting</dt>
+                <dd class="font-medium text-gray-900">{% if data.get('subletting_policy') == 'not_allowed' %}Not Allowed{% elif data.get('subletting_policy') == 'allowed' %}Allowed{% else %}With Written Consent{% endif %}</dd>
+            </div>
             <div>
                 <dt class="text-gray-500">Early Termination</dt>
                 <dd class="font-medium text-gray-900">{{ 'Included' if data.get('early_termination') else 'Not Included' }}</dd>

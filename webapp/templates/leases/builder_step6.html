@@ -29,6 +29,35 @@
 
 <form method="POST" action="/leases/builder/{{ builder.id }}/step/6">
     <div class="max-w-2xl space-y-6">
+        <!-- Subletting Policy -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-900">Assignment & Subletting</h2>
+            <p class="text-xs text-gray-500">Choose whether tenants may assign or sublet the premises</p>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="subletting_policy" value="not_allowed" {% if data.get('subletting_policy', 'consent') == 'not_allowed' %}checked{% endif %} class="text-blue-600">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Not Allowed</p>
+                        <p class="text-xs text-gray-500">Tenant may not assign or sublet under any circumstances</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="subletting_policy" value="consent" {% if data.get('subletting_policy', 'consent') == 'consent' %}checked{% endif %} class="text-blue-600">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">With Written Consent</p>
+                        <p class="text-xs text-gray-500">Subletting allowed only with prior written consent of Landlord</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="subletting_policy" value="allowed" {% if data.get('subletting_policy', 'consent') == 'allowed' %}checked{% endif %} class="text-blue-600">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Allowed</p>
+                        <p class="text-xs text-gray-500">Tenant may freely assign or sublet the premises</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <!-- Early Termination -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
             <h2 class="text-lg font-semibold text-gray-900">Early Termination Clause</h2>

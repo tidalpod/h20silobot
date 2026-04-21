@@ -147,6 +147,45 @@ def _build_section_2(data: dict, provision_templates: list = None) -> list:
     return provisions
 
 
+_SUBLETTING_TEXT = {
+    "not_allowed": (
+        "Tenant shall not assign this Agreement, or sublet or grant any license to use the "
+        "Premises or any part thereof. Any assignment, subletting, or license shall be absolutely "
+        "null and void and shall, at Landlord's option, terminate this Agreement."
+    ),
+    "consent": (
+        "Tenant shall not assign this Agreement, or sublet or grant any license to use the "
+        "Premises or any part thereof without the prior written consent of Landlord. Consent by "
+        "Landlord to one such assignment, subletting, or license shall not be deemed to be consent "
+        "to any subsequent assignment, subletting, or license. An assignment, subletting, or "
+        "license without the prior written consent of Landlord or an assignment or subletting by "
+        "operation of law shall be absolutely null and void and shall, at Landlord's option, "
+        "terminate this Agreement."
+    ),
+    "allowed": (
+        "Tenant may assign this Agreement or sublet the Premises, or any part thereof, upon "
+        "written notice to Landlord. Tenant shall remain jointly and severally liable with any "
+        "assignee or subtenant for all obligations under this Agreement unless Landlord agrees "
+        "in writing to release Tenant from such liability."
+    ),
+}
+
+
+def _build_section_3(data: dict, provision_templates: list) -> list:
+    """Build Section 3 (General Provisions), swapping subletting text based on policy."""
+    subletting_policy = data.get("subletting_policy", "consent")
+    provisions = []
+    for prov in provision_templates:
+        if prov["title"] == "ASSIGNMENT AND SUBLETTING":
+            provisions.append({
+                "title": prov["title"],
+                "text": _SUBLETTING_TEXT.get(subletting_policy, _SUBLETTING_TEXT["consent"]),
+            })
+        else:
+            provisions.append(prov)
+    return provisions
+
+
 def _build_section_4(data: dict) -> list:
     """Build Section 4 (Tenant Responsibilities) for comprehensive lease."""
     provisions = []
@@ -211,11 +250,11 @@ def generate_lease_html(data: dict, property_info: dict, tenant_info: dict,
 
     if is_comprehensive:
         section_2 = _build_section_2(data, COMPREHENSIVE_SECTION_2_PROVISIONS)
-        section_3 = COMPREHENSIVE_SECTION_3_PROVISIONS
+        section_3 = _build_section_3(data, COMPREHENSIVE_SECTION_3_PROVISIONS)
         section_4 = _build_section_4(data)
     else:
         section_2 = _build_section_2(data, SECTION_2_PROVISIONS)
-        section_3 = SECTION_3_GENERAL_PROVISIONS
+        section_3 = _build_section_3(data, SECTION_3_GENERAL_PROVISIONS)
         section_4 = None
 
     # Build tenant list
