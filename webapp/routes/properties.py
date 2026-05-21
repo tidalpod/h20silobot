@@ -381,7 +381,9 @@ async def property_detail(request: Request, property_id: int):
                 selectinload(Property.bills),
                 selectinload(Property.tenants).selectinload(Tenant.pha),
                 selectinload(Property.taxes),
-                selectinload(Property.violations)
+                selectinload(Property.violations),
+                selectinload(Property.work_orders).selectinload(WorkOrder.vendor_ref),
+                selectinload(Property.work_orders).selectinload(WorkOrder.tenant_ref),
             )
         )
         prop = result.scalar_one_or_none()
@@ -411,6 +413,7 @@ async def property_detail(request: Request, property_id: int):
             "bills": prop.bills[:10],  # Last 10 bills
             "today": datetime.now().date(),  # For expiry date comparisons
             "violations": prop.violations,
+            "work_orders": prop.work_orders,
         }
     )
 

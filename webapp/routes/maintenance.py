@@ -410,7 +410,7 @@ async def vendor_detail(request: Request, vendor_id: int):
 # =============================================================================
 
 @router.get("/new", response_class=HTMLResponse)
-async def new_work_order_form(request: Request):
+async def new_work_order_form(request: Request, property_id: int | None = None):
     """Create work order form"""
     user = await get_current_user(request)
     if not user:
@@ -432,6 +432,10 @@ async def new_work_order_form(request: Request):
         )
         vendors = vendors_result.scalars().all()
 
+        preselected_property = None
+        if property_id:
+            preselected_property = next((p for p in properties if p.id == property_id), None)
+
     return templates.TemplateResponse(
         "maintenance/form.html",
         {
@@ -443,6 +447,7 @@ async def new_work_order_form(request: Request):
             "vendors": vendors,
             "priorities": WorkOrderPriority,
             "categories": WorkOrderCategory,
+            "preselected_property": preselected_property,
         }
     )
 

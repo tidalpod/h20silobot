@@ -34,11 +34,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="relative">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Property *</label>
-                    <input type="hidden" name="property_id" id="property-id-input" required value="{{ work_order.property_id if work_order else '' }}">
+                    <input type="hidden" name="property_id" id="property-id-input" required value="{{ work_order.property_id if work_order else (preselected_property.id if preselected_property else '') }}">
                     <input type="text" id="property-search" autocomplete="off"
                         class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                         placeholder="Search by address..."
-                        value="{% if work_order and work_order.property_ref %}{{ work_order.property_ref.address }}{% endif %}">
+                        value="{% if work_order and work_order.property_ref %}{{ work_order.property_ref.address }}{% elif preselected_property %}{{ preselected_property.address }}{% endif %}">
                     <div id="property-dropdown" class="hidden absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto"></div>
                 </div>
                 <div class="relative">
