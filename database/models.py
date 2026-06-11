@@ -1615,6 +1615,23 @@ class InspectionReminderLog(Base):
     )
 
 
+class RecertReminderLog(Base):
+    """Tracks which recertification reminders have been sent per milestone (30/14/7/3/1/0 days)."""
+    __tablename__ = "recert_reminder_log"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    recert_date = Column(Date, nullable=False)
+    milestone = Column(Integer, nullable=False)  # 30, 14, 7, 3, 1, 0
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant")
+
+    __table_args__ = (
+        Index("ix_recert_reminder_log_unique", "tenant_id", "recert_date", "milestone", unique=True),
+    )
+
+
 class ESignEnvelope(Base):
     """E-signature envelope tracking (in-house or legacy DocuSign)."""
     __tablename__ = "esign_envelopes"

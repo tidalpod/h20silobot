@@ -12,6 +12,20 @@ from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
+RECERT_MILESTONES = [0, 1, 3, 7, 14, 30]
+
+
+def _current_recert_milestone(days_until: int, max_days: int) -> Optional[int]:
+    """Return the smallest milestone in [0, max_days] that is >= days_until, or None."""
+    if days_until < 0:
+        return None
+    for m in RECERT_MILESTONES:
+        if m > max_days:
+            return None
+        if days_until <= m:
+            return m
+    return None
+
 
 class BlueDeerBot:
     """Blue Deer notification bot"""
@@ -46,6 +60,14 @@ class BlueDeerBot:
         except Exception as e:
             logger.error(f"Database init failed: {e}")
             self.db_available = False
+
+        # Run recert reminder log migration (idempotent)
+        if self.db_available:
+            try:
+                from database.migrations.add_recert_reminder_log import run_migration as run_recert_migration
+                await run_recert_migration()
+            except Exception as e:
+                logger.warning(f"Recert reminder migration skipped: {e}")
 
         # Set up Telegram bot
         logger.info(f"Setting up Blue Deer bot...")
@@ -227,7 +249,7 @@ class BlueDeerBot:
                 logger.error(f"Failed to send notification to {cid}: {e}")
 
     async def send_recert_reminders(self):
-        """Send reminders for upcoming recertifications"""
+        """Send recert reminders only at milestone days (30/14/7/3/1/0), once per milestone."""
         if not self.db_available:
             return
 
@@ -235,7 +257,7 @@ class BlueDeerBot:
 
         try:
             from database.connection import get_session
-            from database.models import Tenant, Property
+            from database.models import Tenant, RecertReminderLog
             from sqlalchemy import select
             from sqlalchemy.orm import selectinload
             from dateutil.relativedelta import relativedelta
@@ -243,7 +265,6 @@ class BlueDeerBot:
             today = date.today()
 
             async with get_session() as session:
-                # Get active Section 8 tenants with lease dates
                 result = await session.execute(
                     select(Tenant)
                     .where(
@@ -258,42 +279,64 @@ class BlueDeerBot:
                 reminders = []
 
                 for tenant in tenants:
-                    if tenant.lease_start_date:
-                        # Recert eligible date is 9 months after lease start
-                        recert_date = tenant.lease_start_date + relativedelta(months=9)
-                        days_until = (recert_date - today).days
+                    if not tenant.lease_start_date:
+                        continue
 
-                        # Send reminder if within the reminder window
-                        if 0 <= days_until <= self.recert_reminder_days:
-                            prop = tenant.property_ref
-                            reminders.append({
-                                "tenant": tenant.name,
-                                "property": prop.address if prop else "Unknown",
-                                "recert_date": recert_date,
-                                "days_until": days_until
-                            })
+                    recert_date = tenant.lease_start_date + relativedelta(months=9)
+                    days_until = (recert_date - today).days
+                    milestone = _current_recert_milestone(days_until, self.recert_reminder_days)
+                    if milestone is None:
+                        continue
 
-                if reminders:
-                    message = "🦌 *Blue Deer - Recertification Reminders*\n\n"
-                    for r in reminders:
-                        if r["days_until"] == 0:
-                            urgency = "⚠️ *TODAY*"
-                        elif r["days_until"] <= 7:
-                            urgency = f"🔴 {r['days_until']} days"
-                        elif r["days_until"] <= 14:
-                            urgency = f"🟡 {r['days_until']} days"
-                        else:
-                            urgency = f"🟢 {r['days_until']} days"
+                    existing = await session.execute(
+                        select(RecertReminderLog.id).where(
+                            RecertReminderLog.tenant_id == tenant.id,
+                            RecertReminderLog.recert_date == recert_date,
+                            RecertReminderLog.milestone == milestone,
+                        )
+                    )
+                    if existing.scalar_one_or_none() is not None:
+                        continue
 
-                        message += f"• *{r['tenant']}*\n"
-                        message += f"  📍 {r['property']}\n"
-                        message += f"  📅 Recert eligible: {r['recert_date'].strftime('%b %d, %Y')}\n"
-                        message += f"  ⏰ {urgency}\n\n"
+                    prop = tenant.property_ref
+                    reminders.append({
+                        "tenant": tenant.name,
+                        "property": prop.address if prop else "Unknown",
+                        "recert_date": recert_date,
+                        "days_until": days_until,
+                        "milestone": milestone,
+                    })
+                    # Log BEFORE sending so a delivery failure won't cause tomorrow's retry spam
+                    session.add(RecertReminderLog(
+                        tenant_id=tenant.id,
+                        recert_date=recert_date,
+                        milestone=milestone,
+                    ))
 
-                    await self.send_notification(message)
-                    logger.info(f"Sent {len(reminders)} recert reminders")
-                else:
+                if not reminders:
                     logger.info("No recert reminders needed")
+                    return
+
+                await session.commit()
+
+            message = "🦌 *Blue Deer - Recertification Reminders*\n\n"
+            for r in reminders:
+                if r["days_until"] == 0:
+                    urgency = "⚠️ *TODAY*"
+                elif r["days_until"] <= 7:
+                    urgency = f"🔴 {r['days_until']} days"
+                elif r["days_until"] <= 14:
+                    urgency = f"🟡 {r['days_until']} days"
+                else:
+                    urgency = f"🟢 {r['days_until']} days"
+
+                message += f"• *{r['tenant']}*\n"
+                message += f"  📍 {r['property']}\n"
+                message += f"  📅 Recert eligible: {r['recert_date'].strftime('%b %d, %Y')}\n"
+                message += f"  ⏰ {urgency}\n\n"
+
+            await self.send_notification(message)
+            logger.info(f"Sent {len(reminders)} recert reminders")
 
         except Exception as e:
             logger.error(f"Error sending recert reminders: {e}")
