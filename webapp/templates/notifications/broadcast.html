@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Broadcast SMS{% endblock %}
+
+{% block header %}
+<header class="bg-white shadow-sm">
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8">
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/notifications/chat" class="hover:text-gray-700">Messages</a>
+            <span>/</span>
+            <span class="text-gray-900">Broadcast</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 sm:gap-3">
+            <span>📢</span> Broadcast SMS
+        </h1>
+        <p class="mt-1 text-sm text-gray-500">Send the same message to every active tenant with a phone. Each message is sent individually — not a group chat.</p>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+    {% if not has_twilio %}
+    <div class="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+        ⚠️ Twilio is not configured on the server. Sending is disabled.
+    </div>
+    {% endif %}
+
+    {% if recipient_count == 0 %}
+    <div class="rounded-xl border border-gray-100 bg-white shadow-sm p-8 text-center">
+        <span class="text-4xl">📵</span>
+        <h3 class="mt-3 text-lg font-semibold text-gray-900">No tenants with phone numbers</h3>
+        <p class="mt-1 text-sm text-gray-500">Add phone numbers to at least one active tenant before broadcasting.</p>
+    </div>
+    {% else %}
+    <form id="broadcast-form" method="POST" action="/notifications/broadcast/send" onsubmit="return confirmSend(event)" class="space-y-5">
+        <div class="rounded-xl border border-gray-100 bg-white shadow-sm p-5 space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-medium text-gray-700">Message</label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="insertToken('{name}')" class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">+ {name}</button>
+                        <button type="button" onclick="insertToken('{address}')" class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">+ {address}</button>
+                    </div>
+                </div>
+                <textarea id="broadcast-message" name="message" rows="6" required
+                    class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                    placeholder="Hi {name}, quick update about {address}..."
+                    oninput="updatePreview()">Hi {name}, </textarea>
+                <div class="mt-1.5 flex items-center justify-between text-xs text-gray-500">
+                    <span>Tokens are replaced per-tenant.</span>
+                    <span><span id="char-count">0</span> chars</span>
+                </div>
+            </div>
+        </div>
+
+        {% if sample_tenant %}
+        <div class="rounded-xl border border-gray-100 bg-white shadow-sm p-5">
+            <div class="mb-2 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-900">Preview</h3>
+                <span class="text-xs text-gray-500">as {{ sample_tenant.name }}{% if sample_address %} · {{ sample_address }}{% endif %}</span>
+            </div>
+            <div id="preview" class="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm text-gray-800 min-h-[3rem]">—</div>
+        </div>
+        {% endif %}
+
+        <div class="flex items-center justify-between">
+            <a href="/notifications/chat" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" {% if not has_twilio %}disabled{% endif %}
+                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                Send to {{ recipient_count }} tenant{{ 's' if recipient_count != 1 else '' }}
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+    const SAMPLE_NAME = {{ (sample_tenant.name if sample_tenant else '')|tojson }};
+    const SAMPLE_ADDRESS = {{ sample_address|tojson }};
+    const RECIPIENT_COUNT = {{ recipient_count }};
+
+    function insertToken(token) {
+        const ta = document.getElementById('broadcast-message');
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+        const pos = start + token.length;
+        ta.setSelectionRange(pos, pos);
+        ta.focus();
+        updatePreview();
+    }
+
+    function updatePreview() {
+        const raw = document.getElementById('broadcast-message').value;
+        const preview = document.getElementById('preview');
+        const count = document.getElementById('char-count');
+        if (count) count.textContent = raw.length;
+        if (preview) {
+            const rendered = raw
+                .replaceAll('{name}', SAMPLE_NAME)
+                .replaceAll('{address}', SAMPLE_ADDRESS);
+            preview.textContent = rendered.trim() ? rendered : '—';
+        }
+    }
+
+    function confirmSend(e) {
+        const msg = document.getElementById('broadcast-message').value.trim();
+        if (!msg) { e.preventDefault(); return false; }
+        const ok = confirm(`Send this message to ${RECIPIENT_COUNT} tenant${RECIPIENT_COUNT === 1 ? '' : 's'}?\n\nThis cannot be undone.`);
+        if (!ok) { e.preventDefault(); return false; }
+        return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', updatePreview);
+</script>
+{% endblock %}

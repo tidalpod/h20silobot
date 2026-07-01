@@ -107,6 +107,115 @@ async def sms_chat(request: Request):
     )
 
 
+def _render_broadcast(message: str, tenant: Tenant) -> str:
+    """Personalize a broadcast message for a tenant. Uses .replace so stray braces don't crash."""
+    name = tenant.name or ""
+    address = tenant.property_ref.address if tenant.property_ref else ""
+    return message.replace("{name}", name).replace("{address}", address)
+
+
+@router.get("/broadcast", response_class=HTMLResponse)
+async def broadcast_form(request: Request):
+    """Mass-text compose page — sends the same message to every active tenant with a phone."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Tenant)
+            .where(
+                Tenant.is_active == True,
+                Tenant.phone.isnot(None),
+                Tenant.phone != "",
+            )
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
+        )
+        recipients = result.scalars().all()
+
+    sample_tenant = recipients[0] if recipients else None
+
+    return templates.TemplateResponse(
+        "notifications/broadcast.html",
+        {
+            "request": request,
+            "user": user,
+            "recipient_count": len(recipients),
+            "sample_tenant": sample_tenant,
+            "sample_address": sample_tenant.property_ref.address if sample_tenant and sample_tenant.property_ref else "",
+            "has_twilio": web_config.has_twilio,
+        }
+    )
+
+
+@router.post("/broadcast/send")
+async def send_broadcast(request: Request, message: str = Form(...)):
+    """Send a mass text to every active tenant with a phone number."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    message = message.strip()
+    if not message:
+        return RedirectResponse(url="/notifications/broadcast", status_code=303)
+
+    sent_count = 0
+    failed_count = 0
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(Tenant)
+            .where(
+                Tenant.is_active == True,
+                Tenant.phone.isnot(None),
+                Tenant.phone != "",
+            )
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
+        )
+        recipients = result.scalars().all()
+
+        for tenant in recipients:
+            body = _render_broadcast(message, tenant)
+
+            notification = Notification(
+                tenant_id=tenant.id,
+                property_id=tenant.property_id,
+                channel=NotificationChannel.SMS,
+                recipient=tenant.phone,
+                message=body,
+                status=NotificationStatus.PENDING,
+            )
+            session.add(notification)
+            await session.flush()
+
+            try:
+                send_result = await twilio_service.send_sms(tenant.phone, body)
+            except Exception as e:
+                notification.status = NotificationStatus.FAILED
+                notification.error_message = str(e)
+                failed_count += 1
+                continue
+
+            if send_result.success:
+                notification.status = NotificationStatus.SENT
+                notification.external_id = getattr(send_result, "message_sid", None)
+                notification.sent_at = datetime.utcnow()
+                sent_count += 1
+            else:
+                notification.status = NotificationStatus.FAILED
+                notification.error_message = send_result.error_message
+                failed_count += 1
+
+        await session.commit()
+
+    return RedirectResponse(
+        url=f"/notifications?broadcast_sent={sent_count}&broadcast_failed={failed_count}",
+        status_code=303,
+    )
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_notifications(request: Request, status: str = None):
     """List notification history"""
