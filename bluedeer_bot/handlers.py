@@ -34,13 +34,14 @@ async def chatid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /chatid command - shows the chat ID for this chat"""
     chat = update.effective_chat
 
+    # Plain text on purpose: chat titles can contain Markdown-special chars
+    # (underscores, asterisks) that crash the parser when Markdown is enabled.
     await update.message.reply_text(
-        f"📍 *Chat Info*\n\n"
-        f"*Chat ID:* `{chat.id}`\n"
-        f"*Type:* {chat.type}\n"
-        f"*Title:* {chat.title or 'N/A'}\n\n"
-        f"_Add this ID to `BLUEDEER_GROUP_CHAT_ID` to receive group notifications._",
-        parse_mode=ParseMode.MARKDOWN
+        f"📍 Chat Info\n\n"
+        f"Chat ID: {chat.id}\n"
+        f"Type: {chat.type}\n"
+        f"Title: {chat.title or 'N/A'}\n\n"
+        f"Add this ID to BLUEDEER_GROUP_CHAT_ID to receive group notifications."
     )
 
 
