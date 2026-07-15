@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
 from sqlalchemy import (
-    Column, Integer, String, Numeric, DateTime, Date,
+    Column, Integer, BigInteger, String, Numeric, DateTime, Date,
     ForeignKey, Text, Enum, Boolean, Index, Float
 )
 from sqlalchemy.orm import relationship, declarative_base
@@ -1962,3 +1962,20 @@ class VaultPin(Base):
     failed_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VaultAccessLog(Base):
+    """Audit trail for vault read/add/delete actions."""
+    __tablename__ = "vault_access_log"
+
+    id = Column(Integer, primary_key=True)
+    telegram_user_id = Column(BigInteger, nullable=False)
+    action = Column(String(20), nullable=False)  # 'read', 'add', 'delete'
+    entry_id = Column(Integer, nullable=True)
+    entry_label = Column(String(120), nullable=True)  # snapshot in case entry is later removed
+    at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_vault_access_log_at", "at"),
+        Index("ix_vault_access_log_user", "telegram_user_id"),
+    )

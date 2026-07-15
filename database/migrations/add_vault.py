@@ -64,6 +64,31 @@ async def run_migration():
             else:
                 logger.info("vault_pin table already exists")
 
+            result = await conn.execute(text("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_name = 'vault_access_log'
+            """))
+            if not result.fetchone():
+                await conn.execute(text("""
+                    CREATE TABLE vault_access_log (
+                        id SERIAL PRIMARY KEY,
+                        telegram_user_id BIGINT NOT NULL,
+                        action VARCHAR(20) NOT NULL,
+                        entry_id INTEGER,
+                        entry_label VARCHAR(120),
+                        at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """))
+                await conn.execute(text("""
+                    CREATE INDEX ix_vault_access_log_at ON vault_access_log (at)
+                """))
+                await conn.execute(text("""
+                    CREATE INDEX ix_vault_access_log_user ON vault_access_log (telegram_user_id)
+                """))
+                logger.info("Created vault_access_log table")
+            else:
+                logger.info("vault_access_log table already exists")
+
         logger.info("Vault migration completed successfully")
         return True
 

@@ -43,25 +43,59 @@ MAX_LABEL_LEN = 120
 
 # ── admin gate ──────────────────────────────────────────────────────
 
-def _admin_id() -> Optional[int]:
-    val = os.getenv("BLUEDEER_ADMIN_TELEGRAM_ID", "").strip()
-    if not val:
-        return None
-    try:
-        return int(val)
-    except ValueError:
-        return None
+def _allowed_user_ids() -> set:
+    """Whitelist of Telegram user IDs allowed to access the vault.
+
+    Reads BLUEDEER_VAULT_USER_IDS (comma-separated). Falls back to
+    BLUEDEER_ADMIN_TELEGRAM_ID for backward compatibility with the
+    single-admin setup. Silently drops non-integer tokens.
+    """
+    ids: set = set()
+    raw = os.getenv("BLUEDEER_VAULT_USER_IDS", "").strip()
+    if raw:
+        for token in raw.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                ids.add(int(token))
+            except ValueError:
+                logger.warning(f"Vault: ignoring non-int BLUEDEER_VAULT_USER_IDS entry: {token!r}")
+    admin = os.getenv("BLUEDEER_ADMIN_TELEGRAM_ID", "").strip()
+    if admin:
+        try:
+            ids.add(int(admin))
+        except ValueError:
+            pass
+    return ids
 
 
 def _is_admin(update: Update) -> bool:
-    admin = _admin_id()
     user = update.effective_user
-    return user is not None and admin is not None and user.id == admin
+    if user is None:
+        return False
+    return user.id in _allowed_user_ids()
 
 
 def _is_private(update: Update) -> bool:
     chat = update.effective_chat
     return chat is not None and chat.type == "private"
+
+
+# ── audit log ───────────────────────────────────────────────────────
+
+async def _log_access(session, user_id: int, action: str, entry_id: Optional[int] = None, entry_label: Optional[str] = None) -> None:
+    """Best-effort audit log. Failures are logged and swallowed."""
+    from database.models import VaultAccessLog
+    try:
+        session.add(VaultAccessLog(
+            telegram_user_id=user_id,
+            action=action,
+            entry_id=entry_id,
+            entry_label=entry_label,
+        ))
+    except Exception as e:
+        logger.warning(f"Vault: failed to write access log: {e}")
 
 
 # ── session state (in-memory, per user) ─────────────────────────────
@@ -308,6 +342,8 @@ async def vault_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 password_encrypted=encrypted,
             )
             session.add(entry)
+            await session.flush()
+            await _log_access(session, update.effective_user.id, "add", entry.id, entry.label)
             await session.commit()
         # Refresh TTL since they just acted
         _mark_unlocked(context)
@@ -392,17 +428,19 @@ async def vault_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         async with get_session() as session:
             result = await session.execute(select(VaultEntry).where(VaultEntry.id == entry_id))
             entry = result.scalar_one_or_none()
-        if entry is None:
-            await query.edit_message_text("Entry not found.", reply_markup=_main_menu_kb())
-            return
-        try:
-            password = vault_crypto.decrypt(entry.password_encrypted)
-        except vault_crypto.VaultCryptoError:
-            await query.edit_message_text(
-                f"⚠️ Unable to decrypt “{entry.label}” — key may have been rotated.",
-                reply_markup=_main_menu_kb(),
-            )
-            return
+            if entry is None:
+                await query.edit_message_text("Entry not found.", reply_markup=_main_menu_kb())
+                return
+            try:
+                password = vault_crypto.decrypt(entry.password_encrypted)
+            except vault_crypto.VaultCryptoError:
+                await query.edit_message_text(
+                    f"⚠️ Unable to decrypt “{entry.label}” — key may have been rotated.",
+                    reply_markup=_main_menu_kb(),
+                )
+                return
+            await _log_access(session, update.effective_user.id, "read", entry.id, entry.label)
+            await session.commit()
         text = (
             f"🏦 *{_md2(entry.label)}*\n"
             f"User: `{_md2(entry.username or '—')}`\n"
@@ -436,6 +474,7 @@ async def vault_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = await session.execute(select(VaultEntry).where(VaultEntry.id == entry_id))
             entry = result.scalar_one_or_none()
             if entry is not None:
+                await _log_access(session, update.effective_user.id, "delete", entry.id, entry.label)
                 await session.delete(entry)
                 await session.commit()
         await query.edit_message_text("🗑 Deleted.", reply_markup=_main_menu_kb())
