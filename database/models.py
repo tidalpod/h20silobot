@@ -1935,3 +1935,30 @@ class BillAlertLog(Base):
     __table_args__ = (
         Index("ix_bill_alert_log_unique", "property_id", "bill_id", unique=True),
     )
+
+
+class VaultEntry(Base):
+    """Encrypted credential entry for the Blue Deer bot password vault."""
+    __tablename__ = "vault_entries"
+
+    id = Column(Integer, primary_key=True)
+    label = Column(String(120), nullable=False)
+    username = Column(String(255), nullable=True)
+    password_encrypted = Column(Text, nullable=False)  # Fernet ciphertext, base64
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<VaultEntry {self.id}: {self.label}>"
+
+
+class VaultPin(Base):
+    """Singleton row (id=1) holding the bcrypt-hashed vault PIN and lockout state."""
+    __tablename__ = "vault_pin"
+
+    id = Column(Integer, primary_key=True)
+    pin_hash = Column(String(255), nullable=False)
+    failed_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

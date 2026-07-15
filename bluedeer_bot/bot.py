@@ -69,6 +69,12 @@ class BlueDeerBot:
             except Exception as e:
                 logger.warning(f"Recert reminder migration skipped: {e}")
 
+            try:
+                from database.migrations.add_vault import run_migration as run_vault_migration
+                await run_vault_migration()
+            except Exception as e:
+                logger.warning(f"Vault migration skipped: {e}")
+
         # Set up Telegram bot
         logger.info(f"Setting up Blue Deer bot...")
         self.application = Application.builder().token(self.token).build()
@@ -106,6 +112,7 @@ class BlueDeerBot:
             BotCommand("maintenance", "🔧 Open work orders"),
             BotCommand("leases", "📄 Expiring leases"),
             BotCommand("notify", "🔔 Send test notification"),
+            BotCommand("vault", "🔐 Password vault"),
             BotCommand("help", "❓ Help & commands"),
         ]
         await self.application.bot.set_my_commands(commands)

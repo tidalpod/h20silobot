@@ -557,4 +557,8 @@ def setup_handlers(application):
     application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
     application.add_handler(CallbackQueryHandler(back_to_menu_callback, pattern="^back_to_menu$"))
 
+    # Password vault
+    from bluedeer_bot import vault
+    vault.register(application)
+
     logger.info("Blue Deer handlers configured")

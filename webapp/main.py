@@ -90,6 +90,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Recert reminder migration skipped: {e}")
 
+    # Run vault migration
+    try:
+        from database.migrations.add_vault import run_migration as run_vault_migration
+        await run_vault_migration()
+    except Exception as e:
+        logger.warning(f"Vault migration skipped: {e}")
+
     # Run bill alert migration
     try:
         from database.migrations.add_bill_alert import run_migration as run_bill_alert_migration
