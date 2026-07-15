@@ -1,8 +1,10 @@
 """Password vault handlers for the Blue Deer Telegram bot.
 
-PIN-gated, admin-only, private-chat only. Passwords are stored plaintext
-in the DB; the PIN (bcrypt-hashed) is the sole access control alongside
-the admin whitelist. Trade-off chosen for simplicity — see the design spec.
+PIN-gated, admin-only. Works in DMs and in whitelisted group chats
+(BLUEDEER_VAULT_GROUP_IDS, falling back to BLUEDEER_GROUP_CHAT_ID).
+Passwords are stored plaintext; the PIN (bcrypt-hashed) is the sole
+access control alongside the admin whitelist. Trade-off chosen for
+simplicity — see the design spec.
 
 Wiring:
     from bluedeer_bot import vault
@@ -76,9 +78,40 @@ def _is_admin(update: Update) -> bool:
     return user.id in _allowed_user_ids()
 
 
-def _is_private(update: Update) -> bool:
+def _allowed_group_ids() -> set:
+    """Whitelist of group chat IDs where the vault is allowed.
+
+    Reads BLUEDEER_VAULT_GROUP_IDS (comma-separated). Falls back to
+    BLUEDEER_GROUP_CHAT_ID for backward compat.
+    """
+    ids: set = set()
+    raw = os.getenv("BLUEDEER_VAULT_GROUP_IDS", "").strip()
+    if raw:
+        for token in raw.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                ids.add(int(token))
+            except ValueError:
+                logger.warning(f"Vault: ignoring non-int BLUEDEER_VAULT_GROUP_IDS entry: {token!r}")
+    fallback = os.getenv("BLUEDEER_GROUP_CHAT_ID", "").strip()
+    if fallback:
+        try:
+            ids.add(int(fallback))
+        except ValueError:
+            pass
+    return ids
+
+
+def _is_allowed_chat(update: Update) -> bool:
+    """True if the chat is a private DM or a whitelisted group."""
     chat = update.effective_chat
-    return chat is not None and chat.type == "private"
+    if chat is None:
+        return False
+    if chat.type == "private":
+        return True
+    return chat.id in _allowed_group_ids()
 
 
 # ── audit log ───────────────────────────────────────────────────────
@@ -168,8 +201,8 @@ async def vault_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update):
         await update.effective_message.reply_text("Not authorized.")
         return
-    if not _is_private(update):
-        await update.effective_message.reply_text("Send /vault in a private chat with me.")
+    if not _is_allowed_chat(update):
+        await update.effective_message.reply_text("Vault only works in a DM or an approved group.")
         return
     if not context.bot_data.get("db_available", False):
         await update.message.reply_text("🔐 Vault is offline — DB unavailable.")
@@ -218,7 +251,7 @@ async def vault_lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def vault_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process text sent while a vault flow is in progress. No-op otherwise."""
-    if not _is_admin(update) or not _is_private(update):
+    if not _is_admin(update) or not _is_allowed_chat(update):
         return
     state = context.user_data.get("vault_state")
     if not state:
