@@ -1,7 +1,8 @@
 """Password vault handlers for the Blue Deer Telegram bot.
 
-PIN-gated, admin-only. Encryption uses a server-held Fernet key
-(VAULT_ENCRYPTION_KEY). PIN gates the UI and is hashed with bcrypt.
+PIN-gated, admin-only, private-chat only. Passwords are stored plaintext
+in the DB; the PIN (bcrypt-hashed) is the sole access control alongside
+the admin whitelist. Trade-off chosen for simplicity — see the design spec.
 
 Wiring:
     from bluedeer_bot import vault
@@ -29,8 +30,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-
-from bluedeer_bot import vault_crypto
 
 logger = logging.getLogger(__name__)
 
@@ -171,9 +170,6 @@ async def vault_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not _is_private(update):
         await update.effective_message.reply_text("Send /vault in a private chat with me.")
-        return
-    if not vault_crypto.is_configured():
-        await update.message.reply_text("🔐 Vault is not configured. Set VAULT_ENCRYPTION_KEY.")
         return
     if not context.bot_data.get("db_available", False):
         await update.message.reply_text("🔐 Vault is offline — DB unavailable.")
@@ -328,18 +324,13 @@ async def vault_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if state == "add_password":
         add = context.user_data.pop("vault_add", {}) or {}
         context.user_data.pop("vault_state", None)
-        try:
-            encrypted = vault_crypto.encrypt(text)
-        except vault_crypto.VaultCryptoError as e:
-            await context.bot.send_message(chat_id, f"❌ Vault crypto error: {e}")
-            return
         from database.connection import get_session
         from database.models import VaultEntry
         async with get_session() as session:
             entry = VaultEntry(
                 label=add.get("label", ""),
                 username=add.get("username") or None,
-                password_encrypted=encrypted,
+                password=text,
             )
             session.add(entry)
             await session.flush()
@@ -362,10 +353,6 @@ async def vault_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Not authorized.", show_alert=True)
         return
     await query.answer()
-
-    if not vault_crypto.is_configured():
-        await query.edit_message_text("🔐 Vault is not configured. Set VAULT_ENCRYPTION_KEY.")
-        return
 
     if not _is_unlocked(context):
         await query.edit_message_text("🔒 Vault is locked. Send /vault to unlock.")
@@ -431,20 +418,12 @@ async def vault_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if entry is None:
                 await query.edit_message_text("Entry not found.", reply_markup=_main_menu_kb())
                 return
-            try:
-                password = vault_crypto.decrypt(entry.password_encrypted)
-            except vault_crypto.VaultCryptoError:
-                await query.edit_message_text(
-                    f"⚠️ Unable to decrypt “{entry.label}” — key may have been rotated.",
-                    reply_markup=_main_menu_kb(),
-                )
-                return
             await _log_access(session, update.effective_user.id, "read", entry.id, entry.label)
             await session.commit()
         text = (
             f"🏦 *{_md2(entry.label)}*\n"
             f"User: `{_md2(entry.username or '—')}`\n"
-            f"Pass: ||{_md2(password)}||"
+            f"Pass: ||{_md2(entry.password)}||"
         )
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("🗑 Delete", callback_data=f"vault:delask:{entry.id}"),

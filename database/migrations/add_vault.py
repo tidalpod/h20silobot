@@ -36,7 +36,7 @@ async def run_migration():
                         id SERIAL PRIMARY KEY,
                         label VARCHAR(120) NOT NULL,
                         username VARCHAR(255),
-                        password_encrypted TEXT NOT NULL,
+                        password TEXT NOT NULL,
                         notes TEXT,
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
@@ -44,7 +44,18 @@ async def run_migration():
                 """))
                 logger.info("Created vault_entries table")
             else:
-                logger.info("vault_entries table already exists")
+                # Rename legacy password_encrypted column if it's still there
+                col_check = await conn.execute(text("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'vault_entries' AND column_name = 'password_encrypted'
+                """))
+                if col_check.fetchone():
+                    await conn.execute(text("""
+                        ALTER TABLE vault_entries RENAME COLUMN password_encrypted TO password
+                    """))
+                    logger.info("Renamed vault_entries.password_encrypted -> password")
+                else:
+                    logger.info("vault_entries table already exists")
 
             result = await conn.execute(text("""
                 SELECT table_name FROM information_schema.tables

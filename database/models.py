@@ -1938,13 +1938,14 @@ class BillAlertLog(Base):
 
 
 class VaultEntry(Base):
-    """Encrypted credential entry for the Blue Deer bot password vault."""
+    """Credential entry for the Blue Deer bot password vault. Plaintext at rest;
+    access is gated by PIN + admin whitelist + private-chat only."""
     __tablename__ = "vault_entries"
 
     id = Column(Integer, primary_key=True)
     label = Column(String(120), nullable=False)
     username = Column(String(255), nullable=True)
-    password_encrypted = Column(Text, nullable=False)  # Fernet ciphertext, base64
+    password = Column(Text, nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
