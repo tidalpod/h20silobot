@@ -82,7 +82,7 @@ If no row exists in `vault_pin`:
 3. User replies. Bot deletes the reply message.
 4. Bcrypt-verify the PIN.
    - **Success:** set `context.user_data['vault_unlocked_at'] = now`, reset `failed_attempts` to 0, delete the "Send your PIN" prompt, show main menu.
-   - **Failure:** increment `failed_attempts`. At 5, set `locked_until = now + 15 min`, reset attempts to 0. Reply with the appropriate error.
+   - **Failure:** increment `failed_attempts` (consecutive counter — reset to 0 on any success). At 5, set `locked_until = now + 15 min`, reset attempts to 0. Reply with the appropriate error.
 
 ### 3. Main menu
 
@@ -138,6 +138,16 @@ Auto-lock is lazy: checked on the next action. If `now - vault_unlocked_at > 10 
 - **Telegram message deletion failure** (rate limits, missing permissions): log a warning, continue the flow.
 - **Lockout race** (two attempts arrive nearly simultaneously): read `locked_until` on every attempt; the check is idempotent.
 - **Non-admin invocation**: reply "Not authorized" once, drop.
+
+## PIN reset
+
+Because the encryption key lives in `VAULT_ENCRYPTION_KEY` (not derived from the PIN), forgetting the PIN does not lose data. Reset procedure:
+
+1. Connect to the DB (Railway → Postgres → shell).
+2. `DELETE FROM vault_pin;`
+3. Next `/vault` invocation runs the setup flow again to establish a new PIN.
+
+All existing `vault_entries` remain readable with the new PIN. No dedicated UI for this in v1 — running SQL is intentional friction, since PIN reset should be rare and deliberate.
 
 ## Handler registration
 
