@@ -106,6 +106,7 @@ async def run(args: argparse.Namespace) -> dict:
         existing_charge_keys=charge_keys,
         existing_payment_ids=payment_ids,
         excluded_property_addresses=args.exclude_property,
+        excluded_lease_titles=args.exclude_lease,
     )
 
 
@@ -120,6 +121,12 @@ def main() -> int:
         action="append",
         default=[],
         help="TurboTenant property address to classify as out of scope; may be repeated",
+    )
+    parser.add_argument(
+        "--exclude-lease",
+        action="append",
+        default=[],
+        help="Exact TurboTenant lease title to classify as out of scope; may be repeated",
     )
     args = parser.parse_args()
 

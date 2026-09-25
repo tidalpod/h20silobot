@@ -1,10 +1,15 @@
 import tempfile
 import unittest
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from webapp.services.turbotenant_import import (
+    ChargeRow,
+    DepositRow,
     PropertyRecord,
     TenantRecord,
+    match_charges,
     match_deposits,
     normalize_address,
     normalize_name,
@@ -34,10 +39,6 @@ class TurboTenantImportTests(unittest.TestCase):
         )
 
     def test_duplicate_tenant_at_property_is_ambiguous(self):
-        from webapp.services.turbotenant_import import DepositRow
-        from datetime import date
-        from decimal import Decimal
-
         props = [PropertyRecord(1, "11268 Dodge Ave")]
         tenants = [
             TenantRecord(10, 1, "Toney Baker"),
@@ -53,10 +54,6 @@ class TurboTenantImportTests(unittest.TestCase):
         self.assertEqual(match.reason, "duplicate_tenant_at_property")
 
     def test_unique_active_resident_can_receive_payment_from_another_payer(self):
-        from webapp.services.turbotenant_import import DepositRow
-        from datetime import date
-        from decimal import Decimal
-
         props = [PropertyRecord(1, "6300 Canyon St, Warren, MI 48091")]
         tenants = [TenantRecord(10, 1, "James Ingram", True)]
         row = DepositRow(
@@ -70,10 +67,6 @@ class TurboTenantImportTests(unittest.TestCase):
         self.assertEqual(match.reason, "address_single_active_tenant")
 
     def test_out_of_scope_property_is_excluded(self):
-        from webapp.services.turbotenant_import import DepositRow
-        from datetime import date
-        from decimal import Decimal
-
         row = DepositRow(
             2, "789", Decimal("2000.00"), date(2026, 1, 2), "Outside Tenant",
             "BANK_ACCOUNT", "3700 SW 16th Street, #", "", date(2026, 1, 1),
@@ -84,6 +77,17 @@ class TurboTenantImportTests(unittest.TestCase):
             [],
             [],
             [PropertyRecord(-1, "3700 SW 16th St")],
+        )[0]
+        self.assertEqual(match.status, "excluded")
+        self.assertEqual(match.reason, "property_out_of_scope")
+
+    def test_exact_out_of_scope_lease_is_excluded(self):
+        charge = ChargeRow(
+            2, date(2026, 1, 1), "OTHER", "", "Blank Lease", "PAST DUE",
+            Decimal("500.00"), Decimal("500.00"), "source-key",
+        )
+        match = match_charges(
+            [charge], [], [], [], [], excluded_lease_titles=["Blank Lease"]
         )[0]
         self.assertEqual(match.status, "excluded")
         self.assertEqual(match.reason, "property_out_of_scope")

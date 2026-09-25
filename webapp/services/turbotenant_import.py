@@ -428,6 +428,7 @@ def match_charges(
     properties: Sequence[PropertyRecord],
     tenants: Sequence[TenantRecord],
     excluded_properties: Sequence[PropertyRecord] = (),
+    excluded_lease_titles: Sequence[str] = (),
 ) -> list[Match]:
     lease_map = _lease_match_map(deposits, deposit_matches)
     tenants_by_property: dict[int, list[TenantRecord]] = defaultdict(list)
@@ -436,15 +437,16 @@ def match_charges(
         tenants_by_property[tenant.property_id].append(tenant)
         tenants_by_name[normalize_name(tenant.name)].append(tenant)
 
-    excluded_lease_titles = {
+    excluded_lease_keys = {
         normalize_name(row.lease_title)
         for row, match in zip(deposits, deposit_matches)
         if match.status == "excluded"
     }
+    excluded_lease_keys.update(normalize_name(title) for title in excluded_lease_titles)
     matches: list[Match] = []
     for row in charges:
         lease_key = normalize_name(row.lease_title)
-        if lease_key in excluded_lease_titles or _charge_title_property_candidates(
+        if lease_key in excluded_lease_keys or _charge_title_property_candidates(
             row.lease_title, excluded_properties
         ):
             matches.append(Match(None, None, "excluded", "property_out_of_scope"))
@@ -526,6 +528,7 @@ def build_report(
     existing_charge_keys: set[str] | None = None,
     existing_payment_ids: set[str] | None = None,
     excluded_property_addresses: Sequence[str] = (),
+    excluded_lease_titles: Sequence[str] = (),
 ) -> dict:
     excluded_properties = [
         PropertyRecord(-(index + 1), address)
@@ -533,7 +536,13 @@ def build_report(
     ]
     deposit_matches = match_deposits(deposits, properties, tenants, excluded_properties)
     charge_matches = match_charges(
-        charges, deposits, deposit_matches, properties, tenants, excluded_properties
+        charges,
+        deposits,
+        deposit_matches,
+        properties,
+        tenants,
+        excluded_properties,
+        excluded_lease_titles,
     )
     existing_charge_keys = existing_charge_keys or set()
     existing_payment_ids = existing_payment_ids or set()
@@ -607,6 +616,7 @@ def build_report(
             "active_tenants": sum(1 for tenant in tenants if tenant.is_active),
         },
         "excluded_properties": list(excluded_property_addresses),
+        "excluded_lease_titles": list(excluded_lease_titles),
         "matches": {
             "deposits": asdict(_summarize(deposits, deposit_matches, "amount")),
             "charges": asdict(_summarize(charges, charge_matches, "amount")),
