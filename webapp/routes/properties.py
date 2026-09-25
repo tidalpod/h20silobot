@@ -31,6 +31,16 @@ router = APIRouter(tags=["properties"])
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+PROPERTY_SORT_KEYS = ("property", "tenant", "details", "status", "rent", "water")
+
+
+def _property_rent_amount(tenant):
+    if not tenant:
+        return None
+    if tenant.is_section8 and (tenant.voucher_amount or tenant.tenant_portion):
+        return Decimal(tenant.voucher_amount or 0) + Decimal(tenant.tenant_portion or 0)
+    return Decimal(tenant.current_rent) if tenant.current_rent is not None else None
+
 
 @router.get("/", response_class=HTMLResponse)
 async def list_properties(
@@ -40,6 +50,8 @@ async def list_properties(
     entity: str = None,
     page: int = 1,
     page_size: int = 25,
+    sort: str = "property",
+    direction: str = "asc",
 ):
     """List all properties"""
     user = await get_current_user(request)
@@ -52,6 +64,10 @@ async def list_properties(
     allowed_statuses = {"attention", "vacant", "inactive", "overdue", "due_soon", "current", "paid"}
     if status not in allowed_statuses:
         status = None
+    if sort not in PROPERTY_SORT_KEYS:
+        sort = "property"
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
 
     # Support multi-select: ?entity=X&entity=Y
     selected_entities = request.query_params.getlist("entity") if request.query_params.getlist("entity") else []
@@ -92,25 +108,73 @@ async def list_properties(
             failed_inspection = prop.section8_inspection_status == 'failed'
             needs_attention = is_vacant or no_license or failed_inspection
 
-            if status:
-                if status == "attention" and prop.is_active and needs_attention:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "vacant" and prop.is_active and is_vacant:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "inactive" and not prop.is_active:
-                    properties.append({"property": prop, "status": bill_status})
-                # Legacy filters (kept for compatibility)
-                elif status == "overdue" and bill_status == BillStatus.OVERDUE:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "due_soon" and bill_status == BillStatus.DUE_SOON:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "current" and bill_status == BillStatus.CURRENT:
-                    properties.append({"property": prop, "status": bill_status})
-                elif status == "paid" and bill_status == BillStatus.PAID:
-                    properties.append({"property": prop, "status": bill_status})
+            if not prop.is_active:
+                operational_status = "inactive"
+            elif failed_inspection:
+                operational_status = "issue"
+            elif needs_attention:
+                operational_status = "attention"
             else:
-                if prop.is_active:
-                    properties.append({"property": prop, "status": bill_status})
+                operational_status = "ok"
+
+            include_property = False
+            if status == "attention":
+                include_property = prop.is_active and needs_attention
+            elif status == "vacant":
+                include_property = prop.is_active and is_vacant
+            elif status == "inactive":
+                include_property = not prop.is_active
+            elif status == "overdue":
+                include_property = bill_status == BillStatus.OVERDUE
+            elif status == "due_soon":
+                include_property = bill_status == BillStatus.DUE_SOON
+            elif status == "current":
+                include_property = bill_status == BillStatus.CURRENT
+            elif status == "paid":
+                include_property = bill_status == BillStatus.PAID
+            elif not status:
+                include_property = prop.is_active
+
+            if not include_property:
+                continue
+
+            primary_tenant = next((tenant for tenant in active_tenants if tenant.is_primary), None)
+            display_tenant = primary_tenant or (active_tenants[0] if active_tenants else None)
+            rent_amount = _property_rent_amount(display_tenant)
+            water_amount = prop.bills[0].amount_due if prop.bills and prop.bills[0].amount_due is not None else None
+            details_value = None
+            if prop.bedrooms is not None or prop.bathrooms is not None or prop.square_feet is not None:
+                details_value = (
+                    prop.bedrooms if prop.bedrooms is not None else -1,
+                    prop.bathrooms if prop.bathrooms is not None else Decimal("-1"),
+                    prop.square_feet if prop.square_feet is not None else -1,
+                )
+
+            properties.append({
+                "property": prop,
+                "status": bill_status,
+                "active_tenants": active_tenants,
+                "display_tenant": display_tenant,
+                "rent_amount": rent_amount,
+                "water_amount": water_amount,
+                "operational_status": operational_status,
+                "sort_values": {
+                    "property": prop.address.casefold(),
+                    "tenant": display_tenant.name.casefold() if display_tenant else None,
+                    "details": details_value,
+                    "status": {"issue": 0, "attention": 1, "ok": 2, "inactive": 3}[operational_status],
+                    "rent": rent_amount,
+                    "water": water_amount,
+                },
+            })
+
+    populated_items = [item for item in properties if item["sort_values"][sort] is not None]
+    empty_items = [item for item in properties if item["sort_values"][sort] is None]
+    properties = sorted(
+        populated_items,
+        key=lambda item: item["sort_values"][sort],
+        reverse=direction == "desc",
+    ) + empty_items
 
     summary_properties = properties
     total_items = len(properties)
@@ -125,9 +189,44 @@ async def list_properties(
         )
         entity_rows = ent_result.scalars().all()
     entities = [(e.entity_name, e.entity_name) for e in entity_rows]
-    pagination_params = [("status", status or ""), ("search", search)]
+    common_params = [
+        ("status", status or ""),
+        ("search", search),
+        ("sort", sort),
+        ("direction", direction),
+        ("page_size", page_size),
+    ]
+    pagination_params = [
+        ("status", status or ""),
+        ("search", search),
+        ("sort", sort),
+        ("direction", direction),
+    ]
     pagination_params.extend(("entity", value) for value in selected_entities)
     pagination_base = f"/properties?{urlencode(pagination_params)}&"
+
+    sort_urls = {}
+    for sort_key in PROPERTY_SORT_KEYS:
+        next_direction = "desc" if sort == sort_key and direction == "asc" else "asc"
+        sort_params = [
+            ("status", status or ""),
+            ("search", search),
+            ("sort", sort_key),
+            ("direction", next_direction),
+            ("page_size", page_size),
+        ]
+        sort_params.extend(("entity", value) for value in selected_entities)
+        sort_urls[sort_key] = f"/properties?{urlencode(sort_params)}"
+
+    all_entities_params = list(common_params)
+    all_entities_url = f"/properties?{urlencode(all_entities_params)}"
+    clear_filter_params = [
+        ("sort", sort),
+        ("direction", direction),
+        ("page_size", page_size),
+    ]
+    clear_filter_params.extend(("entity", value) for value in selected_entities)
+    clear_filters_url = f"/properties?{urlencode(clear_filter_params)}"
 
     return templates.TemplateResponse(
         "properties/list.html",
@@ -146,6 +245,11 @@ async def list_properties(
             "total_items": total_items,
             "total_pages": total_pages,
             "pagination_base": pagination_base,
+            "sort_key": sort,
+            "sort_direction": direction,
+            "sort_urls": sort_urls,
+            "all_entities_url": all_entities_url,
+            "clear_filters_url": clear_filters_url,
         }
     )
 
