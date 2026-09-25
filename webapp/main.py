@@ -211,6 +211,11 @@ app.add_middleware(
 @app.middleware("http")
 async def security_and_cache_headers(request: Request, call_next):
     """Enforce same-origin form posts and apply browser security defaults."""
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    public_scheme = forwarded_proto.split(",")[0].strip().lower()
+    if public_scheme in {"http", "https"}:
+        request.scope["scheme"] = public_scheme
+
     if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         source = request.headers.get("origin") or request.headers.get("referer")
         if source:
@@ -238,8 +243,7 @@ async def security_and_cache_headers(request: Request, call_next):
         "form-action 'self' https://checkout.stripe.com",
     )
 
-    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-    if forwarded_proto.split(",")[0].strip() == "https":
+    if public_scheme == "https":
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     if request.url.path.startswith("/static/"):
         response.headers.setdefault("Cache-Control", "public, max-age=604800")
