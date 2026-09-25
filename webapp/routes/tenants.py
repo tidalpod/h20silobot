@@ -3,11 +3,12 @@
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
@@ -32,6 +33,8 @@ async def list_tenants(
     property_id: str = "",
     active_only: bool = True,
     tenant_search: str = "",
+    page: int = 1,
+    page_size: int = 25,
 ):
     """List all tenants"""
     user = await get_current_user(request)
@@ -39,13 +42,15 @@ async def list_tenants(
         return RedirectResponse(url="/login", status_code=303)
 
     tenant_search = tenant_search.strip()[:100]
+    page = max(page, 1)
+    page_size = page_size if page_size in {25, 50, 100} else 25
     try:
         selected_property_id = int(property_id) if property_id.strip() else None
     except (TypeError, ValueError):
         selected_property_id = None
 
     async with get_session() as session:
-        query = select(Tenant).options(selectinload(Tenant.property_ref))
+        conditions = []
 
         if tenant_search:
             escaped_search = (
@@ -54,17 +59,32 @@ async def list_tenants(
                 .replace("%", "\\%")
                 .replace("_", "\\_")
             )
-            query = query.where(
+            conditions.append(
                 Tenant.name.ilike(f"%{escaped_search}%", escape="\\")
             )
 
         if selected_property_id:
-            query = query.where(Tenant.property_id == selected_property_id)
+            conditions.append(Tenant.property_id == selected_property_id)
 
         if active_only:
-            query = query.where(Tenant.is_active == True)
+            conditions.append(Tenant.is_active == True)
 
-        result = await session.execute(query.order_by(Tenant.name))
+        count_result = await session.execute(
+            select(func.count(Tenant.id)).where(*conditions)
+        )
+        total_items = count_result.scalar() or 0
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        page = min(page, total_pages)
+
+        query = (
+            select(Tenant)
+            .where(*conditions)
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await session.execute(query)
         tenants = result.scalars().all()
 
         # Get properties for filter dropdown
@@ -72,6 +92,13 @@ async def list_tenants(
             select(Property).where(Property.is_active == True).order_by(Property.address)
         )
         properties = result.scalars().all()
+
+    pagination_params = {
+        "tenant_search": tenant_search,
+        "property_id": selected_property_id or "",
+        "active_only": str(active_only).lower(),
+    }
+    pagination_base = f"/tenants?{urlencode(pagination_params)}&"
 
     return templates.TemplateResponse(
         "tenants/list.html",
@@ -83,6 +110,11 @@ async def list_tenants(
             "property_id": selected_property_id,
             "active_only": active_only,
             "tenant_search": tenant_search,
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "pagination_base": pagination_base,
         }
     )
 

@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -36,12 +37,21 @@ async def list_properties(
     request: Request,
     status: str = None,
     search: str = None,
-    entity: str = None
+    entity: str = None,
+    page: int = 1,
+    page_size: int = 25,
 ):
     """List all properties"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    page = max(page, 1)
+    page_size = page_size if page_size in {25, 50, 100} else 25
+    search = (search or "").strip()[:100]
+    allowed_statuses = {"attention", "vacant", "inactive", "overdue", "due_soon", "current", "paid"}
+    if status not in allowed_statuses:
+        status = None
 
     # Support multi-select: ?entity=X&entity=Y
     selected_entities = request.query_params.getlist("entity") if request.query_params.getlist("entity") else []
@@ -54,9 +64,10 @@ async def list_properties(
         )
 
         if search:
+            escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             query = query.where(
-                Property.address.ilike(f"%{search}%") |
-                Property.bsa_account_number.ilike(f"%{search}%")
+                Property.address.ilike(f"%{escaped_search}%", escape="\\") |
+                Property.bsa_account_number.ilike(f"%{escaped_search}%", escape="\\")
             )
 
         # Filter by entity if specified (multi-select)
@@ -101,6 +112,12 @@ async def list_properties(
                 if prop.is_active:
                     properties.append({"property": prop, "status": bill_status})
 
+    summary_properties = properties
+    total_items = len(properties)
+    total_pages = max(1, (total_items + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    properties = properties[(page - 1) * page_size:page * page_size]
+
     # Load entities from database
     async with get_session() as session:
         ent_result = await session.execute(
@@ -108,6 +125,9 @@ async def list_properties(
         )
         entity_rows = ent_result.scalars().all()
     entities = [(e.entity_name, e.entity_name) for e in entity_rows]
+    pagination_params = [("status", status or ""), ("search", search)]
+    pagination_params.extend(("entity", value) for value in selected_entities)
+    pagination_base = f"/properties?{urlencode(pagination_params)}&"
 
     return templates.TemplateResponse(
         "properties/list.html",
@@ -115,11 +135,17 @@ async def list_properties(
             "request": request,
             "user": user,
             "properties": properties,
+            "summary_properties": summary_properties,
             "status_filter": status,
             "search": search or "",
             "entity_filter": entity or "",
             "selected_entities": selected_entities,
             "entities": entities,
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "pagination_base": pagination_base,
         }
     )
 

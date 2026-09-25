@@ -3,11 +3,12 @@
 from datetime import datetime
 from pathlib import Path
 from typing import List
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import get_session
@@ -217,11 +218,25 @@ async def send_broadcast(request: Request, message: str = Form(...)):
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_notifications(request: Request, status: str = None):
+async def list_notifications(
+    request: Request,
+    status: str = None,
+    page: int = 1,
+    page_size: int = 25,
+):
     """List notification history"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    page = max(page, 1)
+    page_size = page_size if page_size in {25, 50, 100} else 25
+    status_enum = None
+    if status:
+        try:
+            status_enum = NotificationStatus(status)
+        except ValueError:
+            status = None
 
     async with get_session() as session:
         query = (
@@ -232,17 +247,25 @@ async def list_notifications(request: Request, status: str = None):
             )
         )
 
-        if status:
-            try:
-                status_enum = NotificationStatus(status)
-                query = query.where(Notification.status == status_enum)
-            except ValueError:
-                pass
+        if status_enum:
+            query = query.where(Notification.status == status_enum)
+
+        count_query = select(func.count(Notification.id))
+        if status_enum:
+            count_query = count_query.where(Notification.status == status_enum)
+        count_result = await session.execute(count_query)
+        total_items = count_result.scalar() or 0
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        page = min(page, total_pages)
 
         result = await session.execute(
-            query.order_by(Notification.created_at.desc()).limit(100)
+            query.order_by(Notification.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
         notifications = result.scalars().all()
+
+    pagination_base = f"/notifications?{urlencode({'status': status or ''})}&"
 
     return templates.TemplateResponse(
         "notifications/history.html",
@@ -253,6 +276,11 @@ async def list_notifications(request: Request, status: str = None):
             "status_filter": status,
             "has_twilio": web_config.has_twilio,
             "has_email": web_config.has_sendgrid or web_config.has_smtp,
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "pagination_base": pagination_base,
         }
     )
 

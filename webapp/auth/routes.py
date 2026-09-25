@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from time import monotonic
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -19,6 +20,57 @@ router = APIRouter(tags=["auth"])
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+LOGIN_WINDOW_SECONDS = 15 * 60
+MAX_LOGIN_ATTEMPTS_PER_ACCOUNT = 10
+MAX_LOGIN_ATTEMPTS_PER_IP = 30
+_login_attempts = {}
+
+
+def _safe_next_url(value: str) -> str:
+    """Only allow redirects to local application paths."""
+    return value if value.startswith("/") and not value.startswith("//") else "/"
+
+
+def _masked_phone(phone: str) -> str:
+    digits = "".join(character for character in phone if character.isdigit())
+    return f"(***) ***-{digits[-4:]}" if len(digits) >= 4 else "your phone"
+
+
+def _login_keys(request: Request, email: str) -> tuple[str, str]:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded_for.split(",")[0].strip() if forwarded_for else (request.client.host if request.client else "unknown")
+    return f"ip:{client_ip}", f"account:{email.strip().lower()}"
+
+
+def _recent_attempts(key: str) -> list[float]:
+    cutoff = monotonic() - LOGIN_WINDOW_SECONDS
+    attempts = [timestamp for timestamp in _login_attempts.get(key, []) if timestamp >= cutoff]
+    if attempts:
+        _login_attempts[key] = attempts
+    else:
+        _login_attempts.pop(key, None)
+    return attempts
+
+
+def _login_is_limited(request: Request, email: str) -> bool:
+    ip_key, account_key = _login_keys(request, email)
+    return (
+        len(_recent_attempts(ip_key)) >= MAX_LOGIN_ATTEMPTS_PER_IP
+        or len(_recent_attempts(account_key)) >= MAX_LOGIN_ATTEMPTS_PER_ACCOUNT
+    )
+
+
+def _record_login_failure(request: Request, email: str) -> None:
+    timestamp = monotonic()
+    for key in _login_keys(request, email):
+        attempts = _recent_attempts(key)
+        attempts.append(timestamp)
+        _login_attempts[key] = attempts
+
+
+def _clear_account_attempts(email: str) -> None:
+    _login_attempts.pop(f"account:{email.strip().lower()}", None)
+
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, next: str = "/"):
@@ -29,7 +81,7 @@ async def login_page(request: Request, next: str = "/"):
 
     return templates.TemplateResponse(
         "auth/login.html",
-        {"request": request, "next": next, "error": None}
+        {"request": request, "next": _safe_next_url(next), "error": None}
     )
 
 
@@ -41,6 +93,13 @@ async def login(
     next: str = Form("/")
 ):
     """Handle login form submission"""
+    if _login_is_limited(request, email):
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {"request": request, "next": _safe_next_url(next), "error": "Too many sign-in attempts. Please wait 15 minutes and try again."},
+            status_code=429,
+        )
+
     async with get_session() as session:
         result = await session.execute(
             select(WebUser).where(WebUser.email == email.lower())
@@ -48,16 +107,18 @@ async def login(
         user = result.scalar_one_or_none()
 
         if not user or not verify_password(password, user.password_hash):
+            _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
-                {"request": request, "next": next, "error": "Invalid email or password"},
+                {"request": request, "next": _safe_next_url(next), "error": "Invalid email or password"},
                 status_code=400
             )
 
         if not user.is_active:
+            _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
-                {"request": request, "next": next, "error": "Account is disabled"},
+                {"request": request, "next": _safe_next_url(next), "error": "Account is disabled"},
                 status_code=400
             )
 
@@ -67,8 +128,9 @@ async def login(
 
         # Store in session
         login_user(request, user)
+        _clear_account_attempts(email)
 
-    return RedirectResponse(url=next, status_code=303)
+    return RedirectResponse(url=_safe_next_url(next), status_code=303)
 
 
 @router.get("/login/phone", response_class=HTMLResponse)
@@ -80,7 +142,7 @@ async def phone_login_page(request: Request, next: str = "/"):
 
     return templates.TemplateResponse(
         "auth/phone_login.html",
-        {"request": request, "next": next, "error": None}
+        {"request": request, "next": _safe_next_url(next), "error": None}
     )
 
 
@@ -97,8 +159,8 @@ async def phone_login_send_code(request: Request, phone: str = Form(...), next: 
             status_code=400
         )
 
-    request.session["admin_phone"] = phone
-    request.session["admin_next"] = next
+    request.session["admin_phone"] = "".join(character for character in phone if character.isdigit())
+    request.session["admin_next"] = _safe_next_url(next)
     return RedirectResponse(url="/login/verify", status_code=303)
 
 
@@ -111,7 +173,7 @@ async def phone_verify_page(request: Request):
 
     return templates.TemplateResponse(
         "auth/phone_verify.html",
-        {"request": request, "phone": phone, "error": None}
+        {"request": request, "phone_display": _masked_phone(phone), "error": None}
     )
 
 
@@ -128,13 +190,13 @@ async def phone_verify_code(request: Request, code: str = Form(...)):
     if not result["success"]:
         return templates.TemplateResponse(
             "auth/phone_verify.html",
-            {"request": request, "phone": phone, "error": result["error"]},
+            {"request": request, "phone_display": _masked_phone(phone), "error": result["error"]},
             status_code=400
         )
 
     # Log in the user
     login_user(request, result["user"])
-    next_url = request.session.pop("admin_next", "/")
+    next_url = _safe_next_url(request.session.pop("admin_next", "/"))
     request.session.pop("admin_phone", None)
 
     return RedirectResponse(url=next_url, status_code=303)
@@ -341,7 +403,7 @@ async def admin_update_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout(request: Request):
     """Handle logout"""
     logout_user(request)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Vendor Portal{% endblock %} | Blue Deer</title>
-    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="icon" type="image/png" href="/static/images/icons/icon-96x96.png">
     <link rel="apple-touch-icon" href="/static/images/icons/icon-192x192.png">
     <link rel="manifest" href="/vendor/manifest.json">
     <meta name="theme-color" content="#7e22ce">
@@ -47,13 +47,15 @@
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain">
+                <img src="/static/images/icons/icon-96x96.png" alt="Blue Deer" class="h-8 w-8 object-contain">
                 <span class="font-bold text-gray-900">Blue Deer</span>
                 <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Vendor</span>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-sm text-gray-600">{{ vendor.name }}</span>
-                <a href="/vendor/logout" class="text-xs text-red-500 hover:text-red-700">Logout</a>
+                <form method="POST" action="/vendor/logout">
+                    <button type="submit" class="text-xs text-slate-500 hover:text-slate-800">Sign out</button>
+                </form>
             </div>
         </div>
     </header>
@@ -129,7 +131,7 @@
     <div id="install-banner" class="hidden fixed bottom-16 inset-x-0 z-50 px-4 pb-2">
         <div class="max-w-lg mx-auto bg-white rounded-2xl shadow-lg border border-gray-200 p-4">
             <div class="flex items-start gap-3">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="w-12 h-12 rounded-xl">
+                <img src="/static/images/icons/icon-192x192.png" alt="Blue Deer" class="w-12 h-12 rounded-xl">
                 <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-semibold text-gray-900">Install Vendor Portal</h3>
                     <p id="install-instructions" class="text-xs text-gray-500 mt-0.5">Add to your home screen for the full app experience</p>

@@ -79,7 +79,7 @@
 
         <div class="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
             {% if bank_accounts %}
-            <form method="POST" action="/portal/pay" class="space-y-2">
+            <form method="POST" action="/portal/pay" class="space-y-2" onsubmit="return confirmBankPayment(this, '{{ '{:,.2f}'.format(charge.payable_amount) }}')">
                 <input type="hidden" name="charge_id" value="{{ charge.id }}">
                 <label for="bank-{{ charge.id }}" class="sr-only">Bank account</label>
                 <select id="bank-{{ charge.id }}" name="bank_account_id" class="w-full rounded-xl border-gray-300 text-sm px-3 py-2.5 bg-white border">
@@ -107,7 +107,7 @@
                     Pay ${{ "{:,.2f}".format(charge.stripe_fee.total_amount) }} by Card
                 </button>
                 <p class="text-[11px] text-gray-400 text-center mt-1.5">
-                    Includes ${{ "{:,.2f}".format(charge.stripe_fee.convenience_fee) }} card processing fee
+                    Includes ${{ "{:,.2f}".format(charge.stripe_fee.convenience_fee) }} card processing fee · Processed securely by Stripe
                 </p>
             </form>
             {% endif %}
@@ -137,4 +137,20 @@
         <span class="text-xs text-gray-600">Autopay</span>
     </a>
 </div>
+
+<p class="mt-4 text-center text-xs text-slate-500">Bank connections are secured by Plaid. Card payments are processed by Stripe. Blue Deer does not store your bank login or full card number.</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmBankPayment(form, amount) {
+    const account = form.querySelector('select option:checked');
+    const accountLabel = account ? account.textContent.trim() : 'your linked account';
+    if (!window.confirm(`Pay $${amount} from ${accountLabel}?`)) return false;
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = 'Submitting payment…';
+    return true;
+}
+</script>
 {% endblock %}

@@ -1104,20 +1104,22 @@ async def api_search(request: Request, q: str = ""):
     """Global search across properties, tenants, and work orders"""
     from webapp.auth.dependencies import get_current_user
 
-    user = get_current_user(request)
+    user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
+    q = q.strip()[:100]
     if not q or len(q) < 2:
         return {"properties": [], "tenants": [], "work_orders": []}
 
-    term = f"%{q}%"
+    escaped_query = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    term = f"%{escaped_query}%"
 
     async with get_session() as session:
         # Search properties by address
         prop_result = await session.execute(
             select(Property)
-            .where(Property.is_active == True, Property.address.ilike(term))
+            .where(Property.is_active == True, Property.address.ilike(term, escape="\\"))
             .limit(5)
         )
         properties = [
@@ -1128,7 +1130,7 @@ async def api_search(request: Request, q: str = ""):
         # Search tenants by name
         tenant_result = await session.execute(
             select(Tenant)
-            .where(Tenant.is_active == True, Tenant.name.ilike(term))
+            .where(Tenant.is_active == True, Tenant.name.ilike(term, escape="\\"))
             .options(selectinload(Tenant.property_ref))
             .limit(5)
         )
@@ -1144,7 +1146,7 @@ async def api_search(request: Request, q: str = ""):
         # Search work orders by title
         wo_result = await session.execute(
             select(WorkOrder)
-            .where(WorkOrder.title.ilike(term))
+            .where(WorkOrder.title.ilike(term, escape="\\"))
             .options(selectinload(WorkOrder.property_ref))
             .order_by(WorkOrder.created_at.desc())
             .limit(5)
@@ -1168,7 +1170,7 @@ async def api_unread_count(request: Request):
     from webapp.auth.dependencies import get_current_user
     from sqlalchemy import func
 
-    user = get_current_user(request)
+    user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 

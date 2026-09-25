@@ -20,14 +20,19 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_bills(request: Request, property_id: int = None, show_all: str = None):
+async def list_bills(request: Request, property_id: str = "", show_all: str = None):
     """List latest bill per property, or all bills for a specific property"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    try:
+        selected_property_id = int(property_id) if property_id.strip() else None
+    except (TypeError, ValueError):
+        selected_property_id = None
+
     async with get_session() as session:
-        if property_id or show_all:
+        if selected_property_id or show_all:
             # Show all bills when filtering by property or explicitly requested
             query = (
                 select(WaterBill)
@@ -35,8 +40,8 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
                     selectinload(WaterBill.property).selectinload(Property.tenants),
                 )
             )
-            if property_id:
-                query = query.where(WaterBill.property_id == property_id)
+            if selected_property_id:
+                query = query.where(WaterBill.property_id == selected_property_id)
             result = await session.execute(
                 query.order_by(WaterBill.scraped_at.desc()).limit(100)
             )
@@ -84,7 +89,7 @@ async def list_bills(request: Request, property_id: int = None, show_all: str = 
             "user": user,
             "bills": bills,
             "properties": properties,
-            "property_id": property_id,
+            "property_id": selected_property_id,
             "show_all": show_all,
             "now": datetime.utcnow(),
             "alert_settings": alert_settings,

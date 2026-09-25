@@ -3,21 +3,19 @@
 {% block title %}Maintenance{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow-sm">
+<header class="bg-white border-b border-slate-200">
     <div class="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
             <div class="min-w-0">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 sm:gap-3">
-                    <span>🔧</span> Maintenance
-                </h1>
+                <h1 class="bd-page-title">Maintenance</h1>
                 <p class="mt-1 text-sm text-gray-500 hidden sm:block">Work orders and maintenance requests</p>
             </div>
             <div class="flex gap-2 sm:gap-3 flex-shrink-0">
-                <a href="/maintenance/vendors" class="inline-flex items-center rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
-                    <span class="sm:mr-2">👷</span><span class="hidden sm:inline"> Vendors</span>
+                <a href="/maintenance/vendors" class="bd-btn bd-btn-secondary">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.1a7.5 7.5 0 0 1 15 0" /></svg><span class="hidden sm:inline">Vendors</span>
                 </a>
-                <a href="/maintenance/new" class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
-                    <span class="sm:mr-2">+</span><span class="hidden sm:inline"> New Work Order</span>
+                <a href="/maintenance/new" class="bd-btn bd-btn-primary">
+                    <span aria-hidden="true">+</span><span class="hidden sm:inline">New Work Order</span>
                 </a>
             </div>
         </div>
@@ -33,7 +31,6 @@
     </a>
     {% for s in statuses %}
     <a href="/maintenance?status={{ s.value }}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == s.value %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">
-        {% if s.value == 'new' %}🆕{% elif s.value == 'assigned' %}📋{% elif s.value == 'in_progress' %}🔨{% elif s.value == 'completed' %}✅{% elif s.value == 'closed' %}🔒{% endif %}
         {{ s.value.replace('_', ' ').title() }}
         {% if s._count %}<span class="ml-1 text-xs opacity-75">({{ s._count }})</span>{% endif %}
     </a>
@@ -41,11 +38,11 @@
 </div>
 
 <!-- Filters -->
-<div class="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-    <form method="GET" action="/maintenance" class="flex flex-wrap gap-x-4 gap-y-3 items-end">
+<div class="mb-6">
+    <form method="GET" action="/maintenance" class="bd-filter-bar">
         <div class="flex-1 min-w-[140px]">
             <label class="block text-xs font-medium text-gray-500 mb-1.5">Priority</label>
-            <select name="priority" class="w-full rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 focus:border-blue-500 focus:ring-blue-500">
+            <select name="priority" class="bd-input">
                 <option value="">All Priorities</option>
                 {% for p in priorities %}
                 <option value="{{ p.value }}" {% if filter_priority == p.value %}selected{% endif %}>{{ p.value.title() }}</option>
@@ -63,7 +60,7 @@
         </div>
         <div class="flex-1 min-w-[140px]">
             <label class="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
-            <select name="category" class="w-full rounded-lg border-gray-300 text-sm py-2 px-3 bg-gray-50 focus:border-blue-500 focus:ring-blue-500">
+            <select name="category" class="bd-input">
                 <option value="">All Categories</option>
                 {% for c in categories %}
                 <option value="{{ c.value }}" {% if filter_category == c.value %}selected{% endif %}>{{ c.value.replace('_', ' ').title() }}</option>
@@ -72,7 +69,7 @@
         </div>
         {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
         <div class="flex items-center gap-3 ml-auto">
-            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Filter</button>
+            <button type="submit" class="bd-btn bd-btn-primary">Filter</button>
             <a href="/maintenance" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
         </div>
     </form>
@@ -311,10 +308,16 @@
 </div>
 {% endif %}
 
+{% if work_orders %}
+<div class="mt-6 bd-card overflow-hidden">
+    {% include "components/pagination.html" %}
+</div>
+{% endif %}
+
 <!-- Features Explainer -->
-<div class="mt-10 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">How Maintenance Works</h3>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<details class="mt-8 bd-card p-5">
+    <summary class="cursor-pointer text-sm font-semibold text-gray-700">How maintenance workflows work</summary>
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="flex gap-3">
             <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -352,5 +355,5 @@
             </div>
         </div>
     </div>
-</div>
+</details>
 {% endblock %}

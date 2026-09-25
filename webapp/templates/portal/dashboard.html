@@ -14,7 +14,7 @@
 <div class="portal-card p-5 mb-4">
     <div class="flex items-center gap-3 mb-3">
         <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-            <span class="text-lg">🏠</span>
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m3 11.25 9-8.25 9 8.25M5.25 9.2V21h13.5V9.2M9 21v-6.75h6V21" /></svg>
         </div>
         <div>
             <h2 class="text-sm font-semibold text-gray-900">Your Property</h2>
@@ -42,14 +42,14 @@
 <div class="grid grid-cols-2 gap-3 mb-4">
     <!-- Open Requests -->
     <a href="/portal/maintenance" class="portal-card p-4 text-center hover:shadow-md transition-shadow">
-        <span class="text-2xl">🔧</span>
+        <svg class="h-6 w-6 mx-auto text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17 17.25 21A2.65 2.65 0 0 0 21 17.25l-5.88-5.88m-3.7 3.8-4.66 5.65a2.55 2.55 0 1 1-3.58-3.58l6.84-5.63m5.1-.24a4.5 4.5 0 0 0 6.23-6.47l-3.27 3.28a3 3 0 0 1-2.25-2.25l3.27-3.28a4.5 4.5 0 0 0-6.47 6.23" /></svg>
         <p class="text-2xl font-bold text-gray-900 mt-1">{{ open_requests }}</p>
         <p class="text-xs text-gray-500">Open Requests</p>
     </a>
 
     <!-- Lease Status -->
     <a href="/portal/lease" class="portal-card p-4 text-center hover:shadow-md transition-shadow">
-        <span class="text-2xl">📄</span>
+        <svg class="h-6 w-6 mx-auto text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.63a3.38 3.38 0 0 0-3.38-3.37h-1.5a1.13 1.13 0 0 1-1.12-1.13v-1.5a3.38 3.38 0 0 0-3.38-3.37H5.63A1.13 1.13 0 0 0 4.5 3.38v17.25c0 .62.5 1.12 1.13 1.12h12.75c.62 0 1.12-.5 1.12-1.12V14.25Z" /></svg>
         {% if active_lease and active_lease.lease_end %}
         <p class="text-sm font-bold text-gray-900 mt-1">{{ active_lease.lease_end.strftime('%b %d, %Y') }}</p>
         <p class="text-xs text-gray-500">Lease Expires</p>
@@ -64,7 +64,7 @@
 <a href="/portal/pay" class="block portal-card p-5 mb-4 hover:shadow-md transition-shadow">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><span class="text-lg">💳</span></div>
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 8.25h19.5m-16.5 6h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg></div>
             <div><h2 class="text-sm font-semibold text-gray-900">Account Balance</h2><p class="text-xs text-gray-500">{{ payment_balance.charges|length }} open charge{{ 's' if payment_balance.charges|length != 1 else '' }}</p></div>
         </div>
         <div class="text-right"><p class="text-xl font-bold {% if payment_balance.total_due > 0 %}text-blue-700{% else %}text-green-600{% endif %}">${{ "{:,.2f}".format(payment_balance.total_due) }}</p><p class="text-xs text-blue-600">View & pay →</p></div>
@@ -77,7 +77,7 @@
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <span class="text-lg">💧</span>
+                <svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3.75S6.75 9.4 6.75 14.25a5.25 5.25 0 0 0 10.5 0C17.25 9.4 12 3.75 12 3.75Z" /></svg>
             </div>
             <div>
                 <h2 class="text-sm font-semibold text-gray-900">Latest Water Bill</h2>
@@ -95,11 +95,7 @@
 
 <!-- Quick Actions -->
 <a href="/portal/maintenance/new" class="block portal-card p-4 bg-blue-600 text-white text-center hover:bg-blue-500 transition-colors mb-3">
-    <span class="text-lg mr-2">➕</span>
+    <span class="text-lg mr-2" aria-hidden="true">+</span>
     <span class="font-medium">Submit Maintenance Request</span>
-</a>
-<a href="/portal/pay" class="block portal-card p-4 bg-purple-600 text-white text-center hover:bg-purple-500 transition-colors">
-    <span class="text-lg mr-2">&#128179;</span>
-    <span class="font-medium">View Charges & Make a Payment</span>
 </a>
 {% endblock %}

@@ -1,0 +1,21 @@
+{% if total_items %}
+<nav class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination">
+    <p class="text-sm text-slate-600">
+        Showing <span class="font-medium text-slate-900">{{ ((page - 1) * page_size) + 1 }}</span>–<span class="font-medium text-slate-900">{{ [page * page_size, total_items] | min }}</span>
+        of <span class="font-medium text-slate-900">{{ total_items }}</span>
+    </p>
+    <div class="flex items-center gap-2">
+        {% if page > 1 %}
+        <a href="{{ pagination_base }}page={{ page - 1 }}&page_size={{ page_size }}" class="bd-btn bd-btn-secondary">Previous</a>
+        {% else %}
+        <span class="bd-btn cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400" aria-disabled="true">Previous</span>
+        {% endif %}
+        <span class="px-2 text-sm font-medium text-slate-700">Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ pagination_base }}page={{ page + 1 }}&page_size={{ page_size }}" class="bd-btn bd-btn-secondary">Next</a>
+        {% else %}
+        <span class="bd-btn cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400" aria-disabled="true">Next</span>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}

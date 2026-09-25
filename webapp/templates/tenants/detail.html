@@ -3,15 +3,15 @@
 {% block title %}{{ tenant.name }} — Tenant{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow-sm">
+<header class="bg-white border-b border-slate-200">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
             <a href="/tenants" class="hover:text-gray-700">Tenants</a>
             <span>/</span>
             <span class="text-gray-900">{{ tenant.name }}</span>
         </nav>
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-3xl font-bold tracking-tight text-gray-900">{{ tenant.name }}</h1>
                 {% if tenant.is_primary %}
                 <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Primary</span>
@@ -22,10 +22,10 @@
                 <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">Archived</span>
                 {% endif %}
             </div>
-            <div class="flex gap-2">
-                <a href="/payments?tenant_id={{ tenant.id }}" class="inline-flex items-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-900">Ledger</a>
-                <a href="/tenants/{{ tenant.id }}/edit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Edit</a>
-                <a href="/notifications/compose?tenant_id={{ tenant.id }}" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500">Notify</a>
+            <div class="flex flex-wrap gap-2">
+                <a href="/payments?tenant_id={{ tenant.id }}" class="bd-btn bg-blue-950 text-white hover:bg-blue-900">Ledger</a>
+                <a href="/tenants/{{ tenant.id }}/edit" class="bd-btn bd-btn-secondary">Edit</a>
+                <a href="/notifications/compose?tenant_id={{ tenant.id }}" class="bd-btn bd-btn-primary">Notify</a>
                 {% if tenant.is_active %}
                 <form action="/tenants/{{ tenant.id }}/archive" method="POST" class="inline" onsubmit="return confirm('Archive this tenant? They will be hidden from the active list.');">
                     <button type="submit" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-amber-700 shadow-sm ring-1 ring-inset ring-amber-300 hover:bg-amber-50">Archive</button>
@@ -45,7 +45,7 @@
 <!-- Top Row: Info + Balance Due -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <!-- Tenant Info -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="bd-card p-6">
         <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Contact</h2>
         <div class="space-y-3">
             {% if tenant.phone %}
@@ -94,7 +94,7 @@
     </div>
 
     <!-- Water Bill Balance -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="bd-card p-6">
         <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Water Bill Balance</h2>
         <div class="text-center">
             {% if water_balance > 0 %}
@@ -111,7 +111,7 @@
     </div>
 
     <!-- Payment Stats -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="bd-card p-6">
         <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Payment Summary</h2>
         <div class="space-y-4">
             <div>
@@ -175,12 +175,12 @@
 {% endif %}
 
 <!-- Payment History -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+<div class="bd-card overflow-hidden mb-6">
     <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment History</h2>
     </div>
     {% if payments %}
-    <table class="min-w-full divide-y divide-gray-100">
+    <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-100">
         <thead class="bg-gray-50">
             <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
@@ -231,7 +231,7 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+    </table></div>
     {% else %}
     <div class="p-8 text-center">
         <p class="text-sm text-gray-500">No payments recorded yet</p>

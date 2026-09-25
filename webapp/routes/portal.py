@@ -32,6 +32,11 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def _masked_phone(phone: str) -> str:
+    digits = "".join(character for character in phone if character.isdigit())
+    return f"(***) ***-{digits[-4:]}" if len(digits) >= 4 else "your phone"
+
+
 # =============================================================================
 # Authentication
 # =============================================================================
@@ -67,7 +72,7 @@ async def portal_login_submit(request: Request):
         })
 
     # Store phone in session for verification step
-    request.session["portal_phone"] = phone
+    request.session["portal_phone"] = "".join(character for character in phone if character.isdigit())
     return RedirectResponse(url="/portal/verify", status_code=303)
 
 
@@ -79,7 +84,7 @@ async def portal_verify(request: Request):
         return RedirectResponse(url="/portal/login", status_code=303)
     return templates.TemplateResponse("portal/verify.html", {
         "request": request,
-        "phone": phone,
+        "phone_display": _masked_phone(phone),
     })
 
 
@@ -96,7 +101,7 @@ async def portal_verify_submit(request: Request):
     if not code:
         return templates.TemplateResponse("portal/verify.html", {
             "request": request,
-            "phone": phone,
+            "phone_display": _masked_phone(phone),
             "error": "Please enter the verification code.",
         })
 
@@ -105,7 +110,7 @@ async def portal_verify_submit(request: Request):
     if not result["success"]:
         return templates.TemplateResponse("portal/verify.html", {
             "request": request,
-            "phone": phone,
+            "phone_display": _masked_phone(phone),
             "error": result["error"],
         })
 
@@ -115,7 +120,7 @@ async def portal_verify_submit(request: Request):
     return RedirectResponse(url="/portal", status_code=303)
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def portal_logout(request: Request):
     """Clear tenant session"""
     logout_tenant(request)

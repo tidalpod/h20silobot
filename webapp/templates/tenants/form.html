@@ -3,7 +3,7 @@
 {% block title %}{% if tenant %}Edit Tenant{% else %}Add Tenant{% endif %}{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow">
+<header class="bg-white border-b border-slate-200">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <nav class="flex mb-2" aria-label="Breadcrumb">
             <ol class="flex items-center space-x-2">
@@ -12,7 +12,7 @@
                 <li class="text-sm text-gray-900">{% if tenant %}Edit{% else %}Add New{% endif %}</li>
             </ol>
         </nav>
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+        <h1 class="bd-page-title">
             {% if tenant %}Edit Tenant{% else %}Add New Tenant{% endif %}
         </h1>
     </div>
@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="bg-white shadow rounded-lg">
+<div class="bd-card">
     <form action="{% if tenant %}/tenants/{{ tenant.id }}/edit{% else %}/tenants/new{% endif %}" method="POST" class="p-6">
         {% if error %}
         <div class="mb-4 rounded-md bg-red-50 p-4">
@@ -291,16 +291,9 @@
             </div>
         </div>
 
-        <div class="mt-6 flex items-center justify-end gap-x-6">
-            {% if tenant %}
-            <form action="/tenants/{{ tenant.id }}/archive" method="POST" class="mr-auto" onsubmit="return confirm('Archive this tenant? They will be hidden from the active list.')">
-                <button type="submit" class="text-sm font-semibold text-amber-600 hover:text-amber-500">
-                    Archive Tenant
-                </button>
-            </form>
-            {% endif %}
+        <div class="sticky bottom-0 z-20 -mx-6 -mb-6 mt-6 flex items-center justify-end gap-x-4 rounded-b-2xl border-t border-slate-200 bg-white/95 px-6 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur">
             <a href="{% if tenant %}/properties/{{ tenant.property_id }}{% elif selected_property_id %}/properties/{{ selected_property_id }}{% else %}/tenants{% endif %}" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-            <button type="submit" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+            <button type="submit" class="bd-btn bd-btn-primary">
                 {% if tenant %}Save Changes{% else %}Add Tenant{% endif %}
             </button>
         </div>

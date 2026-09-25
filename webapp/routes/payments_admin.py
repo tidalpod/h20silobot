@@ -38,10 +38,12 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def payments_list(
     request: Request,
     status: str = None,
-    property_id: int = None,
-    tenant_id: int = None,
+    property_id: str = "",
+    tenant_id: str = "",
     month: str = None,
     method: str = None,
+    page: int = 1,
+    page_size: int = 25,
 ):
     """All payments list with filters (ACH + Stripe)."""
     user = await get_current_user(request)
@@ -53,6 +55,20 @@ async def payments_list(
     except ValueError:
         selected_status = None
         status = None
+
+    if method not in {None, "", "ach", "card"}:
+        method = None
+
+    page = max(page, 1)
+    page_size = page_size if page_size in {25, 50, 100} else 25
+    try:
+        selected_property_id = int(property_id) if property_id.strip() else None
+    except (TypeError, ValueError):
+        selected_property_id = None
+    try:
+        selected_tenant_id = int(tenant_id) if tenant_id.strip() else None
+    except (TypeError, ValueError):
+        selected_tenant_id = None
 
     async with get_session() as session:
         # --- ACH payments ---
@@ -66,10 +82,10 @@ async def payments_list(
         )
         if selected_status:
             ach_query = ach_query.where(RentPayment.status == selected_status)
-        if property_id:
-            ach_query = ach_query.where(RentPayment.property_id == property_id)
-        if tenant_id:
-            ach_query = ach_query.where(RentPayment.tenant_id == tenant_id)
+        if selected_property_id:
+            ach_query = ach_query.where(RentPayment.property_id == selected_property_id)
+        if selected_tenant_id:
+            ach_query = ach_query.where(RentPayment.tenant_id == selected_tenant_id)
         ach_query = ach_query.order_by(desc(RentPayment.initiated_at))
 
         # --- Stripe payments ---
@@ -82,10 +98,10 @@ async def payments_list(
         )
         if selected_status:
             stripe_query = stripe_query.where(StripePayment.status == selected_status)
-        if property_id:
-            stripe_query = stripe_query.where(StripePayment.property_id == property_id)
-        if tenant_id:
-            stripe_query = stripe_query.where(StripePayment.tenant_id == tenant_id)
+        if selected_property_id:
+            stripe_query = stripe_query.where(StripePayment.property_id == selected_property_id)
+        if selected_tenant_id:
+            stripe_query = stripe_query.where(StripePayment.tenant_id == selected_tenant_id)
         stripe_query = stripe_query.order_by(desc(StripePayment.initiated_at))
 
         # Execute both (skip one if method filter applied)
@@ -171,19 +187,31 @@ async def payments_list(
             .options(selectinload(Tenant.property_ref))
             .order_by(Tenant.name)
         )
-        if property_id:
-            tenant_query = tenant_query.where(Tenant.property_id == property_id)
+        if selected_property_id:
+            tenant_query = tenant_query.where(Tenant.property_id == selected_property_id)
         tenants_result = await session.execute(tenant_query)
         tenants = tenants_result.scalars().all()
 
     charges = await ledger_service.list_charges(
-        tenant_id=tenant_id,
-        property_id=property_id,
+        tenant_id=selected_tenant_id,
+        property_id=selected_property_id,
         include_paid=True,
     )
     charge_totals = ledger_service.totals(charges)
-    selected_tenant = next((tenant for tenant in tenants if tenant.id == tenant_id), None)
-    selected_property = next((prop for prop in properties if prop.id == property_id), None)
+    selected_tenant = next((tenant for tenant in tenants if tenant.id == selected_tenant_id), None)
+    selected_property = next((prop for prop in properties if prop.id == selected_property_id), None)
+
+    total_items = len(all_payments)
+    total_pages = max(1, (total_items + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    all_payments = all_payments[(page - 1) * page_size:page * page_size]
+    pagination_params = {
+        "status": status or "",
+        "property_id": selected_property_id or "",
+        "tenant_id": selected_tenant_id or "",
+        "method": method or "",
+    }
+    pagination_base = f"/payments?{urlencode(pagination_params)}&"
 
     return templates.TemplateResponse(
         "payments/list.html",
@@ -202,10 +230,15 @@ async def payments_list(
             "pending_count": pending_count,
             "entity_summary": entity_summary,
             "filter_status": status,
-            "filter_property_id": property_id,
-            "filter_tenant_id": tenant_id,
+            "filter_property_id": selected_property_id,
+            "filter_tenant_id": selected_tenant_id,
             "filter_method": method,
             "statuses": PaymentStatus,
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "pagination_base": pagination_base,
         },
     )
 

@@ -6,13 +6,13 @@
 <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
     <div class="sm:mx-auto sm:w-full sm:max-w-md">
         <div class="flex items-center justify-center gap-3">
-            <img src="/static/images/logo.png" alt="Blue Deer" class="h-12 w-12 object-contain">
+            <img src="/static/images/icons/icon-192x192.png" alt="Blue Deer" class="h-12 w-12 object-contain">
             <h1 class="text-3xl font-bold text-blue-600">Blue Deer</h1>
         </div>
         <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
             Enter verification code
         </h2>
-        <p class="mt-2 text-center text-sm text-gray-500">Sent to {{ phone }}</p>
+        <p class="mt-2 text-center text-sm text-gray-500">If registered, a code was sent to {{ phone_display }}</p>
     </div>
 
     <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
@@ -36,12 +36,12 @@
                 <div>
                     <label class="block text-sm font-medium leading-6 text-gray-900 text-center mb-3">Verification Code</label>
                     <div class="flex justify-center gap-2" id="code-inputs">
-                        <input type="text" maxlength="1" class="code-input" data-idx="0" inputmode="numeric" autofocus>
-                        <input type="text" maxlength="1" class="code-input" data-idx="1" inputmode="numeric">
-                        <input type="text" maxlength="1" class="code-input" data-idx="2" inputmode="numeric">
-                        <input type="text" maxlength="1" class="code-input" data-idx="3" inputmode="numeric">
-                        <input type="text" maxlength="1" class="code-input" data-idx="4" inputmode="numeric">
-                        <input type="text" maxlength="1" class="code-input" data-idx="5" inputmode="numeric">
+                        <input type="text" maxlength="1" class="code-input" data-idx="0" inputmode="numeric" autocomplete="one-time-code" aria-label="Verification code digit 1" autofocus>
+                        <input type="text" maxlength="1" class="code-input" data-idx="1" inputmode="numeric" aria-label="Verification code digit 2">
+                        <input type="text" maxlength="1" class="code-input" data-idx="2" inputmode="numeric" aria-label="Verification code digit 3">
+                        <input type="text" maxlength="1" class="code-input" data-idx="3" inputmode="numeric" aria-label="Verification code digit 4">
+                        <input type="text" maxlength="1" class="code-input" data-idx="4" inputmode="numeric" aria-label="Verification code digit 5">
+                        <input type="text" maxlength="1" class="code-input" data-idx="5" inputmode="numeric" aria-label="Verification code digit 6">
                     </div>
                     <input type="hidden" name="code" id="code-hidden">
                 </div>

@@ -45,6 +45,11 @@ def _fmt_time_12h(value):
 templates.env.filters["time12"] = _fmt_time_12h
 
 
+def _masked_phone(phone: str) -> str:
+    digits = "".join(character for character in phone if character.isdigit())
+    return f"(***) ***-{digits[-4:]}" if len(digits) >= 4 else "your phone"
+
+
 # =============================================================================
 # Authentication
 # =============================================================================
@@ -79,7 +84,7 @@ async def vendor_login_submit(request: Request):
             "phone": phone,
         })
 
-    request.session["vendor_phone"] = phone
+    request.session["vendor_phone"] = "".join(character for character in phone if character.isdigit())
     return RedirectResponse(url="/vendor/verify", status_code=303)
 
 
@@ -91,7 +96,7 @@ async def vendor_verify(request: Request):
         return RedirectResponse(url="/vendor/login", status_code=303)
     return templates.TemplateResponse("vendor/verify.html", {
         "request": request,
-        "phone": phone,
+        "phone_display": _masked_phone(phone),
     })
 
 
@@ -108,7 +113,7 @@ async def vendor_verify_submit(request: Request):
     if not code:
         return templates.TemplateResponse("vendor/verify.html", {
             "request": request,
-            "phone": phone,
+            "phone_display": _masked_phone(phone),
             "error": "Please enter the verification code.",
         })
 
@@ -117,7 +122,7 @@ async def vendor_verify_submit(request: Request):
     if not result["success"]:
         return templates.TemplateResponse("vendor/verify.html", {
             "request": request,
-            "phone": phone,
+            "phone_display": _masked_phone(phone),
             "error": result["error"],
         })
 
@@ -126,7 +131,7 @@ async def vendor_verify_submit(request: Request):
     return RedirectResponse(url="/vendor", status_code=303)
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def vendor_logout(request: Request):
     """Clear vendor session"""
     logout_vendor(request)

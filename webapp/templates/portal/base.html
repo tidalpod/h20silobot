@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Tenant Portal{% endblock %} | Blue Deer</title>
-    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="icon" type="image/png" href="/static/images/icons/icon-96x96.png">
     <link rel="apple-touch-icon" href="/static/images/icons/icon-192x192.png">
     <link rel="manifest" href="/portal/manifest.json">
     <meta name="theme-color" content="#2563eb">
@@ -29,15 +29,16 @@
     </script>
     <style>
         body {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
             min-height: 100vh;
         }
         .portal-card {
             background: white;
             border-radius: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 10px 30px rgba(15,23,42,0.05);
+            border: 1px solid #e2e8f0;
         }
+        :focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -47,12 +48,14 @@
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="h-8 w-8 object-contain">
+                <img src="/static/images/icons/icon-96x96.png" alt="Blue Deer" class="h-8 w-8 object-contain">
                 <span class="font-bold text-gray-900">Blue Deer</span>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-sm text-gray-600">{{ tenant.name }}</span>
-                <a href="/portal/logout" class="text-xs text-red-500 hover:text-red-700">Logout</a>
+                <form method="POST" action="/portal/logout">
+                    <button type="submit" class="text-xs font-medium text-slate-500 hover:text-slate-800">Sign out</button>
+                </form>
             </div>
         </div>
     </header>
@@ -67,24 +70,24 @@
     {% if tenant %}
     <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-50">
         <div class="max-w-lg mx-auto flex">
-            <a href="/portal" class="flex-1 py-3 text-center {% if request.url.path == '/portal' or request.url.path == '/portal/' %}text-blue-600{% else %}text-gray-500{% endif %}">
-                <span class="block text-lg">🏠</span>
+            <a href="/portal" {% if request.url.path == '/portal' or request.url.path == '/portal/' %}aria-current="page"{% endif %} class="flex-1 min-h-16 py-2 text-center flex flex-col items-center justify-center {% if request.url.path == '/portal' or request.url.path == '/portal/' %}text-blue-600 bg-blue-50{% else %}text-gray-500{% endif %}">
+                <svg class="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m3 11.25 9-8.25 9 8.25M5.25 9.2V21h13.5V9.2M9 21v-6.75h6V21" /></svg>
                 <span class="text-xs font-medium">Home</span>
             </a>
-            <a href="/portal/pay" class="flex-1 py-3 text-center {% if '/portal/pay' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
-                <span class="block text-lg">💳</span>
+            <a href="/portal/pay" {% if '/portal/pay' in request.url.path %}aria-current="page"{% endif %} class="flex-1 min-h-16 py-2 text-center flex flex-col items-center justify-center {% if '/portal/pay' in request.url.path %}text-blue-600 bg-blue-50{% else %}text-gray-500{% endif %}">
+                <svg class="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 8.25h19.5m-16.5 6h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
                 <span class="text-xs font-medium">Pay</span>
             </a>
-            <a href="/portal/maintenance" class="flex-1 py-3 text-center {% if '/portal/maintenance' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
-                <span class="block text-lg">🔧</span>
+            <a href="/portal/maintenance" {% if '/portal/maintenance' in request.url.path %}aria-current="page"{% endif %} class="flex-1 min-h-16 py-2 text-center flex flex-col items-center justify-center {% if '/portal/maintenance' in request.url.path %}text-blue-600 bg-blue-50{% else %}text-gray-500{% endif %}">
+                <svg class="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17 17.25 21A2.65 2.65 0 0 0 21 17.25l-5.88-5.88m-3.7 3.8-4.66 5.65a2.55 2.55 0 1 1-3.58-3.58l6.84-5.63m5.1-.24a4.5 4.5 0 0 0 6.23-6.47l-3.27 3.28a3 3 0 0 1-2.25-2.25l3.27-3.28a4.5 4.5 0 0 0-6.47 6.23" /></svg>
                 <span class="text-xs font-medium">Requests</span>
             </a>
-            <a href="/portal/lease" class="flex-1 py-3 text-center {% if '/portal/lease' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
-                <span class="block text-lg">📄</span>
+            <a href="/portal/lease" {% if '/portal/lease' in request.url.path %}aria-current="page"{% endif %} class="flex-1 min-h-16 py-2 text-center flex flex-col items-center justify-center {% if '/portal/lease' in request.url.path %}text-blue-600 bg-blue-50{% else %}text-gray-500{% endif %}">
+                <svg class="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.63a3.38 3.38 0 0 0-3.38-3.37h-1.5a1.13 1.13 0 0 1-1.12-1.13v-1.5a3.38 3.38 0 0 0-3.38-3.37H5.63A1.13 1.13 0 0 0 4.5 3.38v17.25c0 .62.5 1.12 1.13 1.12h12.75c.62 0 1.12-.5 1.12-1.12V14.25Z" /></svg>
                 <span class="text-xs font-medium">Lease</span>
             </a>
-            <a href="/portal/bills" class="flex-1 py-3 text-center {% if '/portal/bills' in request.url.path %}text-blue-600{% else %}text-gray-500{% endif %}">
-                <span class="block text-lg">💧</span>
+            <a href="/portal/bills" {% if '/portal/bills' in request.url.path %}aria-current="page"{% endif %} class="flex-1 min-h-16 py-2 text-center flex flex-col items-center justify-center {% if '/portal/bills' in request.url.path %}text-blue-600 bg-blue-50{% else %}text-gray-500{% endif %}">
+                <svg class="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3.75S6.75 9.4 6.75 14.25a5.25 5.25 0 0 0 10.5 0C17.25 9.4 12 3.75 12 3.75Z" /></svg>
                 <span class="text-xs font-medium">Bills</span>
             </a>
         </div>
@@ -95,12 +98,12 @@
     <div id="install-banner" class="hidden fixed bottom-16 inset-x-0 z-50 px-4 pb-2">
         <div class="max-w-lg mx-auto bg-white rounded-2xl shadow-lg border border-gray-200 p-4">
             <div class="flex items-start gap-3">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="w-12 h-12 rounded-xl">
+                <img src="/static/images/icons/icon-192x192.png" alt="Blue Deer" class="w-12 h-12 rounded-xl">
                 <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-semibold text-gray-900">Install Tenant Portal</h3>
                     <p id="install-instructions" class="text-xs text-gray-500 mt-0.5">Add to your home screen for the full app experience</p>
                 </div>
-                <button onclick="dismissInstallBanner()" class="text-gray-400 hover:text-gray-600 -mt-1 -mr-1 p-1">
+                <button type="button" onclick="dismissInstallBanner()" aria-label="Dismiss install prompt" class="text-gray-400 hover:text-gray-600 -mt-1 -mr-1 p-1">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>

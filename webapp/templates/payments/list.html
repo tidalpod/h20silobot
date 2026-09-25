@@ -3,7 +3,7 @@
 {% block title %}Payment Ledger{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow-sm">
+<header class="bg-white border-b border-slate-200">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
             <p class="text-sm font-medium text-blue-600">Payment center</p>
@@ -16,11 +16,11 @@
         </div>
         <div class="flex items-center gap-3">
             <div class="relative" id="actions-wrap">
-                <button type="button" onclick="toggleActions()" class="inline-flex items-center gap-2 rounded-full border-2 border-blue-600 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-blue-700 hover:bg-blue-50">
+                <button type="button" onclick="toggleActions(this)" aria-expanded="false" aria-controls="actions-menu" class="inline-flex items-center gap-2 rounded-full border-2 border-blue-600 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-blue-700 hover:bg-blue-50">
                     Actions
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
                 </button>
-                <div id="actions-menu" class="hidden absolute right-0 z-30 mt-2 w-72 rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
+                <div id="actions-menu" role="menu" class="hidden absolute right-0 z-30 mt-2 w-72 rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
                     <button type="button" onclick="openActivity('payment')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Record payment</button>
                     <button type="button" onclick="openActivity('credit')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Add credit</button>
                     <button type="button" onclick="openActivity('refund')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Return security deposit</button>
@@ -45,7 +45,7 @@
 {% endif %}
 
 <section class="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1.25fr_1.25fr_.75fr_.75fr_auto]">
         <div>
             <label for="property-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Property</label>
             <select id="property-filter" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm searchable-select" data-placeholder="All properties">
@@ -62,6 +62,21 @@
                 {% for tenant in tenants %}
                 <option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>
                 {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="status-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Status</label>
+            <select id="status-filter" class="bd-input">
+                <option value="">All statuses</option>
+                {% for status in statuses %}<option value="{{ status.value }}" {% if filter_status == status.value %}selected{% endif %}>{{ status.value.replace('_', ' ').title() }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="method-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Method</label>
+            <select id="method-filter" class="bd-input">
+                <option value="">All methods</option>
+                <option value="ach" {% if filter_method == 'ach' %}selected{% endif %}>ACH</option>
+                <option value="card" {% if filter_method == 'card' %}selected{% endif %}>Card</option>
             </select>
         </div>
         <button type="button" onclick="applyLedgerFilters()" class="self-end rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800">View ledger</button>
@@ -165,7 +180,7 @@
 </section>
 
 <details class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" {% if not charges %}open{% endif %}>
-    <summary class="cursor-pointer px-6 py-5 text-lg font-bold text-blue-950">Payment activity <span class="ml-2 text-sm font-normal text-gray-400">{{ payments|length }} transactions</span></summary>
+    <summary class="cursor-pointer px-6 py-5 text-lg font-bold text-blue-950">Payment activity <span class="ml-2 text-sm font-normal text-gray-400">{{ total_items }} transactions</span></summary>
     {% if payments %}
     <div class="overflow-x-auto border-t border-gray-100">
         <table class="min-w-full divide-y divide-gray-200">
@@ -190,6 +205,7 @@
         </table>
     </div>
     {% else %}<div class="border-t border-gray-100 px-6 py-10 text-center text-sm text-gray-500">No payment activity in this view.</div>{% endif %}
+    {% include "components/pagination.html" %}
 </details>
 
 <!-- Create charge modal -->
@@ -199,20 +215,20 @@
             <input type="hidden" name="property_id" value="{{ filter_property_id or '' }}">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div><h2 id="charge-title" class="text-xl font-bold text-gray-950">Create charge</h2><p class="text-sm text-gray-500">Add a receivable to a tenant ledger.</p></div>
-                <button type="button" onclick="closeModal('charge-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button>
+                <button type="button" onclick="closeModal('charge-modal')" aria-label="Close create charge dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button>
             </div>
             <div class="space-y-4 p-6">
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select name="tenant_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                <div><label for="create-tenant" class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select id="create-tenant" name="tenant_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
                     <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
                 </select></div>
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="mb-1 block text-sm font-medium text-gray-700">Type</label><select name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
-                    <div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="0.00"></div>
+                    <div><label for="create-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="create-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
+                    <div><label for="create-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="create-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="0.00"></div>
                 </div>
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input name="description" required maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Monthly rent"></div>
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input name="due_date" type="date" required value="{{ request.query_params.get('due_date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+                <div><label for="create-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="create-description" name="description" required maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Monthly rent"></div>
+                <div><label for="create-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="create-due" name="due_date" type="date" required value="{{ request.query_params.get('due_date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
                 <label class="flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><input id="repeat-monthly" name="repeat_monthly" type="checkbox" onchange="document.getElementById('repeat-end').classList.toggle('hidden', !this.checked)"> Repeat this charge monthly</label>
-                <div id="repeat-end" class="hidden"><label class="mb-1 block text-sm font-medium text-gray-700">Repeat through</label><input name="end_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><p class="mt-1 text-xs text-gray-400">Up to 36 monthly charges will be created.</p></div>
+                <div id="repeat-end" class="hidden"><label for="repeat-end-date" class="mb-1 block text-sm font-medium text-gray-700">Repeat through</label><input id="repeat-end-date" name="end_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><p class="mt-1 text-xs text-gray-400">Up to 36 monthly charges will be created.</p></div>
             </div>
             <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('charge-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Create charge</button></div>
         </form>
@@ -224,14 +240,14 @@
     <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
         <form method="POST" action="/payments/entries">
             <input type="hidden" name="entry_type" id="activity-type" value="payment"><input type="hidden" name="property_id" value="{{ filter_property_id or '' }}">
-            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="activity-title" class="text-xl font-bold text-gray-950">Record payment</h2><p id="activity-subtitle" class="text-sm text-gray-500">Apply an offline payment to a charge.</p></div><button type="button" onclick="closeModal('activity-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
+            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="activity-title" class="text-xl font-bold text-gray-950">Record payment</h2><p id="activity-subtitle" class="text-sm text-gray-500">Apply an offline payment to a charge.</p></div><button type="button" onclick="closeModal('activity-modal')" aria-label="Close payment activity dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
             <div class="space-y-4 p-6">
-                <div id="activity-tenant-wrap"><label class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select name="tenant_id" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}</select></div>
-                <div id="activity-charge-wrap"><label class="mb-1 block text-sm font-medium text-gray-700">Charge</label><select name="charge_id" id="activity-charge" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose unpaid charge</option>{% for charge in charges %}{% if charge.status not in ['paid', 'void'] %}<option value="{{ charge.id }}" data-balance="{{ charge.outstanding }}">{{ charge.tenant_name }} · {{ charge.description }} · ${{ "{:,.2f}".format(charge.outstanding) }}</option>{% endif %}{% endfor %}</select></div>
-                <div class="grid grid-cols-2 gap-4"><div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="activity-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Date</label><input name="occurred_on" type="date" required value="{{ request.query_params.get('date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Method</label><select name="payment_method" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="cash">Cash</option><option value="check">Check</option><option value="money_order">Money order</option><option value="zelle">Zelle</option><option value="ach">External ACH</option><option value="card">External card</option><option value="manual">Other</option></select></div>
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input name="description" maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Optional description"></div>
-                <div><label class="mb-1 block text-sm font-medium text-gray-700">Note</label><textarea name="note" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Internal note"></textarea></div>
+                <div id="activity-tenant-wrap"><label for="activity-tenant" class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select id="activity-tenant" name="tenant_id" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}</select></div>
+                <div id="activity-charge-wrap"><label for="activity-charge" class="mb-1 block text-sm font-medium text-gray-700">Charge</label><select name="charge_id" id="activity-charge" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose unpaid charge</option>{% for charge in charges %}{% if charge.status not in ['paid', 'void'] %}<option value="{{ charge.id }}" data-balance="{{ charge.outstanding }}">{{ charge.tenant_name }} · {{ charge.description }} · ${{ "{:,.2f}".format(charge.outstanding) }}</option>{% endif %}{% endfor %}</select></div>
+                <div class="grid grid-cols-2 gap-4"><div><label for="activity-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="activity-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div><label for="activity-date" class="mb-1 block text-sm font-medium text-gray-700">Date</label><input id="activity-date" name="occurred_on" type="date" required value="{{ request.query_params.get('date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
+                <div><label for="activity-method" class="mb-1 block text-sm font-medium text-gray-700">Method</label><select id="activity-method" name="payment_method" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="cash">Cash</option><option value="check">Check</option><option value="money_order">Money order</option><option value="zelle">Zelle</option><option value="ach">External ACH</option><option value="card">External card</option><option value="manual">Other</option></select></div>
+                <div><label for="activity-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="activity-description" name="description" maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Optional description"></div>
+                <div><label for="activity-note" class="mb-1 block text-sm font-medium text-gray-700">Note</label><textarea id="activity-note" name="note" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Internal note"></textarea></div>
             </div>
             <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('activity-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button id="activity-submit" class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Record payment</button></div>
         </form>
@@ -242,8 +258,8 @@
 <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-title">
     <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><form id="edit-form" method="POST">
         <input type="hidden" name="tenant_id" id="edit-tenant"><input type="hidden" name="property_id" id="edit-property">
-        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="edit-title" class="text-xl font-bold text-gray-950">Edit charge</h2><p class="text-sm text-gray-500">Amounts cannot be reduced below money already applied.</p></div><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
-        <div class="space-y-4 p-6"><div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
+        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="edit-title" class="text-xl font-bold text-gray-950">Edit charge</h2><p class="text-sm text-gray-500">Amounts cannot be reduced below money already applied.</p></div><button type="button" onclick="closeModal('edit-modal')" aria-label="Close edit charge dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
+        <div class="space-y-4 p-6"><div><label for="edit-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label for="edit-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label for="edit-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
         <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Save changes</button></div>
     </form></div>
 </div>
@@ -258,13 +274,21 @@ function openModal(id) {
     if (first) setTimeout(() => first.focus(), 30);
 }
 function closeModal(id) { const el = document.getElementById(id); el.classList.add('hidden'); el.classList.remove('flex'); }
-function toggleActions() { document.getElementById('actions-menu').classList.toggle('hidden'); }
+function toggleActions(button) {
+    const menu = document.getElementById('actions-menu');
+    menu.classList.toggle('hidden');
+    button.setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
+}
 function applyLedgerFilters() {
     const propertyId = document.getElementById('property-filter').value;
     const tenantId = document.getElementById('tenant-filter').value;
+    const status = document.getElementById('status-filter').value;
+    const method = document.getElementById('method-filter').value;
     const params = new URLSearchParams();
     if (propertyId) params.set('property_id', propertyId);
     if (tenantId) params.set('tenant_id', tenantId);
+    if (status) params.set('status', status);
+    if (method) params.set('method', method);
     window.location = '/payments' + (params.toString() ? '?' + params.toString() : '');
 }
 function openActivity(type) {
@@ -293,6 +317,11 @@ document.addEventListener('click', function(event) {
     const wrap = document.getElementById('actions-wrap');
     if (wrap && !wrap.contains(event.target)) document.getElementById('actions-menu').classList.add('hidden');
     if (event.target.matches('[id$="-modal"]')) closeModal(event.target.id);
+});
+document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Escape') return;
+    document.getElementById('actions-menu').classList.add('hidden');
+    document.querySelectorAll('[id$="-modal"]').forEach(modal => closeModal(modal.id));
 });
 document.getElementById('activity-charge')?.addEventListener('change', function() {
     const option = this.options[this.selectedIndex];

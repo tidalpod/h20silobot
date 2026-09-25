@@ -194,8 +194,8 @@ async def list_showings(
     request: Request,
     status: str = None,
     showing_type: str = None,
-    property_id: int = None,
-    vendor_id: int = None,
+    property_id: str = "",
+    vendor_id: str = "",
     date_from: str = None,
     date_to: str = None,
 ):
@@ -203,6 +203,36 @@ async def list_showings(
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    try:
+        selected_property_id = int(property_id) if property_id.strip() else None
+    except (TypeError, ValueError):
+        selected_property_id = None
+    try:
+        selected_vendor_id = int(vendor_id) if vendor_id.strip() else None
+    except (TypeError, ValueError):
+        selected_vendor_id = None
+    try:
+        selected_showing_type = ShowingType(showing_type) if showing_type else None
+    except ValueError:
+        selected_showing_type = None
+        showing_type = None
+    try:
+        selected_status = ShowingStatus(status) if status else None
+    except ValueError:
+        selected_status = None
+        status = None
+
+    def parse_filter_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    selected_date_from = parse_filter_date(date_from)
+    selected_date_to = parse_filter_date(date_to)
 
     async with get_session() as session:
         query = (
@@ -213,18 +243,18 @@ async def list_showings(
             )
         )
 
-        if status:
-            query = query.where(Showing.status == status)
-        if showing_type:
-            query = query.where(Showing.showing_type == ShowingType(showing_type))
-        if property_id:
-            query = query.where(Showing.property_id == property_id)
-        if vendor_id:
-            query = query.where(Showing.vendor_id == vendor_id)
-        if date_from:
-            query = query.where(Showing.scheduled_date >= datetime.strptime(date_from, "%Y-%m-%d").date())
-        if date_to:
-            query = query.where(Showing.scheduled_date <= datetime.strptime(date_to, "%Y-%m-%d").date())
+        if selected_status:
+            query = query.where(Showing.status == selected_status)
+        if selected_showing_type:
+            query = query.where(Showing.showing_type == selected_showing_type)
+        if selected_property_id:
+            query = query.where(Showing.property_id == selected_property_id)
+        if selected_vendor_id:
+            query = query.where(Showing.vendor_id == selected_vendor_id)
+        if selected_date_from:
+            query = query.where(Showing.scheduled_date >= selected_date_from)
+        if selected_date_to:
+            query = query.where(Showing.scheduled_date <= selected_date_to)
 
         query = query.order_by(desc(Showing.scheduled_date), desc(Showing.scheduled_time))
         result = await session.execute(query)
@@ -283,10 +313,10 @@ async def list_showings(
             "showing_types": ShowingType,
             "filter_status": status,
             "filter_type": showing_type,
-            "filter_property_id": property_id,
-            "filter_vendor_id": vendor_id,
-            "filter_date_from": date_from,
-            "filter_date_to": date_to,
+            "filter_property_id": selected_property_id,
+            "filter_vendor_id": selected_vendor_id,
+            "filter_date_from": selected_date_from.isoformat() if selected_date_from else None,
+            "filter_date_to": selected_date_to.isoformat() if selected_date_to else None,
             "reminder_settings": reminder_settings,
         }
     )

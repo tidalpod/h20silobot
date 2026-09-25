@@ -5,8 +5,10 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -201,7 +203,49 @@ app.add_middleware(
     secret_key=web_config.secret_key,
     session_cookie=web_config.session_cookie_name,
     max_age=web_config.session_max_age,
+    same_site=web_config.session_same_site,
+    https_only=web_config.session_cookie_secure,
 )
+
+
+@app.middleware("http")
+async def security_and_cache_headers(request: Request, call_next):
+    """Enforce same-origin form posts and apply browser security defaults."""
+    if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        source = request.headers.get("origin") or request.headers.get("referer")
+        if source:
+            source_host = urlparse(source).netloc.lower()
+            request_host = request.headers.get("x-forwarded-host", request.headers.get("host", "")).lower()
+            if source_host and source_host != request_host:
+                return JSONResponse({"detail": "Cross-origin request rejected"}, status_code=403)
+
+    response = await call_next(request)
+    is_upload = request.url.path.startswith("/uploads/")
+    frame_ancestors = "'self'" if is_upload else "'none'"
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN" if is_upload else "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.plaid.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: blob: https:; "
+        "font-src 'self' data:; connect-src 'self' https://*.plaid.com https://*.stripe.com; "
+        "frame-src 'self' https:; "
+        f"frame-ancestors {frame_ancestors}; base-uri 'self'; "
+        "form-action 'self' https://checkout.stripe.com",
+    )
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    if forwarded_proto.split(",")[0].strip() == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if request.url.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=604800")
+    elif response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 # Mount static files
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -301,20 +345,7 @@ async def health_check():
     }
 
 
-@app.get("/debug/uploads")
-async def debug_uploads():
-    """Debug endpoint to check upload configuration"""
-    props_dir = UPLOAD_DIR / "properties"
-    files = []
-    if props_dir.exists():
-        files = [f.name for f in props_dir.iterdir()][:20]
-
-    return {
-        "upload_path_env": os.environ.get("UPLOAD_PATH", "NOT SET (using default)"),
-        "actual_upload_path": str(UPLOAD_PATH),
-        "upload_dir_exists": UPLOAD_DIR.exists(),
-        "properties_dir_exists": props_dir.exists(),
-        "file_count": len(list(props_dir.iterdir())) if props_dir.exists() else 0,
-        "sample_files": files,
-        "is_volume": not str(UPLOAD_PATH).startswith(str(BASE_DIR))
-    }
+@app.get("/healthz")
+async def liveness_check():
+    """Lightweight platform liveness check that does not expose internals."""
+    return {"status": "ok"}

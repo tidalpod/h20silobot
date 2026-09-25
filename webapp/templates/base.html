@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Blue Deer{% endblock %} | Property Management</title>
-    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+    <link rel="icon" type="image/png" href="/static/images/icons/icon-96x96.png">
     <link rel="apple-touch-icon" href="/static/images/icons/icon-192x192.png">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1e3a8a">
@@ -47,27 +47,14 @@
         .htmx-request .htmx-indicator { display: inline-block; }
         .htmx-request.htmx-indicator { display: inline-block; }
 
-        /* Background image with soft overlay */
+        /* Calm, high-contrast application canvas */
         body {
             position: relative;
+            color: #172033;
+            background: linear-gradient(180deg, #f8fafc 0, #f3f6fb 22rem, #eef3f9 100%);
         }
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background-image: url('/static/images/bluedeebg.png');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            z-index: -2;
-        }
-        body::after {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background: rgba(255, 255, 255, 0.70);
-            z-index: -1;
-        }
+
+        :focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
 
         /* Gradient background */
         .gradient-bg {
@@ -80,8 +67,8 @@
             border: 1px solid transparent;
         }
         .card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -12px rgba(30,58,138,0.12), 0 8px 16px -8px rgba(59,130,246,0.08);
+            transform: translateY(-2px);
+            box-shadow: 0 16px 32px -16px rgba(30,58,138,0.18), 0 6px 12px -8px rgba(59,130,246,0.10);
             border-color: rgba(59,130,246,0.15);
         }
 
@@ -145,6 +132,33 @@
         .bd-btn-press { transition: transform 0.1s ease; }
         .bd-btn-press:active { transform: scale(0.97); }
 
+        /* Shared interface primitives */
+        .bd-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04); }
+        .bd-page-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .bd-page-title { font-size: 1.75rem; line-height: 2.25rem; font-weight: 700; letter-spacing: -0.025em; color: #0f172a; }
+        .bd-page-subtitle { margin-top: 0.25rem; font-size: 0.875rem; color: #64748b; }
+        .bd-filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; padding: 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+        .bd-input { min-height: 2.625rem; width: 100%; border: 1px solid #cbd5e1; border-radius: 0.625rem; background: #fff; padding: 0.625rem 0.75rem; color: #0f172a; transition: border-color .15s ease, box-shadow .15s ease; }
+        .bd-input:hover { border-color: #94a3b8; }
+        .bd-input:focus { border-color: #2563eb; outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, .13); }
+        .bd-btn { display: inline-flex; min-height: 2.625rem; align-items: center; justify-content: center; gap: .5rem; border-radius: .625rem; padding: .625rem 1rem; font-size: .875rem; font-weight: 600; line-height: 1.25rem; transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+        .bd-btn-primary { background: #2563eb; color: #fff; box-shadow: 0 1px 2px rgba(30, 64, 175, .2); }
+        .bd-btn-primary:hover { background: #1d4ed8; }
+        .bd-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+        .bd-btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
+        .bd-btn-danger { background: #dc2626; color: #fff; }
+        .bd-btn-danger:hover { background: #b91c1c; }
+        .bd-icon-button { display: inline-flex; width: 2.625rem; height: 2.625rem; align-items: center; justify-content: center; border-radius: .625rem; transition: background-color .15s ease; }
+
+        @media (max-width: 640px) {
+            .bd-page-header { align-items: flex-start; flex-direction: column; }
+            .bd-page-title { font-size: 1.5rem; line-height: 2rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        }
+
 
         /* ── Visual Polish ── */
         .bd-glass {
@@ -200,7 +214,7 @@
 
     {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-gray-50">
+<body class="h-full">
     <div class="min-h-full">
         <!-- Navigation -->
         {% if user %}
@@ -218,7 +232,7 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
                             <a href="/" class="text-white font-bold text-xl flex items-center gap-2">
-                                <img src="/static/images/logo.png" alt="Blue Deer" class="h-10 w-10 object-contain">
+                                <img src="/static/images/icons/icon-192x192.png" alt="Blue Deer" class="h-10 w-10 object-contain">
                                 <span class="hidden sm:inline">Blue Deer</span>
                             </a>
                         </div>
@@ -510,7 +524,7 @@
                         </div>
 
                         <!-- Search button -->
-                        <button onclick="openSearchModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer" title="Search (Cmd+K)">
+                        <button type="button" onclick="openSearchModal()" aria-label="Search Blue Deer" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer" title="Search (Cmd+K)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
@@ -565,12 +579,14 @@
                                     Public Site
                                 </a>
                                 <div class="border-t border-gray-100 my-1"></div>
-                                <a href="/logout" class="flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                <form method="POST" action="/logout">
+                                <button type="submit" class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                                     </svg>
-                                    Logout
-                                </a>
+                                    Sign out
+                                </button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -578,20 +594,20 @@
                     <!-- Mobile: right side buttons -->
                     <div class="flex items-center gap-2 lg:hidden">
                         <!-- Mobile messages -->
-                        <a href="/notifications/chat" class="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                        <a href="/notifications/chat" aria-label="Open messages" class="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                             </svg>
                             <span id="mobile-header-unread-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none"></span>
                         </a>
                         <!-- Mobile search -->
-                        <button onclick="openSearchModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer">
+                        <button type="button" onclick="openSearchModal()" aria-label="Search Blue Deer" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
                         </button>
                         <!-- Mobile menu button -->
-                        <button type="button" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="inline-flex items-center justify-center rounded-lg bg-white/20 p-2 text-white hover:bg-white/30 transition-colors">
+                        <button type="button" onclick="toggleMobileMenu(this)" aria-label="Open navigation menu" aria-controls="mobile-menu" aria-expanded="false" class="inline-flex items-center justify-center rounded-lg bg-white/20 p-2 text-white hover:bg-white/30 transition-colors">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                             </svg>
@@ -750,10 +766,12 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>
                             Public Site
                         </a>
-                        <a href="/logout" class="flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-red-300 hover:bg-white/10">
+                        <form method="POST" action="/logout">
+                        <button type="submit" class="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-red-300 hover:bg-white/10">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
-                            Logout
-                        </a>
+                            Sign out
+                        </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -805,7 +823,7 @@
         {% if user %}
         <footer class="mt-auto py-6 text-center text-sm text-gray-500">
             <p class="flex items-center justify-center gap-2">
-                <img src="/static/images/logo.png" alt="Blue Deer" class="h-6 w-6 object-contain">
+                <img src="/static/images/icons/icon-96x96.png" alt="" class="h-6 w-6 object-contain">
                 Blue Deer Property Management
             </p>
         </footer>
@@ -826,6 +844,14 @@
             });
             const target = document.getElementById('dropdown-' + name);
             if (target) target.classList.toggle('hidden');
+        }
+
+        function toggleMobileMenu(button) {
+            const menu = document.getElementById('mobile-menu');
+            const isOpening = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', String(isOpening));
+            button.setAttribute('aria-label', isOpening ? 'Close navigation menu' : 'Open navigation menu');
         }
 
         // Close all dropdowns when clicking outside
@@ -918,11 +944,13 @@
                     hasResults = true;
                     list.innerHTML += '<div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Properties</div>';
                     data.properties.forEach(p => {
+                        const address = escapeHTML(p.address);
+                        const city = escapeHTML(p.city);
                         list.innerHTML += `<a href="/properties/${p.id}" class="search-result flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors" data-search-result>
                             <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
                             </div>
-                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${p.address}</div><div class="text-xs text-gray-500">${p.city}</div></div>
+                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${address}</div><div class="text-xs text-gray-500">${city}</div></div>
                         </a>`;
                     });
                 }
@@ -932,11 +960,13 @@
                     hasResults = true;
                     list.innerHTML += '<div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Tenants</div>';
                     data.tenants.forEach(t => {
+                        const name = escapeHTML(t.name);
+                        const property = escapeHTML(t.property);
                         list.innerHTML += `<a href="/tenants/${t.id}" class="search-result flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors" data-search-result>
                             <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
                             </div>
-                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${t.name}</div><div class="text-xs text-gray-500 truncate">${t.property}</div></div>
+                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${name}</div><div class="text-xs text-gray-500 truncate">${property}</div></div>
                         </a>`;
                     });
                 }
@@ -946,11 +976,14 @@
                     hasResults = true;
                     list.innerHTML += '<div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Work Orders</div>';
                     data.work_orders.forEach(w => {
+                        const title = escapeHTML(w.title);
+                        const property = escapeHTML(w.property);
+                        const status = escapeHTML(w.status);
                         list.innerHTML += `<a href="/maintenance/${w.id}" class="search-result flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors" data-search-result>
                             <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
                                 <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743" /></svg>
                             </div>
-                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${w.title}</div><div class="text-xs text-gray-500 truncate">${w.property} &middot; ${w.status}</div></div>
+                            <div class="min-w-0"><div class="text-sm font-medium text-gray-900 truncate">${title}</div><div class="text-xs text-gray-500 truncate">${property} &middot; ${status}</div></div>
                         </a>`;
                     });
                 }
@@ -966,6 +999,12 @@
                 document.getElementById('search-loading').classList.add('hidden');
                 document.getElementById('search-no-results').classList.remove('hidden');
             }
+        }
+
+        function escapeHTML(value) {
+            const element = document.createElement('span');
+            element.textContent = value == null ? '' : String(value);
+            return element.innerHTML;
         }
 
         // Keyboard navigation in search results

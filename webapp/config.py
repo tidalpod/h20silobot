@@ -20,6 +20,8 @@ class WebConfig:
     # Session
     session_cookie_name: str = "h2o_session"
     session_max_age: int = 60 * 60 * 24 * 7  # 7 days
+    session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "true").lower() == "true"
+    session_same_site: str = os.getenv("SESSION_SAME_SITE", "lax")
 
     # Twilio
     twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")

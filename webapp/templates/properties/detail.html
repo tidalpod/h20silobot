@@ -3,7 +3,7 @@
 {% block title %}{{ property.address }}{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow">
+<header class="bg-white border-b border-slate-200">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <!-- Breadcrumb -->
         <nav class="flex mb-3" aria-label="Breadcrumb">
@@ -74,7 +74,7 @@
             </div>
 
             <!-- Header Actions -->
-            <div class="flex gap-2 flex-shrink-0">
+            <div class="flex flex-wrap gap-2 flex-shrink-0">
                 <a href="/payments?property_id={{ property.id }}" class="inline-flex items-center rounded-md bg-blue-950 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-900">
                     <span class="mr-1.5">💳</span>
                     Ledger
@@ -108,7 +108,7 @@
 
         <!-- Tab Navigation -->
         <div class="border-b border-gray-200">
-            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <nav class="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
                 <button onclick="showTab('overview')" id="tab-overview" class="tab-btn border-b-2 border-blue-500 py-3 px-1 text-sm font-medium text-blue-600">
                     Overview
                 </button>
@@ -1105,21 +1105,18 @@
         </div>
         {% endif %}
 
-        <!-- Quick Actions -->
+        <!-- Property Actions -->
         <div class="bg-white shadow rounded-lg">
             <div class="px-4 py-3 border-b border-gray-100">
-                <h4 class="text-sm font-semibold text-gray-900">Quick Actions</h4>
+                <h4 class="text-sm font-semibold text-gray-900">Property Actions</h4>
             </div>
             <div class="p-3 space-y-2">
                 <a href="/tenants/new?property_id={{ property.id }}" class="w-full inline-flex items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500">
-                    <span class="mr-2">👤</span> Add Tenant
-                </a>
-                <a href="/notifications/compose?property_id={{ property.id }}" class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <span class="mr-2">📧</span> Send Notification
+                    <span class="mr-2" aria-hidden="true">+</span> Add Tenant
                 </a>
                 <button data-sidebar-refresh onclick="refreshPropertyBill()"
                         class="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
-                    <span class="mr-2">🔄</span> Refresh Bills
+                    <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.023 9.348h4.992V4.356m-.77 4.22a9 9 0 1 0 .21 7.125" /></svg> Refresh Bills
                 </button>
             </div>
         </div>

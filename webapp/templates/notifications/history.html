@@ -3,10 +3,13 @@
 {% block title %}Notifications{% endblock %}
 
 {% block header %}
-<header class="bg-white shadow">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Notification History</h1>
-        <a href="/notifications/compose" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+<header class="bg-white border-b border-slate-200">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 bd-page-header">
+        <div>
+            <h1 class="bd-page-title">Notification History</h1>
+            <p class="bd-page-subtitle">Track outgoing SMS and email delivery in one place.</p>
+        </div>
+        <a href="/notifications/compose" class="bd-btn bd-btn-primary">
             <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
@@ -18,7 +21,7 @@
 
 {% block content %}
 <!-- Service Status -->
-<div class="bg-white shadow rounded-lg mb-6 p-4">
+<div class="bd-card mb-6 p-4">
     <h3 class="text-sm font-medium text-gray-700 mb-2">Service Status</h3>
     <div class="flex gap-4">
         <div class="flex items-center">
@@ -51,11 +54,11 @@
 </div>
 
 <!-- Filters -->
-<div class="bg-white shadow rounded-lg mb-6 p-4">
-    <form method="GET" class="flex flex-wrap gap-4 items-end">
+<div class="mb-6">
+    <form method="GET" class="bd-filter-bar">
         <div>
             <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select name="status" id="status" class="block rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm px-3">
+            <select name="status" id="status" class="bd-input min-w-48">
                 <option value="">All</option>
                 <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
                 <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
@@ -63,7 +66,7 @@
                 <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
             </select>
         </div>
-        <button type="submit" class="rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-200">
+        <button type="submit" class="bd-btn bd-btn-secondary">
             Filter
         </button>
         {% if status_filter %}
@@ -73,8 +76,9 @@
 </div>
 
 <!-- Notifications list -->
-<div class="bg-white shadow rounded-lg overflow-hidden">
+<div class="bd-card overflow-hidden">
     {% if notifications %}
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
@@ -136,6 +140,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <div class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,6 +157,9 @@
             </a>
         </div>
     </div>
+    {% endif %}
+    {% if notifications %}
+        {% include "components/pagination.html" %}
     {% endif %}
 </div>
 

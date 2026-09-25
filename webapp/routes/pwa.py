@@ -90,14 +90,13 @@ async def vendor_manifest():
 # --- Service Workers ---
 
 _SW_JS = """// Blue Deer Service Worker — {portal_name}
-const CACHE_NAME = '{cache_name}-v1';
+const CACHE_NAME = '{cache_name}-v2';
 const SCOPE = '{scope}';
 
 // Static assets to pre-cache
 const PRECACHE_URLS = [
-    SCOPE,
-    '/static/images/logo.png',
-    '/static/images/favicon.png',
+    '/static/images/icons/icon-192x192.png',
+    '/static/images/icons/icon-96x96.png',
 ];
 
 // Install: pre-cache shell
@@ -132,17 +131,9 @@ self.addEventListener('fetch', (event) => {{
         return;
     }}
 
-    // HTML pages: network-first with cache fallback
+    // Authenticated HTML may contain personal or financial data; never cache it.
     if (event.request.headers.get('Accept')?.includes('text/html')) {{
-        event.respondWith(
-            fetch(event.request)
-                .then((response) => {{
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                    return response;
-                }})
-                .catch(() => caches.match(event.request))
-        );
+        event.respondWith(fetch(event.request));
         return;
     }}
 

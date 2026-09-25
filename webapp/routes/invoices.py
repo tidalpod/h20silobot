@@ -34,6 +34,19 @@ async def invoice_list(request: Request):
     status_filter = request.query_params.get("status", "")
     vendor_filter = request.query_params.get("vendor_id", "")
     property_filter = request.query_params.get("property_id", "")
+    allowed_statuses = {status.value for status in InvoiceStatus}
+    if status_filter not in allowed_statuses:
+        status_filter = ""
+    try:
+        selected_vendor_id = int(vendor_filter) if vendor_filter else None
+    except ValueError:
+        selected_vendor_id = None
+        vendor_filter = ""
+    try:
+        selected_property_id = int(property_filter) if property_filter else None
+    except ValueError:
+        selected_property_id = None
+        property_filter = ""
 
     async with get_session() as session:
         query = (
@@ -47,10 +60,10 @@ async def invoice_list(request: Request):
 
         if status_filter:
             query = query.where(Invoice.status == status_filter)
-        if vendor_filter:
-            query = query.where(Invoice.vendor_id == int(vendor_filter))
-        if property_filter:
-            query = query.where(Invoice.property_id == int(property_filter))
+        if selected_vendor_id:
+            query = query.where(Invoice.vendor_id == selected_vendor_id)
+        if selected_property_id:
+            query = query.where(Invoice.property_id == selected_property_id)
 
         query = query.order_by(desc(Invoice.created_at))
         result = await session.execute(query)

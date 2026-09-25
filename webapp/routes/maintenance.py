@@ -4,6 +4,7 @@ import logging
 import uuid
 from datetime import datetime, date
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -182,17 +183,52 @@ async def list_work_orders(
     request: Request,
     status: str = None,
     priority: str = None,
-    property_id: int = None,
-    category: str = None
+    property_id: str = "",
+    category: str = None,
+    page: int = 1,
+    page_size: int = 25,
 ):
     """List work orders with filters"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    page = max(page, 1)
+    page_size = page_size if page_size in {25, 50, 100} else 25
+    try:
+        selected_property_id = int(property_id) if property_id.strip() else None
+    except (TypeError, ValueError):
+        selected_property_id = None
+    conditions = []
+    try:
+        status_enum = WorkOrderStatus(status) if status else None
+    except ValueError:
+        status_enum = None
+        status = None
+    try:
+        priority_enum = WorkOrderPriority(priority) if priority else None
+    except ValueError:
+        priority_enum = None
+        priority = None
+    try:
+        category_enum = WorkOrderCategory(category) if category else None
+    except ValueError:
+        category_enum = None
+        category = None
+
+    if status_enum:
+        conditions.append(WorkOrder.status == status_enum)
+    if priority_enum:
+        conditions.append(WorkOrder.priority == priority_enum)
+    if selected_property_id:
+        conditions.append(WorkOrder.property_id == selected_property_id)
+    if category_enum:
+        conditions.append(WorkOrder.category == category_enum)
+
     async with get_session() as session:
         query = (
             select(WorkOrder)
+            .where(*conditions)
             .options(
                 selectinload(WorkOrder.property_ref),
                 selectinload(WorkOrder.tenant_ref),
@@ -200,16 +236,18 @@ async def list_work_orders(
             )
         )
 
-        if status:
-            query = query.where(WorkOrder.status == WorkOrderStatus(status))
-        if priority:
-            query = query.where(WorkOrder.priority == WorkOrderPriority(priority))
-        if property_id:
-            query = query.where(WorkOrder.property_id == property_id)
-        if category:
-            query = query.where(WorkOrder.category == WorkOrderCategory(category))
+        count_result = await session.execute(
+            select(func.count(WorkOrder.id)).where(*conditions)
+        )
+        total_items = count_result.scalar() or 0
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        page = min(page, total_pages)
 
-        query = query.order_by(desc(WorkOrder.created_at))
+        query = (
+            query.order_by(desc(WorkOrder.created_at))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         result = await session.execute(query)
         work_orders = result.scalars().all()
 
@@ -226,6 +264,8 @@ async def list_work_orders(
             )
             setattr(s, '_count', count_result.scalar() or 0)
 
+    pagination_base = f"/maintenance?{urlencode({'status': status or '', 'priority': priority or '', 'property_id': selected_property_id or '', 'category': category or ''})}&"
+
     return templates.TemplateResponse(
         "maintenance/list.html",
         {
@@ -238,8 +278,13 @@ async def list_work_orders(
             "categories": WorkOrderCategory,
             "filter_status": status,
             "filter_priority": priority,
-            "filter_property_id": property_id,
+            "filter_property_id": selected_property_id,
             "filter_category": category,
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "pagination_base": pagination_base,
         }
     )
 
