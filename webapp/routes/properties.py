@@ -531,6 +531,17 @@ async def property_detail(request: Request, property_id: int):
         # Get active tenants
         active_tenants = [t for t in prop.tenants if t.is_active]
 
+        # Build a clean display location without surfacing placeholder values.
+        def clean_location_part(value):
+            text = str(value).strip() if value is not None else ""
+            return "" if text.lower() in {"none", "null", "n/a"} else text
+
+        city = clean_location_part(prop.city)
+        state = clean_location_part(prop.state)
+        zip_code = clean_location_part(prop.zip_code)
+        state_zip = " ".join(part for part in (state, zip_code) if part)
+        property_location = ", ".join(part for part in (city, state_zip) if part)
+
     return templates.TemplateResponse(
         "properties/detail.html",
         {
@@ -540,6 +551,7 @@ async def property_detail(request: Request, property_id: int):
             "current_status": current_status,
             "latest_bill": latest_bill,
             "active_tenants": active_tenants,
+            "property_location": property_location,
             "bills": prop.bills[:10],  # Last 10 bills
             "today": datetime.now().date(),  # For expiry date comparisons
             "violations": prop.violations,
