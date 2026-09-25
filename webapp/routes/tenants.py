@@ -17,6 +17,7 @@ from database.models import (
     WaterBill, TenantBankAccount, TenantAutopay, PaymentStatus,
 )
 from webapp.auth.dependencies import get_current_user
+from webapp.services import ledger_service
 from decimal import Decimal
 
 router = APIRouter(tags=["tenants"])
@@ -325,6 +326,8 @@ async def tenant_detail(request: Request, tenant_id: int):
 
     # Water bill balance = latest bill amount only (each bill is a scrape snapshot, not a separate charge)
     water_balance = float(water_bills[0].amount_due or 0) if water_bills and water_bills[0].amount_due else 0.0
+    ledger_charges = await ledger_service.list_charges(tenant_id=tenant_id, include_paid=True)
+    ledger_totals = ledger_service.totals(ledger_charges)
 
     return templates.TemplateResponse(
         "tenants/detail.html",
@@ -341,6 +344,7 @@ async def tenant_detail(request: Request, tenant_id: int):
             "water_bills": water_bills,
             "bank_accounts": bank_accounts,
             "water_balance": water_balance,
+            "ledger_totals": ledger_totals,
         }
     )
 

@@ -31,6 +31,10 @@ async def run_migrations(engine):
         ("entity_bank_accounts", "is_manual", "BOOLEAN DEFAULT false"),
         # Entity bank account on rent payments
         ("rent_payments", "entity_bank_account_id", "INTEGER REFERENCES entity_bank_accounts(id) ON DELETE SET NULL"),
+        # Shared tenant charge ledger links
+        ("rent_payments", "charge_id", "INTEGER REFERENCES tenant_charges(id) ON DELETE SET NULL"),
+        ("rent_payments", "plaid_authorization_id", "VARCHAR(255)"),
+        ("stripe_payments", "charge_id", "INTEGER REFERENCES tenant_charges(id) ON DELETE SET NULL"),
         # Investment / Financial columns on properties
         ("properties", "purchase_price", "NUMERIC(12,2)"),
         ("properties", "purchase_date", "DATE"),
@@ -106,6 +110,12 @@ async def run_migrations(engine):
         # Create indexes for new columns (idempotent)
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_sms_messages_vendor ON sms_messages(vendor_id)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_rent_payments_charge ON rent_payments(charge_id)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_stripe_payments_charge ON stripe_payments(charge_id)"
         ))
 
         # Make Plaid columns nullable on entity_bank_accounts (for manual entries)

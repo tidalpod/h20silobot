@@ -154,6 +154,16 @@ async def lifespan(app: FastAPI):
     # Start background showing reminder service
     reminder_task = None
     inspection_reminder_task = None
+    ledger_task = None
+    if db_success:
+        try:
+            from webapp.services.ledger_service import ensure_all_monthly_rent_charges, monthly_charge_loop
+            await ensure_all_monthly_rent_charges()
+            ledger_task = asyncio.create_task(monthly_charge_loop())
+            logger.info("Monthly rent charge service started")
+        except Exception as e:
+            logger.warning(f"Monthly rent charge service skipped: {e}")
+
     if db_success and web_config.has_twilio:
         from webapp.services.showing_reminders import reminder_loop
         reminder_task = asyncio.create_task(reminder_loop())
@@ -166,7 +176,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cancel reminder tasks on shutdown
-    for task in [reminder_task, inspection_reminder_task]:
+    for task in [reminder_task, inspection_reminder_task, ledger_task]:
         if task:
             task.cancel()
             try:

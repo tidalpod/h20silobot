@@ -42,6 +42,9 @@ def create_checkout_session(
     success_url: str,
     cancel_url: str,
     metadata: dict,
+    client_reference_id: str | None = None,
+    customer_email: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
     """Create a Stripe Checkout Session with two line items.
 
@@ -74,13 +77,23 @@ def create_checkout_session(
         })
 
     try:
+        params = {
+            "payment_method_types": ["card"],
+            "line_items": line_items,
+            "mode": "payment",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "metadata": {str(key): str(value) for key, value in metadata.items()},
+        }
+        if client_reference_id:
+            params["client_reference_id"] = client_reference_id
+        if customer_email:
+            params["customer_email"] = customer_email
+
+        request_options = {"idempotency_key": idempotency_key} if idempotency_key else {}
         session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=line_items,
-            mode="payment",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata=metadata,
+            **params,
+            **request_options,
         )
         return {"session_id": session.id, "url": session.url}
     except stripe.StripeError as e:

@@ -1,5 +1,6 @@
 """Tenant Portal — Payment routes (Plaid ACH + Stripe Checkout)"""
 
+import logging
 from datetime import datetime, date
 from decimal import Decimal
 from pathlib import Path
@@ -15,9 +16,10 @@ from database.models import (
     Tenant, TenantBankAccount, RentPayment, TenantAutopay,
     PaymentStatus, AutopayStatus,
     StripePayment, StripePaymentType, WaterBill, BillStatus,
+    TenantLedgerEntry,
 )
 from webapp.auth.tenant_auth import get_current_tenant
-from webapp.services import plaid_service, payment_service
+from webapp.services import ledger_service, plaid_service, payment_service
 from webapp.services import stripe_service
 from webapp.config import web_config
 
@@ -25,6 +27,7 @@ router = APIRouter(tags=["portal-payments"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+logger = logging.getLogger(__name__)
 
 
 async def _get_tenant_or_redirect(request: Request):
@@ -68,10 +71,21 @@ async def pay_rent_page(request: Request):
         )
         recent_payment = recent_result.scalar_one_or_none()
 
-    # Stripe fee preview
-    stripe_fee = None
-    if web_config.has_stripe and not balance.get("paid") and balance.get("total_due", 0) > 0:
-        stripe_fee = stripe_service.calculate_convenience_fee(balance["total_due"])
+    # Attach payable totals to each charge. The existing current-rent late fee remains
+    # separate from the underlying receivable and is collected with that charge.
+    charge_rows = balance.get("charges", [])
+    for charge in charge_rows:
+        is_current_rent = (
+            charge["charge_type"] == "rent"
+            and charge["due_date"].year == balance["payment_month"].year
+            and charge["due_date"].month == balance["payment_month"].month
+        )
+        charge["late_fee"] = balance.get("late_fee", Decimal("0.00")) if is_current_rent else Decimal("0.00")
+        charge["payable_amount"] = charge["outstanding"] + charge["late_fee"]
+        charge["stripe_fee"] = (
+            stripe_service.calculate_convenience_fee(charge["payable_amount"])
+            if web_config.has_stripe else None
+        )
 
     return templates.TemplateResponse(
         "portal/pay.html",
@@ -79,10 +93,10 @@ async def pay_rent_page(request: Request):
             "request": request,
             "tenant": tenant,
             "balance": balance,
+            "charges": charge_rows,
             "bank_accounts": bank_accounts,
             "recent_payment": recent_payment,
             "has_stripe": web_config.has_stripe,
-            "stripe_fee": stripe_fee,
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error"),
         },
@@ -97,25 +111,30 @@ async def submit_payment(request: Request):
         return redirect
 
     form = await request.form()
-    bank_account_id = int(form.get("bank_account_id", 0))
+    try:
+        bank_account_id = int(form.get("bank_account_id", 0))
+        charge_id = int(form.get("charge_id", 0))
+    except (TypeError, ValueError):
+        return RedirectResponse(url="/portal/pay?error=invalid_payment", status_code=303)
 
     if not bank_account_id:
         return RedirectResponse(url="/portal/pay?error=no_bank", status_code=303)
 
-    # Get balance
-    balance = await payment_service.calculate_balance_due(tenant["id"])
-    if balance.get("paid"):
+    charge = await ledger_service.get_charge(charge_id, tenant_id=tenant["id"])
+    if not charge or charge["status"] in {"paid", "void"}:
         return RedirectResponse(url="/portal/pay?error=already_paid", status_code=303)
 
     result = await payment_service.initiate_payment(
         tenant_id=tenant["id"],
         bank_account_id=bank_account_id,
-        amount=balance["rent_amount"],
-        payment_month=balance["payment_month"],
+        amount=charge["outstanding"],
+        payment_month=charge["due_date"].replace(day=1),
+        charge_id=charge_id,
     )
 
     if "error" in result:
-        return RedirectResponse(url=f"/portal/pay?error={result['error']}", status_code=303)
+        logger.warning("ACH payment failed for tenant %s: %s", tenant["id"], result["error"])
+        return RedirectResponse(url="/portal/pay?error=payment_failed", status_code=303)
 
     return RedirectResponse(url="/portal/pay?success=1", status_code=303)
 
@@ -149,6 +168,17 @@ async def payment_history(request: Request):
         )
         stripe_payments = stripe_result.scalars().all()
 
+        manual_result = await session.execute(
+            select(TenantLedgerEntry)
+            .where(
+                TenantLedgerEntry.tenant_id == tenant["id"],
+                TenantLedgerEntry.external_provider == "manual",
+                TenantLedgerEntry.status == "posted",
+            )
+            .order_by(desc(TenantLedgerEntry.created_at))
+        )
+        manual_entries = manual_result.scalars().all()
+
     # Merge and sort by date
     all_payments = []
     for p in ach_payments:
@@ -159,6 +189,7 @@ async def payment_history(request: Request):
             "late_fee": p.late_fee,
             "payment_month": p.payment_month,
             "status": p.status,
+            "status_value": p.status.value,
             "initiated_at": p.initiated_at,
             "is_autopay": p.is_autopay,
             "failure_reason": p.failure_reason,
@@ -168,15 +199,34 @@ async def payment_history(request: Request):
         all_payments.append({
             "type": "card",
             "total_amount": p.total_amount,
-            "amount": p.base_amount,
+            "amount": max(
+                Decimal(str(p.base_amount or 0)) - Decimal(str(p.late_fee or 0)),
+                Decimal("0.00"),
+            ),
             "late_fee": p.late_fee,
             "convenience_fee": p.convenience_fee,
             "payment_month": p.payment_month,
             "status": p.status,
+            "status_value": p.status.value,
             "initiated_at": p.initiated_at,
             "is_autopay": False,
             "failure_reason": p.failure_reason,
             "description": p.description,
+        })
+    for entry in manual_entries:
+        all_payments.append({
+            "type": entry.entry_type,
+            "total_amount": entry.amount,
+            "amount": entry.amount,
+            "late_fee": Decimal("0.00"),
+            "convenience_fee": Decimal("0.00"),
+            "payment_month": None,
+            "status": None,
+            "status_value": "completed",
+            "initiated_at": entry.created_at,
+            "is_autopay": False,
+            "failure_reason": None,
+            "description": entry.description,
         })
     all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
 
@@ -192,7 +242,7 @@ async def payment_history(request: Request):
 
 @router.post("/pay/stripe")
 async def stripe_pay_rent(request: Request):
-    """Create Stripe Checkout session for rent payment."""
+    """Create a Stripe Checkout session for a selected ledger charge."""
     tenant, redirect = await _get_tenant_or_redirect(request)
     if redirect:
         return redirect
@@ -200,27 +250,54 @@ async def stripe_pay_rent(request: Request):
     if not web_config.has_stripe:
         return RedirectResponse(url="/portal/pay?error=stripe_not_configured", status_code=303)
 
-    balance = await payment_service.calculate_balance_due(tenant["id"])
-    if balance.get("paid"):
+    form = await request.form()
+    try:
+        charge_id = int(form.get("charge_id", 0))
+    except (TypeError, ValueError):
+        charge_id = 0
+    charge = await ledger_service.get_charge(charge_id, tenant_id=tenant["id"])
+    if not charge or charge["status"] in {"paid", "void"}:
         return RedirectResponse(url="/portal/pay?error=already_paid", status_code=303)
 
-    base_amount = balance["total_due"]
+    async with get_session() as session:
+        pending_result = await session.execute(
+            select(StripePayment.id).where(
+                StripePayment.charge_id == charge_id,
+                StripePayment.status.in_([PaymentStatus.PENDING, PaymentStatus.PROCESSING]),
+            ).limit(1)
+        )
+        if pending_result.scalar_one_or_none():
+            return RedirectResponse(url="/portal/pay?error=payment_processing", status_code=303)
+
+    is_current_rent = (
+        charge["charge_type"] == "rent"
+        and charge["due_date"].year == date.today().year
+        and charge["due_date"].month == date.today().month
+    )
+    late_fee = payment_service.calculate_late_fee() if is_current_rent else Decimal("0.00")
+    base_amount = charge["outstanding"] + late_fee
     fee_info = stripe_service.calculate_convenience_fee(base_amount)
-    description = f"Rent - {balance['payment_month'].strftime('%B %Y')}"
+    description = charge["description"]
+    type_map = {
+        "rent": StripePaymentType.RENT,
+        "water": StripePaymentType.WATER_BILL,
+        "security_deposit": StripePaymentType.SECURITY_DEPOSIT,
+    }
 
     # Create StripePayment record
     async with get_session() as session:
         sp = StripePayment(
             tenant_id=tenant["id"],
             property_id=tenant["property_id"],
-            payment_type=StripePaymentType.RENT,
+            charge_id=charge_id,
+            payment_type=type_map.get(charge["charge_type"], StripePaymentType.OTHER),
             description=description,
             base_amount=fee_info["base_amount"],
             convenience_fee=fee_info["convenience_fee"],
             total_amount=fee_info["total_amount"],
-            late_fee=balance.get("late_fee", 0),
+            late_fee=late_fee,
             status=PaymentStatus.PENDING,
-            payment_month=balance["payment_month"],
+            payment_month=charge["due_date"].replace(day=1) if charge["charge_type"] == "rent" else None,
         )
         session.add(sp)
         await session.flush()
@@ -233,17 +310,30 @@ async def stripe_pay_rent(request: Request):
         convenience_fee=fee_info["convenience_fee"],
         description=description,
         success_url=f"{base_url}/portal/pay/stripe/success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{base_url}/portal/pay?error=cancelled",
+        cancel_url=f"{base_url}/portal/pay/stripe/cancel?payment_id={sp_id}",
         metadata={
             "tenant_id": str(tenant["id"]),
-            "payment_type": "rent",
+            "payment_type": charge["charge_type"],
             "stripe_payment_id": str(sp_id),
-            "payment_month": balance["payment_month"].isoformat(),
+            "charge_id": str(charge_id),
         },
+        client_reference_id=f"tenant-charge-{charge_id}",
+        customer_email=tenant.get("email"),
+        idempotency_key=f"blue-deer-stripe-payment-{sp_id}",
     )
 
     if "error" in result:
-        return RedirectResponse(url=f"/portal/pay?error={result['error']}", status_code=303)
+        logger.warning("Stripe Checkout creation failed for payment %s: %s", sp_id, result["error"])
+        async with get_session() as session:
+            failed_result = await session.execute(
+                select(StripePayment).where(StripePayment.id == sp_id)
+            )
+            failed_payment = failed_result.scalar_one_or_none()
+            if failed_payment:
+                failed_payment.status = PaymentStatus.FAILED
+                failed_payment.failed_at = datetime.utcnow()
+                failed_payment.failure_reason = str(result["error"])
+        return RedirectResponse(url="/portal/pay?error=payment_failed", status_code=303)
 
     # Save session ID
     async with get_session() as session:
@@ -256,6 +346,36 @@ async def stripe_pay_rent(request: Request):
     return RedirectResponse(url=result["url"], status_code=303)
 
 
+@router.get("/pay/stripe/cancel")
+async def stripe_cancel(request: Request):
+    """Release a pending charge when a tenant cancels Stripe Checkout."""
+    tenant, redirect = await _get_tenant_or_redirect(request)
+    if redirect:
+        return redirect
+
+    try:
+        payment_id = int(request.query_params.get("payment_id", "0"))
+    except ValueError:
+        payment_id = 0
+
+    if payment_id:
+        async with get_session() as session:
+            result = await session.execute(
+                select(StripePayment).where(
+                    StripePayment.id == payment_id,
+                    StripePayment.tenant_id == tenant["id"],
+                    StripePayment.status.in_([PaymentStatus.PENDING, PaymentStatus.PROCESSING]),
+                )
+            )
+            payment = result.scalar_one_or_none()
+            if payment:
+                payment.status = PaymentStatus.CANCELLED
+                payment.failed_at = datetime.utcnow()
+                payment.failure_reason = "Tenant cancelled Stripe Checkout"
+
+    return RedirectResponse(url="/portal/pay?error=cancelled", status_code=303)
+
+
 @router.get("/pay/stripe/success", response_class=HTMLResponse)
 async def stripe_success(request: Request):
     """Success landing page after Stripe Checkout redirect."""
@@ -266,7 +386,16 @@ async def stripe_success(request: Request):
     session_id = request.query_params.get("session_id")
     payment_info = None
     if session_id:
-        payment_info = stripe_service.retrieve_session(session_id)
+        async with get_session() as session:
+            result = await session.execute(
+                select(StripePayment.id).where(
+                    StripePayment.stripe_checkout_session_id == session_id,
+                    StripePayment.tenant_id == tenant["id"],
+                )
+            )
+            owns_session = result.scalar_one_or_none() is not None
+        if owns_session:
+            payment_info = stripe_service.retrieve_session(session_id)
 
     return templates.TemplateResponse(
         "portal/pay_stripe_success.html",

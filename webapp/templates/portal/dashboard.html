@@ -60,6 +60,17 @@
     </a>
 </div>
 
+<!-- Account Balance -->
+<a href="/portal/pay" class="block portal-card p-5 mb-4 hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><span class="text-lg">💳</span></div>
+            <div><h2 class="text-sm font-semibold text-gray-900">Account Balance</h2><p class="text-xs text-gray-500">{{ payment_balance.charges|length }} open charge{{ 's' if payment_balance.charges|length != 1 else '' }}</p></div>
+        </div>
+        <div class="text-right"><p class="text-xl font-bold {% if payment_balance.total_due > 0 %}text-blue-700{% else %}text-green-600{% endif %}">${{ "{:,.2f}".format(payment_balance.total_due) }}</p><p class="text-xs text-blue-600">View & pay →</p></div>
+    </div>
+</a>
+
 <!-- Latest Water Bill -->
 {% if latest_bill %}
 <div class="portal-card p-5 mb-4">
@@ -87,10 +98,8 @@
     <span class="text-lg mr-2">➕</span>
     <span class="font-medium">Submit Maintenance Request</span>
 </a>
-{% if has_stripe %}
-<a href="/portal/pay/deposit" class="block portal-card p-4 bg-purple-600 text-white text-center hover:bg-purple-500 transition-colors">
+<a href="/portal/pay" class="block portal-card p-4 bg-purple-600 text-white text-center hover:bg-purple-500 transition-colors">
     <span class="text-lg mr-2">&#128179;</span>
-    <span class="font-medium">Pay Security Deposit</span>
+    <span class="font-medium">View Charges & Make a Payment</span>
 </a>
-{% endif %}
 {% endblock %}

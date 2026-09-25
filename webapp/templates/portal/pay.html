@@ -1,173 +1,139 @@
 {% extends "portal/base.html" %}
 
-{% block title %}Pay Rent{% endblock %}
-
-{% block head %}
-<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
-{% endblock %}
+{% block title %}Payments{% endblock %}
 
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Pay Rent</h1>
-    <p class="text-sm text-gray-500 mt-1">Make a one-time rent payment</p>
+    <h1 class="text-2xl font-bold text-gray-900">Payments</h1>
+    <p class="text-sm text-gray-500 mt-1">View charges and pay securely</p>
 </div>
 
-<!-- Success/Error Messages -->
 {% if success %}
-<div class="mb-4 p-4 rounded-xl bg-green-50 border border-green-200">
-    <div class="flex items-center gap-2">
-        <span class="text-green-600 text-lg">&#10003;</span>
-        <p class="text-sm font-medium text-green-800">Payment submitted successfully! It may take 1-3 business days to process.</p>
-    </div>
+<div class="mb-4 p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-2">
+    <span class="text-green-600 text-lg">&#10003;</span>
+    <p class="text-sm font-medium text-green-800">Payment submitted. Bank payments can take 1–3 business days to settle.</p>
 </div>
 {% endif %}
 
 {% if error %}
-<div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200">
-    <div class="flex items-center gap-2">
-        <span class="text-red-600 text-lg">&#10007;</span>
-        <p class="text-sm font-medium text-red-800">
-            {% if error == 'no_bank' %}Please link a bank account first.
-            {% elif error == 'already_paid' %}Rent has already been paid for this month.
-            {% else %}{{ error }}{% endif %}
-        </p>
-    </div>
+<div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+    <span class="text-red-600 text-lg">&#10007;</span>
+    <p class="text-sm font-medium text-red-800">
+        {% if error == 'no_bank' %}Please link a bank account first.
+        {% elif error == 'already_paid' %}That charge no longer has an unpaid balance.
+        {% elif error == 'payment_processing' %}A payment is already processing for that charge.
+        {% elif error == 'stripe_not_configured' %}Card payments are temporarily unavailable.
+        {% elif error == 'cancelled' %}Card checkout was cancelled.
+        {% else %}We could not start that payment. Please try again or contact management.{% endif %}
+    </p>
 </div>
 {% endif %}
 
-<!-- Balance Due Card -->
-<div class="portal-card p-5 mb-4">
-    <div class="text-center mb-4">
-        <p class="text-sm text-gray-500 mb-1">
-            {% if balance.paid %}Paid for{% else %}Balance Due for{% endif %}
-            {{ balance.payment_month.strftime('%B %Y') }}
-        </p>
-        <p class="text-4xl font-bold {% if balance.paid %}text-green-600{% elif balance.total_due > 0 %}text-gray-900{% else %}text-green-600{% endif %}">
-            ${{ "{:,.2f}".format(balance.total_due) }}
-        </p>
-        {% if balance.paid %}
-        <span class="inline-flex items-center mt-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">Paid</span>
-        {% endif %}
-    </div>
-
-    {% if not balance.paid and balance.total_due > 0 %}
-    <!-- Breakdown -->
-    <div class="border-t border-gray-100 pt-3 space-y-2">
-        <div class="flex justify-between text-sm">
-            <span class="text-gray-500">Monthly Rent</span>
-            <span class="text-gray-900 font-medium">${{ "{:,.2f}".format(balance.rent_amount) }}</span>
-        </div>
+<div class="portal-card overflow-hidden mb-5 bg-gradient-to-br from-blue-700 to-blue-900 text-white border-0">
+    <div class="p-6">
+        <p class="text-sm text-blue-100">Total unpaid charges</p>
+        <p class="text-4xl font-bold mt-1">${{ "{:,.2f}".format(balance.total_due) }}</p>
         {% if balance.late_fee > 0 %}
-        <div class="flex justify-between text-sm">
-            <span class="text-red-500">Late Fee</span>
-            <span class="text-red-600 font-medium">${{ "{:,.2f}".format(balance.late_fee) }}</span>
-        </div>
+        <p class="text-xs text-blue-100 mt-2">Includes ${{ "{:,.2f}".format(balance.late_fee) }} current rent late fee</p>
         {% endif %}
-        <div class="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
-            <span>Total</span>
-            <span>${{ "{:,.2f}".format(balance.total_due) }}</span>
-        </div>
     </div>
-    {% endif %}
+    <div class="bg-white/10 px-6 py-3 flex justify-between text-xs text-blue-50">
+        <span>{{ charges|length }} open charge{{ 's' if charges|length != 1 else '' }}</span>
+        <a href="/portal/pay/history" class="font-medium hover:text-white">Payment history →</a>
+    </div>
 </div>
 
-<!-- Payment Form -->
-{% if not balance.paid and balance.total_due > 0 %}
-<form method="POST" action="/portal/pay" class="mb-4">
-    {% if bank_accounts %}
-    <!-- Linked Bank Account -->
-    <div class="portal-card p-4 mb-4">
-        <label class="text-sm font-medium text-gray-700 mb-2 block">Pay From</label>
-        {% for account in bank_accounts %}
-        {% if account.is_active %}
-        <label class="flex items-center gap-3 p-3 rounded-lg border {% if loop.first %}border-blue-300 bg-blue-50{% else %}border-gray-200{% endif %} cursor-pointer mb-2">
-            <input type="radio" name="bank_account_id" value="{{ account.id }}" {% if loop.first %}checked{% endif %} class="text-blue-600">
-            <div class="flex-1">
-                <p class="text-sm font-medium text-gray-900">{{ account.institution_name or 'Bank Account' }}</p>
-                <p class="text-xs text-gray-500">{{ account.account_name }} ...{{ account.account_mask }}</p>
+{% if charges %}
+<div class="space-y-4 mb-5">
+    {% for charge in charges %}
+    <section class="portal-card overflow-hidden">
+        <div class="p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        {% if charge.charge_type == 'rent' %}<span aria-hidden="true">🏠</span>
+                        {% elif charge.charge_type == 'water' %}<span aria-hidden="true">💧</span>
+                        {% elif charge.charge_type == 'security_deposit' %}<span aria-hidden="true">🔐</span>
+                        {% elif charge.charge_type == 'late_fee' %}<span aria-hidden="true">⏱️</span>
+                        {% else %}<span aria-hidden="true">🧾</span>{% endif %}
+                        <h2 class="font-semibold text-gray-900 truncate">{{ charge.description }}</h2>
+                    </div>
+                    <p class="text-xs {% if charge.status == 'overdue' %}text-red-600 font-medium{% else %}text-gray-500{% endif %}">
+                        Due {{ charge.due_date.strftime('%b %d, %Y') }}
+                        {% if charge.status == 'overdue' %} · Overdue{% if charge.is_partial %}, partially paid{% endif %}{% endif %}
+                    </p>
+                    {% if charge.applied > 0 %}
+                    <p class="text-xs text-green-600 mt-1">${{ "{:,.2f}".format(charge.applied) }} already applied</p>
+                    {% endif %}
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="text-xl font-bold text-gray-900">${{ "{:,.2f}".format(charge.payable_amount) }}</p>
+                    {% if charge.late_fee > 0 %}
+                    <p class="text-[11px] text-red-500">includes ${{ "{:,.2f}".format(charge.late_fee) }} late fee</p>
+                    {% else %}
+                    <p class="text-[11px] text-gray-400">${{ "{:,.2f}".format(charge.outstanding) }} remaining</p>
+                    {% endif %}
+                </div>
             </div>
-        </label>
-        {% endif %}
-        {% endfor %}
-    </div>
+        </div>
 
-    <button type="submit" class="w-full py-3 rounded-xl bg-blue-600 text-white font-medium text-center hover:bg-blue-500 transition-colors">
-        Pay ${{ "{:,.2f}".format(balance.total_due) }}
-    </button>
-    {% else %}
-    <!-- No Bank Account Linked -->
-    <div class="portal-card p-5 text-center mb-4">
-        <span class="text-3xl block mb-2">&#127974;</span>
-        <p class="text-sm font-medium text-gray-900 mb-1">No bank account linked</p>
-        <p class="text-xs text-gray-500 mb-3">Link your bank account to pay rent online</p>
-        <a href="/portal/pay/bank" class="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 transition-colors">
-            Link Bank Account
-        </a>
-    </div>
-    {% endif %}
-</form>
-{% endif %}
+        <div class="border-t border-gray-100 p-4 bg-gray-50 space-y-3">
+            {% if bank_accounts %}
+            <form method="POST" action="/portal/pay" class="space-y-2">
+                <input type="hidden" name="charge_id" value="{{ charge.id }}">
+                <label for="bank-{{ charge.id }}" class="sr-only">Bank account</label>
+                <select id="bank-{{ charge.id }}" name="bank_account_id" class="w-full rounded-xl border-gray-300 text-sm px-3 py-2.5 bg-white border">
+                    {% for account in bank_accounts %}
+                    {% if account.is_active %}
+                    <option value="{{ account.id }}">{{ account.institution_name or 'Bank account' }} ····{{ account.account_mask }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="submit" class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-500 transition-colors">
+                    Pay ${{ "{:,.2f}".format(charge.payable_amount) }} from Bank
+                </button>
+            </form>
+            {% else %}
+            <a href="/portal/pay/bank" class="block w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm text-center hover:bg-blue-500 transition-colors">
+                Link a Bank Account
+            </a>
+            {% endif %}
 
-<!-- Pay with Card (Stripe) -->
-{% if has_stripe and not balance.paid and balance.total_due > 0 and stripe_fee %}
-<div class="portal-card p-5 mb-4">
-    <div class="flex items-center gap-2 mb-3">
-        <span class="text-lg">&#128179;</span>
-        <h3 class="text-sm font-semibold text-gray-900">Or Pay with Card</h3>
-    </div>
-    <div class="space-y-2 mb-4">
-        <div class="flex justify-between text-sm">
-            <span class="text-gray-500">Rent Amount</span>
-            <span class="text-gray-900">${{ "{:,.2f}".format(stripe_fee.base_amount) }}</span>
+            {% if has_stripe and charge.stripe_fee %}
+            <form method="POST" action="/portal/pay/stripe">
+                <input type="hidden" name="charge_id" value="{{ charge.id }}">
+                <button type="submit" class="w-full py-3 rounded-xl bg-white border border-gray-300 text-gray-800 font-semibold text-sm hover:bg-gray-100 transition-colors flex items-center justify-center gap-2">
+                    <span aria-hidden="true">💳</span>
+                    Pay ${{ "{:,.2f}".format(charge.stripe_fee.total_amount) }} by Card
+                </button>
+                <p class="text-[11px] text-gray-400 text-center mt-1.5">
+                    Includes ${{ "{:,.2f}".format(charge.stripe_fee.convenience_fee) }} card processing fee
+                </p>
+            </form>
+            {% endif %}
         </div>
-        <div class="flex justify-between text-sm">
-            <span class="text-gray-500">Card Processing Fee</span>
-            <span class="text-gray-900">${{ "{:,.2f}".format(stripe_fee.convenience_fee) }}</span>
-        </div>
-        <div class="flex justify-between text-sm font-bold border-t border-gray-100 pt-2">
-            <span>Total</span>
-            <span>${{ "{:,.2f}".format(stripe_fee.total_amount) }}</span>
-        </div>
-    </div>
-    <form method="POST" action="/portal/pay/stripe">
-        <button type="submit" class="w-full py-3 rounded-xl bg-purple-600 text-white font-medium text-center hover:bg-purple-500 transition-colors">
-            Pay ${{ "{:,.2f}".format(stripe_fee.total_amount) }} with Card
-        </button>
-    </form>
-    <p class="text-xs text-gray-400 mt-2 text-center">You'll be redirected to Stripe's secure checkout</p>
+    </section>
+    {% endfor %}
+</div>
+{% else %}
+<div class="portal-card p-8 text-center mb-5">
+    <span class="text-4xl block mb-3">✓</span>
+    <h2 class="text-lg font-semibold text-gray-900">You're all caught up</h2>
+    <p class="text-sm text-gray-500 mt-1">There are no unpaid charges on your account.</p>
 </div>
 {% endif %}
 
-<!-- Recent Payment -->
-{% if recent_payment %}
-<div class="portal-card p-4 mb-4">
-    <h3 class="text-sm font-semibold text-gray-900 mb-2">Most Recent Payment</h3>
-    <div class="flex justify-between items-center">
-        <div>
-            <p class="text-sm text-gray-900">${{ "{:,.2f}".format(recent_payment.total_amount) }}</p>
-            <p class="text-xs text-gray-500">{{ recent_payment.payment_month.strftime('%B %Y') }} &middot; {{ recent_payment.initiated_at.strftime('%b %d') }}</p>
-        </div>
-        {% if recent_payment.status.value == 'completed' %}
-        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
-        {% elif recent_payment.status.value == 'processing' %}
-        <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Processing</span>
-        {% elif recent_payment.status.value == 'pending' %}
-        <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>
-        {% elif recent_payment.status.value == 'failed' %}
-        <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Failed</span>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
-
-<!-- Quick Links -->
-<div class="grid grid-cols-2 gap-3">
+<div class="grid grid-cols-3 gap-3">
     <a href="/portal/pay/history" class="portal-card p-3 text-center hover:shadow-md transition-shadow">
-        <span class="text-lg block">&#128196;</span>
+        <span class="text-lg block">📄</span>
         <span class="text-xs text-gray-600">History</span>
     </a>
+    <a href="/portal/pay/bank" class="portal-card p-3 text-center hover:shadow-md transition-shadow">
+        <span class="text-lg block">🏦</span>
+        <span class="text-xs text-gray-600">Bank</span>
+    </a>
     <a href="/portal/pay/autopay" class="portal-card p-3 text-center hover:shadow-md transition-shadow">
-        <span class="text-lg block">&#128260;</span>
+        <span class="text-lg block">🔄</span>
         <span class="text-xs text-gray-600">Autopay</span>
     </a>
 </div>

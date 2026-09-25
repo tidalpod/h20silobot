@@ -1,11 +1,11 @@
 """Database models for Water Bill Tracker"""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Numeric, DateTime, Date,
-    ForeignKey, Text, Enum, Boolean, Index, Float
+    ForeignKey, Text, Enum, Boolean, Index, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -1245,6 +1245,99 @@ class ProjectDraw(Base):
 # Payment Models (Plaid ACH)
 # =============================================================================
 
+class TenantCharge(Base):
+    """A receivable shown on both the manager ledger and tenant portal."""
+    __tablename__ = "tenant_charges"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    charge_type = Column(String(30), nullable=False, default="other")
+    description = Column(String(255), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    due_date = Column(Date, nullable=False)
+    service_start = Column(Date, nullable=True)
+    service_end = Column(Date, nullable=True)
+
+    is_recurring = Column(Boolean, default=False, nullable=False)
+    recurrence_group = Column(String(64), nullable=True)
+    unique_key = Column(String(100), unique=True, nullable=True)
+    is_void = Column(Boolean, default=False, nullable=False)
+    void_reason = Column(String(255), nullable=True)
+
+    created_by_user_id = Column(Integer, ForeignKey("web_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    tenant_ref = relationship("Tenant")
+    property_ref = relationship("Property")
+    ledger_entries = relationship(
+        "TenantLedgerEntry",
+        back_populates="charge_ref",
+        order_by="TenantLedgerEntry.created_at",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_tenant_charges_tenant_due", "tenant_id", "due_date"),
+        Index("ix_tenant_charges_property_due", "property_id", "due_date"),
+        Index("ix_tenant_charges_type", "charge_type"),
+    )
+
+    def __repr__(self):
+        return f"<TenantCharge {self.description} ${self.amount}>"
+
+
+class TenantLedgerEntry(Base):
+    """Immutable activity applied to a charge or recorded on a tenant ledger."""
+    __tablename__ = "tenant_ledger_entries"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    charge_id = Column(Integer, ForeignKey("tenant_charges.id", ondelete="CASCADE"), nullable=True)
+
+    # payment and credit reduce a charge; reversal restores it; refund is history-only
+    entry_type = Column(String(20), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    status = Column(String(20), nullable=False, default="posted")
+    payment_method = Column(String(30), nullable=True)
+    description = Column(String(255), nullable=False)
+    note = Column(Text, nullable=True)
+
+    external_provider = Column(String(30), nullable=True)
+    external_id = Column(String(255), nullable=True)
+    occurred_on = Column(Date, nullable=False, default=date.today)
+    created_by_user_id = Column(Integer, ForeignKey("web_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant_ref = relationship("Tenant")
+    property_ref = relationship("Property")
+    charge_ref = relationship("TenantCharge", back_populates="ledger_entries")
+
+    __table_args__ = (
+        Index("ix_tenant_ledger_entries_tenant", "tenant_id"),
+        Index("ix_tenant_ledger_entries_property", "property_id"),
+        Index("ix_tenant_ledger_entries_charge", "charge_id"),
+        UniqueConstraint(
+            "external_provider", "external_id", "entry_type",
+            name="uq_tenant_ledger_external_entry",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<TenantLedgerEntry {self.entry_type} ${self.amount}>"
+
+
+class PaymentProviderState(Base):
+    """Durable cursors used to consume provider event streams once."""
+    __tablename__ = "payment_provider_state"
+
+    provider = Column(String(30), primary_key=True)
+    cursor = Column(String(255), nullable=False, default="0")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class TenantBankAccount(Base):
     """Plaid-linked bank accounts for tenants"""
     __tablename__ = "tenant_bank_accounts"
@@ -1287,6 +1380,7 @@ class RentPayment(Base):
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
     bank_account_id = Column(Integer, ForeignKey("tenant_bank_accounts.id", ondelete="SET NULL"), nullable=True)
     entity_bank_account_id = Column(Integer, ForeignKey("entity_bank_accounts.id", ondelete="SET NULL"), nullable=True)
+    charge_id = Column(Integer, ForeignKey("tenant_charges.id", ondelete="SET NULL"), nullable=True)
 
     # Amounts
     amount = Column(Numeric(10, 2), nullable=False)
@@ -1295,6 +1389,7 @@ class RentPayment(Base):
 
     # Plaid transfer
     plaid_transfer_id = Column(String(255), nullable=True)
+    plaid_authorization_id = Column(String(255), nullable=True)
     plaid_transfer_status = Column(String(50), nullable=True)
 
     # Payment info
@@ -1313,6 +1408,7 @@ class RentPayment(Base):
     property_ref = relationship("Property")
     bank_account_ref = relationship("TenantBankAccount", back_populates="payments")
     entity_bank_account_ref = relationship("EntityBankAccount")
+    charge_ref = relationship("TenantCharge")
 
     __table_args__ = (
         Index("ix_rent_payments_tenant", "tenant_id"),
@@ -1865,6 +1961,7 @@ class StripePayment(Base):
     id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    charge_id = Column(Integer, ForeignKey("tenant_charges.id", ondelete="SET NULL"), nullable=True)
 
     # Payment type and reference
     payment_type = Column(Enum(StripePaymentType), nullable=False)
@@ -1894,6 +1991,7 @@ class StripePayment(Base):
     # Relationships
     tenant_ref = relationship("Tenant")
     property_ref = relationship("Property")
+    charge_ref = relationship("TenantCharge")
 
     __table_args__ = (
         Index("ix_stripe_payments_tenant", "tenant_id"),

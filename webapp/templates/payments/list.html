@@ -1,154 +1,306 @@
 {% extends "base.html" %}
 
-{% block title %}Payments{% endblock %}
+{% block title %}Payment Ledger{% endblock %}
 
 {% block header %}
 <header class="bg-white shadow-sm">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-                <span>&#128176;</span> Payments
-            </h1>
-            <p class="mt-1 text-sm text-gray-500">All tenant payments — ACH and Card</p>
+            <p class="text-sm font-medium text-blue-600">Payment center</p>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Payment Ledger</h1>
+            <p class="mt-1 text-sm text-gray-500">
+                {% if selected_tenant %}{{ selected_tenant.name }} · {{ selected_tenant.property_ref.address }}
+                {% elif selected_property %}{{ selected_property.address }}
+                {% else %}Charges and payments across every property{% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="relative" id="actions-wrap">
+                <button type="button" onclick="toggleActions()" class="inline-flex items-center gap-2 rounded-full border-2 border-blue-600 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-blue-700 hover:bg-blue-50">
+                    Actions
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+                <div id="actions-menu" class="hidden absolute right-0 z-30 mt-2 w-72 rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
+                    <button type="button" onclick="openActivity('payment')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Record payment</button>
+                    <button type="button" onclick="openActivity('credit')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Add credit</button>
+                    <button type="button" onclick="openActivity('refund')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Return security deposit</button>
+                </div>
+            </div>
+            <button type="button" onclick="openModal('charge-modal')" class="rounded-full bg-blue-950 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-blue-900">
+                Create charge
+            </button>
         </div>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
-<!-- Summary Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <p class="text-sm text-gray-500">Total Collected</p>
-        <p class="text-2xl font-bold text-green-600">${{ "{:,.2f}".format(completed_amount) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <p class="text-sm text-gray-500">Total Initiated</p>
-        <p class="text-2xl font-bold text-gray-900">${{ "{:,.2f}".format(total_amount) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <p class="text-sm text-gray-500">Pending / Processing</p>
-        <p class="text-2xl font-bold text-blue-600">{{ pending_count }}</p>
-    </div>
+{% if request.query_params.get('success') %}
+<div class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">Ledger updated successfully.</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+    The ledger could not be updated. Check the amount and selected charge, then try again.
 </div>
+{% endif %}
 
-<!-- Entity Breakdown -->
-{% if entity_summary and entity_summary|length > 0 %}
-<div class="mb-6">
-    <h2 class="text-sm font-semibold text-gray-700 mb-3">By Entity</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{ [entity_summary|length, 4]|min }} gap-4">
-        {% for entity_name, data in entity_summary.items() %}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <div class="flex items-center justify-between mb-2">
-                <p class="text-sm font-medium text-gray-900 truncate" title="{{ entity_name }}">{{ entity_name }}</p>
-                <span class="text-xs text-gray-400">{{ data.count }} pmt{{ 's' if data.count != 1 else '' }}</span>
-            </div>
-            <p class="text-xl font-bold text-green-600">${{ "{:,.2f}".format(data.collected) }}</p>
-            <p class="text-xs text-gray-500">collected</p>
-            {% if data.pending > 0 %}
-            <p class="text-xs text-blue-600 mt-1">${{ "{:,.2f}".format(data.pending) }} pending</p>
-            {% endif %}
+<section class="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+        <div>
+            <label for="property-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Property</label>
+            <select id="property-filter" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm searchable-select" data-placeholder="All properties">
+                <option value="">All properties</option>
+                {% for prop in properties %}
+                <option value="{{ prop.id }}" {% if filter_property_id == prop.id %}selected{% endif %}>{{ prop.address }}</option>
+                {% endfor %}
+            </select>
         </div>
+        <div>
+            <label for="tenant-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Tenant</label>
+            <select id="tenant-filter" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm searchable-select" data-placeholder="All tenants">
+                <option value="">All tenants</option>
+                {% for tenant in tenants %}
+                <option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="button" onclick="applyLedgerFilters()" class="self-end rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800">View ledger</button>
+    </div>
+</section>
+
+<section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+        <p class="text-sm text-gray-500">Unpaid charges</p>
+        <p class="mt-1 text-3xl font-bold text-blue-950">${{ "{:,.2f}".format(charge_totals.outstanding) }}</p>
+        <p class="mt-1 text-xs text-gray-400">Across {{ charges|selectattr('status', 'in', ['open', 'partial', 'overdue'])|list|length }} open items</p>
+    </article>
+    <article class="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
+        <p class="text-sm text-gray-500">Payments & credits applied</p>
+        <p class="mt-1 text-3xl font-bold text-green-700">${{ "{:,.2f}".format(charge_totals.paid_or_credited) }}</p>
+        <p class="mt-1 text-xs text-gray-400">Against ledger charges</p>
+    </article>
+    <article class="rounded-2xl border {% if charge_totals.overdue > 0 %}border-red-100{% else %}border-gray-100{% endif %} bg-white p-5 shadow-sm">
+        <p class="text-sm text-gray-500">Overdue</p>
+        <p class="mt-1 text-3xl font-bold {% if charge_totals.overdue > 0 %}text-red-600{% else %}text-gray-900{% endif %}">${{ "{:,.2f}".format(charge_totals.overdue) }}</p>
+        <p class="mt-1 text-xs text-gray-400">Past-due outstanding balance</p>
+    </article>
+</section>
+
+<section class="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+        <div>
+            <h2 class="text-xl font-bold text-blue-950">Charges</h2>
+            <p class="text-sm text-gray-500">Rent, deposits, utilities, fees, and other tenant receivables</p>
+        </div>
+        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{{ charges|length }} total</span>
+    </div>
+
+    {% if charges %}
+    <div class="divide-y divide-gray-100">
+        {% for charge in charges %}
+        <article class="px-6 py-5 hover:bg-gray-50">
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:items-center">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-base">
+                            {% if charge.charge_type == 'rent' %}↻{% elif charge.charge_type == 'water' %}💧{% elif charge.charge_type == 'security_deposit' %}🔐{% else %}＋{% endif %}
+                        </span>
+                        <div class="min-w-0">
+                            <h3 class="truncate font-semibold text-gray-950">{{ charge.description }}</h3>
+                            <p class="truncate text-sm text-gray-500">
+                                <a href="/payments?tenant_id={{ charge.tenant_id }}" class="hover:text-blue-600">{{ charge.tenant_name }}</a>
+                                · <a href="/payments?property_id={{ charge.property_id }}" class="hover:text-blue-600">{{ charge.property_address }}</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-sm">
+                    <p class="font-medium text-gray-800">Due {{ charge.due_date.strftime('%b %d, %Y') }}</p>
+                    <p class="text-gray-500">{{ charge.charge_type.replace('_', ' ').title() }}{% if charge.is_recurring %} · Monthly{% endif %}</p>
+                </div>
+                <div class="lg:text-right">
+                    <p class="text-lg font-bold text-gray-950">${{ "{:,.2f}".format(charge.outstanding) }}</p>
+                    <p class="text-xs text-gray-500">of ${{ "{:,.2f}".format(charge.amount) }} unpaid</p>
+                </div>
+                <div class="flex items-center justify-between gap-3 lg:justify-end">
+                    {% if charge.status == 'paid' %}<span class="bd-badge bd-badge-success">Paid</span>
+                    {% elif charge.status == 'partial' %}<span class="bd-badge bd-badge-info">Partial</span>
+                    {% elif charge.status == 'overdue' %}<span class="bd-badge bd-badge-danger">Overdue{% if charge.is_partial %} · partial{% endif %}</span>
+                    {% elif charge.status == 'void' %}<span class="bd-badge bg-gray-100 text-gray-600">Void</span>
+                    {% else %}<span class="bd-badge bd-badge-warning">Open</span>{% endif %}
+                    {% if charge.status != 'void' %}
+                    <button type="button" class="rounded-lg p-2 text-blue-700 hover:bg-blue-50" aria-label="Edit {{ charge.description }}"
+                        onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})'>
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if charge.entries %}
+            <details class="ml-11 mt-3">
+                <summary class="cursor-pointer text-xs font-medium text-blue-600">{{ charge.entries|length }} ledger entr{{ 'y' if charge.entries|length == 1 else 'ies' }}</summary>
+                <div class="mt-2 space-y-1.5 border-l-2 border-blue-100 pl-3">
+                    {% for entry in charge.entries %}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600">{{ entry.description }} · {{ entry.occurred_on.strftime('%b %d, %Y') }}</span>
+                        <span class="font-semibold {% if entry.entry_type in ['payment', 'credit'] %}text-green-700{% elif entry.entry_type == 'reversal' %}text-red-600{% else %}text-gray-700{% endif %}">
+                            {% if entry.entry_type in ['payment', 'credit'] %}−{% elif entry.entry_type == 'reversal' %}+{% endif %}${{ "{:,.2f}".format(entry.amount) }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        </article>
         {% endfor %}
     </div>
-</div>
-{% endif %}
-
-<!-- Filters -->
-<div class="mb-6 flex flex-wrap gap-3">
-    <!-- Status filters -->
-    <a href="/payments{% if filter_method %}?method={{ filter_method }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if not filter_status %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">All</a>
-    <a href="/payments?status=completed{% if filter_method %}&method={{ filter_method }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'completed' %}bg-green-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Completed</a>
-    <a href="/payments?status=processing{% if filter_method %}&method={{ filter_method }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'processing' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Processing</a>
-    <a href="/payments?status=pending{% if filter_method %}&method={{ filter_method }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'pending' %}bg-yellow-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Pending</a>
-    <a href="/payments?status=failed{% if filter_method %}&method={{ filter_method }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_status == 'failed' %}bg-red-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Failed</a>
-
-    <span class="border-l border-gray-300 mx-1"></span>
-
-    <!-- Method filters -->
-    <a href="/payments{% if filter_status %}?status={{ filter_status }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if not filter_method %}bg-gray-800 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">All Methods</a>
-    <a href="/payments?method=ach{% if filter_status %}&status={{ filter_status }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_method == 'ach' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">ACH</a>
-    <a href="/payments?method=card{% if filter_status %}&status={{ filter_status }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium {% if filter_method == 'card' %}bg-purple-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50{% endif %} transition-colors">Card</a>
-
-    {% if properties %}
-    <select onchange="if(this.value) window.location='/payments?property_id='+this.value; else window.location='/payments';" class="px-3 py-2 rounded-lg text-sm bg-white text-gray-700 ring-1 ring-gray-300 searchable-select" data-placeholder="Type to search...">
-        <option value="">All Properties</option>
-        {% for prop in properties %}
-        <option value="{{ prop.id }}" {% if filter_property_id == prop.id %}selected{% endif %}>{{ prop.address }}</option>
-        {% endfor %}
-    </select>
+    {% else %}
+    <div class="px-6 py-14 text-center">
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-2xl">🧾</div>
+        <h3 class="mt-3 font-semibold text-gray-900">No charges in this view</h3>
+        <p class="mt-1 text-sm text-gray-500">Create a charge to begin tracking this tenant's balance.</p>
+    </div>
     {% endif %}
+</section>
+
+<details class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" {% if not charges %}open{% endif %}>
+    <summary class="cursor-pointer px-6 py-5 text-lg font-bold text-blue-950">Payment activity <span class="ml-2 text-sm font-normal text-gray-400">{{ payments|length }} transactions</span></summary>
+    {% if payments %}
+    <div class="overflow-x-auto border-t border-gray-100">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50"><tr>
+                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Tenant / Property</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Description</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Method</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th>
+                <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-gray-500">Amount</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for payment in payments %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3"><p class="text-sm font-medium text-gray-900">{{ payment.tenant_name }}</p><p class="text-xs text-gray-500">{{ payment.property_address }}</p></td>
+                    <td class="px-5 py-3 text-sm text-gray-600">{{ payment.description }}<p class="text-xs text-gray-400">{{ payment.initiated_at.strftime('%b %d, %Y') }}</p></td>
+                    <td class="px-5 py-3 text-sm text-gray-600">{{ 'Card' if payment.method == 'card' else 'ACH' }}</td>
+                    <td class="px-5 py-3 text-sm text-gray-600">{{ payment.status.value.replace('_', ' ').title() }}</td>
+                    <td class="px-5 py-3 text-right text-sm font-semibold text-gray-900">${{ "{:,.2f}".format(payment.total_amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}<div class="border-t border-gray-100 px-6 py-10 text-center text-sm text-gray-500">No payment activity in this view.</div>{% endif %}
+</details>
+
+<!-- Create charge modal -->
+<div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="charge-title">
+    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+        <form method="POST" action="/payments/charges">
+            <input type="hidden" name="property_id" value="{{ filter_property_id or '' }}">
+            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                <div><h2 id="charge-title" class="text-xl font-bold text-gray-950">Create charge</h2><p class="text-sm text-gray-500">Add a receivable to a tenant ledger.</p></div>
+                <button type="button" onclick="closeModal('charge-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div class="space-y-4 p-6">
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select name="tenant_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                    <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
+                </select></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="mb-1 block text-sm font-medium text-gray-700">Type</label><select name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
+                    <div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="0.00"></div>
+                </div>
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input name="description" required maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Monthly rent"></div>
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input name="due_date" type="date" required value="{{ request.query_params.get('due_date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
+                <label class="flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><input id="repeat-monthly" name="repeat_monthly" type="checkbox" onchange="document.getElementById('repeat-end').classList.toggle('hidden', !this.checked)"> Repeat this charge monthly</label>
+                <div id="repeat-end" class="hidden"><label class="mb-1 block text-sm font-medium text-gray-700">Repeat through</label><input name="end_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><p class="mt-1 text-xs text-gray-400">Up to 36 monthly charges will be created.</p></div>
+            </div>
+            <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('charge-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Create charge</button></div>
+        </form>
+    </div>
 </div>
 
-{% if payments %}
-<div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entity</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-            {% for payment in payments %}
-            <tr class="hover:bg-gray-50 transition-colors {% if payment.detail_url %}cursor-pointer{% endif %}" {% if payment.detail_url %}onclick="window.location='{{ payment.detail_url }}'"{% endif %}>
-                <td class="px-6 py-4 text-sm text-gray-900 font-medium">
-                    {{ payment.tenant_name }}
-                    {% if payment.is_autopay %}
-                    <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">Auto</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ payment.property_address }}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ payment.entity }}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{ payment.description }}</td>
-                <td class="px-6 py-4 text-sm text-gray-900 font-medium text-right">
-                    ${{ "{:,.2f}".format(payment.total_amount) }}
-                    {% if payment.late_fee and payment.late_fee > 0 %}
-                    <span class="block text-xs text-red-500">+${{ "{:,.2f}".format(payment.late_fee) }} late</span>
-                    {% endif %}
-                    {% if payment.convenience_fee and payment.convenience_fee > 0 %}
-                    <span class="block text-xs text-gray-400">incl. ${{ "{:,.2f}".format(payment.convenience_fee) }} fee</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4">
-                    {% if payment.method == 'card' %}
-                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">Card</span>
-                    {% else %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">ACH</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4">
-                    {% if payment.status.value == 'completed' %}
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Completed</span>
-                    {% elif payment.status.value == 'processing' %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Processing</span>
-                    {% elif payment.status.value == 'pending' %}
-                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>
-                    {% elif payment.status.value == 'failed' %}
-                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Failed</span>
-                    {% elif payment.status.value == 'returned' %}
-                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Returned</span>
-                    {% elif payment.status.value == 'cancelled' %}
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cancelled</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ payment.initiated_at.strftime('%b %d, %Y') }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- Record payment / credit / refund modal -->
+<div id="activity-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="activity-title">
+    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+        <form method="POST" action="/payments/entries">
+            <input type="hidden" name="entry_type" id="activity-type" value="payment"><input type="hidden" name="property_id" value="{{ filter_property_id or '' }}">
+            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="activity-title" class="text-xl font-bold text-gray-950">Record payment</h2><p id="activity-subtitle" class="text-sm text-gray-500">Apply an offline payment to a charge.</p></div><button type="button" onclick="closeModal('activity-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
+            <div class="space-y-4 p-6">
+                <div id="activity-tenant-wrap"><label class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select name="tenant_id" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}</select></div>
+                <div id="activity-charge-wrap"><label class="mb-1 block text-sm font-medium text-gray-700">Charge</label><select name="charge_id" id="activity-charge" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="">Choose unpaid charge</option>{% for charge in charges %}{% if charge.status not in ['paid', 'void'] %}<option value="{{ charge.id }}" data-balance="{{ charge.outstanding }}">{{ charge.tenant_name }} · {{ charge.description }} · ${{ "{:,.2f}".format(charge.outstanding) }}</option>{% endif %}{% endfor %}</select></div>
+                <div class="grid grid-cols-2 gap-4"><div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="activity-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Date</label><input name="occurred_on" type="date" required value="{{ request.query_params.get('date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Method</label><select name="payment_method" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="cash">Cash</option><option value="check">Check</option><option value="money_order">Money order</option><option value="zelle">Zelle</option><option value="ach">External ACH</option><option value="card">External card</option><option value="manual">Other</option></select></div>
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input name="description" maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Optional description"></div>
+                <div><label class="mb-1 block text-sm font-medium text-gray-700">Note</label><textarea name="note" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Internal note"></textarea></div>
+            </div>
+            <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('activity-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button id="activity-submit" class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Record payment</button></div>
+        </form>
+    </div>
 </div>
-{% else %}
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-    <span class="text-4xl">&#128176;</span>
-    <h3 class="mt-3 text-lg font-semibold text-gray-900">No payments found</h3>
-    <p class="mt-1 text-sm text-gray-500">Payments will appear here when tenants pay through the portal.</p>
+
+<!-- Edit charge modal -->
+<div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><form id="edit-form" method="POST">
+        <input type="hidden" name="tenant_id" id="edit-tenant"><input type="hidden" name="property_id" id="edit-property">
+        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="edit-title" class="text-xl font-bold text-gray-950">Edit charge</h2><p class="text-sm text-gray-500">Amounts cannot be reduced below money already applied.</p></div><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
+        <div class="space-y-4 p-6"><div><label class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
+        <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Save changes</button></div>
+    </form></div>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden'); el.classList.add('flex');
+    const first = el.querySelector('input:not([type=hidden]), select, textarea, button');
+    if (first) setTimeout(() => first.focus(), 30);
+}
+function closeModal(id) { const el = document.getElementById(id); el.classList.add('hidden'); el.classList.remove('flex'); }
+function toggleActions() { document.getElementById('actions-menu').classList.toggle('hidden'); }
+function applyLedgerFilters() {
+    const propertyId = document.getElementById('property-filter').value;
+    const tenantId = document.getElementById('tenant-filter').value;
+    const params = new URLSearchParams();
+    if (propertyId) params.set('property_id', propertyId);
+    if (tenantId) params.set('tenant_id', tenantId);
+    window.location = '/payments' + (params.toString() ? '?' + params.toString() : '');
+}
+function openActivity(type) {
+    document.getElementById('actions-menu').classList.add('hidden');
+    document.getElementById('activity-type').value = type;
+    const titles = {payment: ['Record payment', 'Apply an offline payment to an unpaid charge.'], credit: ['Add credit', 'Reduce a charge without recording money received.'], refund: ['Return security deposit', 'Record a deposit returned to the tenant.']};
+    document.getElementById('activity-title').textContent = titles[type][0];
+    document.getElementById('activity-subtitle').textContent = titles[type][1];
+    document.getElementById('activity-submit').textContent = titles[type][0];
+    document.getElementById('activity-charge-wrap').classList.toggle('hidden', type === 'refund');
+    document.getElementById('activity-tenant-wrap').classList.toggle('hidden', type !== 'refund');
+    document.getElementById('activity-charge').required = type !== 'refund';
+    openModal('activity-modal');
+}
+function openEdit(id, description, type, amount, dueDate, tenantId, propertyId) {
+    document.getElementById('edit-form').action = '/payments/charges/' + id + '/edit';
+    document.getElementById('edit-description').value = description;
+    document.getElementById('edit-type').value = type;
+    document.getElementById('edit-amount').value = amount;
+    document.getElementById('edit-due').value = dueDate;
+    document.getElementById('edit-tenant').value = tenantId;
+    document.getElementById('edit-property').value = propertyId;
+    openModal('edit-modal');
+}
+document.addEventListener('click', function(event) {
+    const wrap = document.getElementById('actions-wrap');
+    if (wrap && !wrap.contains(event.target)) document.getElementById('actions-menu').classList.add('hidden');
+    if (event.target.matches('[id$="-modal"]')) closeModal(event.target.id);
+});
+document.getElementById('activity-charge')?.addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    if (option && option.dataset.balance) document.getElementById('activity-amount').value = option.dataset.balance;
+});
+// Provide useful defaults without trusting client values on the server.
+for (const input of document.querySelectorAll('input[type="date"]')) {
+    if (!input.value) input.value = new Date().toISOString().slice(0, 10);
+}
+</script>
 {% endblock %}

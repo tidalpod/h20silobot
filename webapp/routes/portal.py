@@ -20,6 +20,7 @@ from webapp.auth.tenant_auth import get_current_tenant, login_tenant, logout_ten
 from webapp.services.verification_service import send_verification_code, verify_code
 from webapp.services.telegram_service import telegram_service
 from webapp.services.storage_service import storage
+from webapp.services import payment_service
 from webapp.config import web_config
 
 import logging
@@ -168,6 +169,8 @@ async def portal_dashboard(request: Request):
         else:
             latest_bill = None
 
+    payment_balance = await payment_service.calculate_balance_due(tenant["id"])
+
     return templates.TemplateResponse("portal/dashboard.html", {
         "request": request,
         "tenant": tenant,
@@ -176,6 +179,7 @@ async def portal_dashboard(request: Request):
         "active_lease": active_lease,
         "latest_bill": latest_bill,
         "has_stripe": web_config.has_stripe,
+        "payment_balance": payment_balance,
     })
 
 

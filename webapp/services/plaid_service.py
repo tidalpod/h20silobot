@@ -160,31 +160,77 @@ async def create_transfer(
     account_id: str,
     amount: str,
     description: str,
+    legal_name: str,
+    idempotency_key: str,
+    metadata: dict | None = None,
+    ach_class: str = "web",
 ) -> dict:
-    """Initiate an ACH debit transfer (pull money from tenant's account)."""
-    url = f"{_base_url()}/transfer/create"
-    payload = {
+    """Authorize and initiate an ACH debit from a tenant account.
+
+    Plaid requires an approved transfer authorization before /transfer/create.
+    The authorization id then makes transfer creation idempotent.
+    """
+    authorization_url = f"{_base_url()}/transfer/authorization/create"
+    authorization_payload = {
         **_auth_body(),
         "access_token": access_token,
         "account_id": account_id,
         "type": "debit",
         "network": "ach",
         "amount": str(amount),
-        "ach_class": "ppd",
-        "description": description[:10],  # Plaid limits to 10 chars
+        "ach_class": ach_class,
         "user": {
-            "legal_name": "Tenant",
+            "legal_name": legal_name,
         },
+        "idempotency_key": idempotency_key,
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=_headers()) as resp:
+        async with session.post(
+            authorization_url,
+            json=authorization_payload,
+            headers=_headers(),
+        ) as resp:
+            data = await resp.json()
+            if resp.status != 200:
+                logger.error(f"Plaid transfer/authorization/create failed: {data}")
+                return {"error": data.get("error_message", "Transfer authorization failed")}
+
+        authorization = data.get("authorization", {})
+        authorization_id = authorization.get("id")
+        decision = authorization.get("decision")
+        if decision != "approved" or not authorization_id:
+            rationale = authorization.get("decision_rationale") or {}
+            message = rationale.get("description") or "Bank transfer was not approved"
+            return {
+                "error": message,
+                "decision": decision,
+                "authorization_id": authorization_id,
+            }
+
+        transfer_url = f"{_base_url()}/transfer/create"
+        transfer_payload = {
+            **_auth_body(),
+            "access_token": access_token,
+            "account_id": account_id,
+            "authorization_id": authorization_id,
+            "amount": str(amount),
+            "description": description[:10],  # ACH descriptions are limited to 10 chars.
+        }
+        if metadata:
+            transfer_payload["metadata"] = {str(key): str(value) for key, value in metadata.items()}
+
+        async with session.post(transfer_url, json=transfer_payload, headers=_headers()) as resp:
             data = await resp.json()
             if resp.status != 200:
                 logger.error(f"Plaid transfer/create failed: {data}")
-                return {"error": data.get("error_message", "Transfer creation failed")}
+                return {
+                    "error": data.get("error_message", "Transfer creation failed"),
+                    "authorization_id": authorization_id,
+                }
             transfer = data.get("transfer", {})
             return {
+                "authorization_id": authorization_id,
                 "transfer_id": transfer.get("id"),
                 "status": transfer.get("status"),
             }
@@ -209,6 +255,27 @@ async def get_transfer(transfer_id: str) -> dict:
                 "transfer_id": transfer.get("id"),
                 "status": transfer.get("status"),
                 "failure_reason": transfer.get("failure_reason"),
+            }
+
+
+async def sync_transfer_events(after_id: int = 0, count: int = 500) -> dict:
+    """Fetch the next ordered page of Plaid Transfer events."""
+    url = f"{_base_url()}/transfer/event/sync"
+    payload = {
+        **_auth_body(),
+        "after_id": int(after_id),
+        "count": min(max(int(count), 1), 500),
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=_headers()) as resp:
+            data = await resp.json()
+            if resp.status != 200:
+                logger.error(f"Plaid transfer/event/sync failed: {data}")
+                return {"error": data.get("error_message", "Failed to sync transfer events")}
+            return {
+                "events": data.get("transfer_events", []),
+                "has_more": bool(data.get("has_more")),
             }
 
 
