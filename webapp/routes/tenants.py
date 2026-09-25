@@ -305,6 +305,8 @@ async def tenant_detail(request: Request, tenant_id: int):
                 "status": p.status,
                 "initiated_at": p.initiated_at,
                 "is_autopay": p.is_autopay,
+                "provider": "plaid",
+                "external_id": p.plaid_transfer_id,
             })
         for p in stripe_payments:
             all_payments.append({
@@ -316,6 +318,8 @@ async def tenant_detail(request: Request, tenant_id: int):
                 "status": p.status,
                 "initiated_at": p.initiated_at,
                 "is_autopay": False,
+                "provider": "stripe",
+                "external_id": p.stripe_checkout_session_id,
             })
         all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
 
@@ -380,13 +384,76 @@ async def tenant_detail(request: Request, tenant_id: int):
     ledger_charges = await ledger_service.list_charges(tenant_id=tenant_id, include_paid=True)
     ledger_totals = ledger_service.totals(ledger_charges)
 
+    # Financial overview — make lease economics and rent collection the primary story.
+    if tenant.is_section8:
+        monthly_rent_total = Decimal(tenant.voucher_amount or 0) + Decimal(tenant.tenant_portion or 0)
+    elif tenant.current_rent is not None:
+        monthly_rent_total = Decimal(tenant.current_rent)
+    elif active_lease and active_lease.monthly_rent is not None:
+        monthly_rent_total = Decimal(active_lease.monthly_rent)
+    else:
+        monthly_rent_total = Decimal("0.00")
+
+    lease_start = tenant.lease_start_date or (active_lease.lease_start if active_lease else None)
+    lease_end = tenant.lease_end_date or (active_lease.lease_end if active_lease else None)
+    lease_months = None
+    lease_contract_total = None
+    if lease_start and lease_end and lease_end >= lease_start:
+        lease_months = ((lease_end.year - lease_start.year) * 12) + lease_end.month - lease_start.month + 1
+        lease_contract_total = monthly_rent_total * lease_months
+
+    rent_received = Decimal("0.00")
+    ledger_payment_activity = []
+    ledger_provider_keys = set()
+    for charge in ledger_charges:
+        for entry in charge["entries"]:
+            amount = ledger_service.money(entry.amount)
+            if charge["charge_type"] == "rent" and charge["status"] != "void":
+                if entry.status == "posted" and entry.entry_type == "payment":
+                    rent_received += amount
+                elif entry.status == "posted" and entry.entry_type == "reversal":
+                    rent_received -= amount
+
+            if entry.entry_type != "payment":
+                continue
+            if entry.external_provider and entry.external_id:
+                ledger_provider_keys.add((entry.external_provider, entry.external_id))
+            ledger_payment_activity.append({
+                "method": entry.payment_method or "manual",
+                "description": entry.description or charge["description"],
+                "total_amount": float(amount),
+                "convenience_fee": 0,
+                "status": "completed" if entry.status == "posted" else entry.status,
+                "initiated_at": entry.created_at,
+                "is_autopay": False,
+            })
+    rent_received = max(rent_received, Decimal("0.00"))
+    if rent_received == 0 and total_paid > 0:
+        # Legacy provider payments predate the shared ledger, so retain them as a fallback.
+        rent_received = ledger_service.money(total_paid)
+
+    payment_activity = ledger_payment_activity + [
+        {
+            **payment,
+            "status": payment["status"].value if payment["status"] else "pending",
+        }
+        for payment in all_payments
+        if not payment["external_id"]
+        or (payment["provider"], payment["external_id"]) not in ledger_provider_keys
+    ]
+    payment_activity.sort(key=lambda item: item["initiated_at"] or datetime.min, reverse=True)
+
+    open_charge_count = sum(
+        1 for charge in ledger_charges if charge["status"] in {"open", "partial", "overdue"}
+    )
+
     return templates.TemplateResponse(
         "tenants/detail.html",
         {
             "request": request,
             "user": user,
             "tenant": tenant,
-            "payments": all_payments,
+            "payments": payment_activity,
             "total_paid": total_paid,
             "pending_amount": pending_amount,
             "work_orders": work_orders,
@@ -396,6 +463,13 @@ async def tenant_detail(request: Request, tenant_id: int):
             "bank_accounts": bank_accounts,
             "water_balance": water_balance,
             "ledger_totals": ledger_totals,
+            "monthly_rent_total": monthly_rent_total,
+            "rent_received": rent_received,
+            "lease_start": lease_start,
+            "lease_end": lease_end,
+            "lease_months": lease_months,
+            "lease_contract_total": lease_contract_total,
+            "open_charge_count": open_charge_count,
         }
     )
 
