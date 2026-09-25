@@ -227,7 +227,8 @@
         {% set assets_active = '/assets' in request.url.path %}
         {% set portfolio_active = '/properties' in request.url.path or '/tenants' in request.url.path or '/leases' in request.url.path or '/phas' in request.url.path or '/leads' in request.url.path or '/maintenance/vendors' in request.url.path %}
         {% set fieldwork_active = ('/maintenance' in request.url.path and '/maintenance/vendors' not in request.url.path) or '/showings' in request.url.path or '/inspections' in request.url.path or '/projects' in request.url.path or '/packets' in request.url.path or (request.url.path == '/notifications' or '/notifications/compose' in request.url.path) %}
-        {% set operations_active = '/payments' in request.url.path or '/bills' in request.url.path or '/invoices' in request.url.path %}
+        {% set payment_ledger_active = '/payments' in request.url.path and '/bank-accounts' not in request.url.path %}
+        {% set operations_active = '/bank-accounts' in request.url.path or '/bills' in request.url.path or '/invoices' in request.url.path %}
         {% set messages_active = '/notifications/chat' in request.url.path %}
 
         <nav class="gradient-bg shadow-lg relative z-40">
@@ -425,6 +426,14 @@
                                     </div>
                                 </div>
 
+                                <!-- Payment Ledger (direct link) -->
+                                <a href="/payments" title="Payment Ledger" class="{% if payment_ledger_active %}bg-white/20{% endif %} text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-2 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                                    </svg>
+                                    Payments
+                                </a>
+
                                 <!-- Billing dropdown -->
                                 <div class="relative" data-dropdown="operations">
                                     <button onclick="toggleDropdown('operations')" class="{% if operations_active %}bg-white/20{% endif %} text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-white/10 flex items-center gap-1.5 transition-colors cursor-pointer">
@@ -437,17 +446,6 @@
                                         </svg>
                                     </button>
                                     <div id="dropdown-operations" class="nav-dropdown hidden absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                                        <a href="/payments" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/payments' in request.url.path else '' }}">
-                                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">Payment Ledger</div>
-                                                <div class="text-xs text-gray-500">Charges, ACH & card payments</div>
-                                            </div>
-                                        </a>
                                         <a href="/payments/bank-accounts" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors {{ 'bg-blue-50' if '/bank-accounts' in request.url.path else '' }}">
                                             <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
                                                 <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
