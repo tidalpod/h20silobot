@@ -121,8 +121,6 @@ async def dashboard(request: Request, entity: List[str] = None):
                     "severity": "danger",
                     "icon": "🔍"
                 })
-            elif prop.section8_inspection_status in ('pending', 'scheduled', 'reinspection'):
-                pending_inspections += 1
 
             # Water bills - check for outstanding amounts
             if prop.bills:
@@ -240,6 +238,7 @@ async def dashboard(request: Request, entity: List[str] = None):
 
             for insp_name, icon, insp_date, insp_time in co_inspections:
                 if insp_date and insp_date >= today:
+                    pending_inspections += 1
                     days_until = (insp_date - today).days
                     if days_until <= 30:  # Show inspections within 30 days
                         upcoming_inspections.append({
@@ -253,6 +252,7 @@ async def dashboard(request: Request, entity: List[str] = None):
 
             # Rental Inspection
             if prop.rental_inspection_date and prop.rental_inspection_date >= today:
+                pending_inspections += 1
                 days_until = (prop.rental_inspection_date - today).days
                 if days_until <= 30:
                     upcoming_inspections.append({
@@ -267,6 +267,7 @@ async def dashboard(request: Request, entity: List[str] = None):
             # Section 8 Inspection
             if prop.section8_inspection_date and prop.section8_inspection_date >= today:
                 if prop.section8_inspection_status in ('scheduled', 'pending', 'reinspection'):
+                    pending_inspections += 1
                     days_until = (prop.section8_inspection_date - today).days
                     if days_until <= 30:
                         upcoming_inspections.append({
