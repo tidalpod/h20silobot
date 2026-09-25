@@ -30,15 +30,29 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def list_tenants(
     request: Request,
     property_id: int = None,
-    active_only: bool = True
+    active_only: bool = True,
+    tenant_search: str = "",
 ):
     """List all tenants"""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    tenant_search = tenant_search.strip()[:100]
+
     async with get_session() as session:
         query = select(Tenant).options(selectinload(Tenant.property_ref))
+
+        if tenant_search:
+            escaped_search = (
+                tenant_search
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            query = query.where(
+                Tenant.name.ilike(f"%{escaped_search}%", escape="\\")
+            )
 
         if property_id:
             query = query.where(Tenant.property_id == property_id)
@@ -64,6 +78,7 @@ async def list_tenants(
             "properties": properties,
             "property_id": property_id,
             "active_only": active_only,
+            "tenant_search": tenant_search,
         }
     )
 
