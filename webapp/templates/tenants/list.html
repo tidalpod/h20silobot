@@ -80,9 +80,6 @@
                     <a href="/tenants/{{ tenant.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                         {{ tenant.name }}
                     </a>
-                    {% if tenant.is_primary %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 ml-1">Primary</span>
-                    {% endif %}
                     <a href="/properties/{{ tenant.property_ref.id }}" class="text-xs text-blue-600 hover:text-blue-500">
                         {{ tenant.property_ref.address }}
                     </a>
@@ -145,9 +142,6 @@
                     <a href="/tenants/{{ tenant.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-500">
                         {{ tenant.name }}
                     </a>
-                    {% if tenant.is_primary %}
-                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 ml-2">Primary</span>
-                    {% endif %}
                     {% if tenant.move_in_date %}
                     <p class="text-xs text-gray-500">Since {{ tenant.move_in_date.strftime('%b %Y') }}</p>
                     {% endif %}

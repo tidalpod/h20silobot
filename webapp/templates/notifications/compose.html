@@ -55,7 +55,7 @@
                                         data-email="{{ tenant.email or '' }}"
                                         data-name="{{ tenant.name }}"
                                         {% if selected_tenant and selected_tenant.id == tenant.id %}selected{% endif %}>
-                                    {{ tenant.name }}{% if tenant.is_primary %} (Primary){% endif %}
+                                    {{ tenant.name }}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -194,8 +194,7 @@
                 id: {{ tenant.id }},
                 name: "{{ tenant.name }}",
                 phone: "{{ tenant.phone or '' }}",
-                email: "{{ tenant.email or '' }}",
-                is_primary: {{ 'true' if tenant.is_primary else 'false' }}
+                email: "{{ tenant.email or '' }}"
             },
             {% endfor %}
         ],
@@ -249,7 +248,7 @@
                 option.dataset.phone = tenant.phone;
                 option.dataset.email = tenant.email;
                 option.dataset.name = tenant.name;
-                option.textContent = tenant.name + (tenant.is_primary ? ' (Primary)' : '');
+                option.textContent = tenant.name;
                 tenantSelect.appendChild(option);
             });
         }
