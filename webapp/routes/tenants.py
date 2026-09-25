@@ -16,6 +16,7 @@ from database.models import (
     Tenant, Property, PHA, RentPayment, StripePayment,
     WorkOrder, WorkOrderStatus, LeaseDocument, LeaseStatus,
     WaterBill, TenantBankAccount, TenantAutopay, PaymentStatus,
+    ExternalPayment,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services import ledger_service
@@ -293,6 +294,14 @@ async def tenant_detail(request: Request, tenant_id: int):
         )
         stripe_payments = stripe_result.scalars().all()
 
+        # Imported payment history
+        external_result = await session.execute(
+            select(ExternalPayment)
+            .where(ExternalPayment.tenant_id == tenant_id)
+            .order_by(desc(ExternalPayment.paid_on))
+        )
+        external_payments = external_result.scalars().all()
+
         # Merge payments
         all_payments = []
         for p in ach_payments:
@@ -320,6 +329,19 @@ async def tenant_detail(request: Request, tenant_id: int):
                 "is_autopay": False,
                 "provider": "stripe",
                 "external_id": p.stripe_checkout_session_id,
+            })
+        for p in external_payments:
+            all_payments.append({
+                "method": p.payment_method or "other",
+                "description": p.description or f"{p.external_provider.title()} payment",
+                "total_amount": float(p.amount or 0),
+                "late_fee": 0,
+                "convenience_fee": 0,
+                "status": PaymentStatus(p.status),
+                "initiated_at": datetime.combine(p.paid_on, datetime.min.time()),
+                "is_autopay": False,
+                "provider": p.external_provider,
+                "external_id": p.external_id,
             })
         all_payments.sort(key=lambda x: x["initiated_at"] or datetime.min, reverse=True)
 
@@ -415,6 +437,10 @@ async def tenant_detail(request: Request, tenant_id: int):
                     rent_received -= amount
 
             if entry.entry_type != "payment":
+                continue
+            # These entries allocate imported charge balances. The source
+            # deposits are rendered separately as the actual transactions.
+            if entry.external_provider == "turbotenant_charge":
                 continue
             if entry.external_provider and entry.external_id:
                 ledger_provider_keys.add((entry.external_provider, entry.external_id))

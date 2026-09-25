@@ -21,6 +21,31 @@ from typing import Iterable, Sequence
 
 MONEY = Decimal("0.01")
 
+CHARGE_TYPE_MAP = {
+    "RENT": "rent",
+    "LATE_FEE": "late_fee",
+    "SECURITY_DEPOSIT": "security_deposit",
+    "UTILITY_CHARGE": "utility",
+    "OTHER": "other",
+}
+
+CARD_METHODS = {"CREDIT_CARD", "DEBIT_CARD", "PREPAID"}
+
+
+def map_charge_type(value: str) -> str:
+    """Map a TurboTenant category to the shared ledger vocabulary."""
+    return CHARGE_TYPE_MAP.get(value.strip().upper(), "other")
+
+
+def map_payment_method(value: str) -> str:
+    """Map a TurboTenant method to the two payment methods used by the UI."""
+    normalized = value.strip().upper()
+    if normalized == "BANK_ACCOUNT":
+        return "ach"
+    if normalized in CARD_METHODS:
+        return "card"
+    return "other"
+
 
 @dataclass(frozen=True)
 class PropertyRecord:

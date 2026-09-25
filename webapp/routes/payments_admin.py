@@ -19,7 +19,7 @@ from database.models import (
     RentPayment, PaymentStatus, Property, Tenant,
     StripePayment, WaterBill, BillStatus,
     TenantApplication, ApplicationStatus,
-    TenantCharge, TenantLedgerEntry,
+    TenantCharge, TenantLedgerEntry, ExternalPayment,
 )
 from webapp.auth.dependencies import get_current_user
 from webapp.services import payment_service
@@ -45,7 +45,7 @@ async def payments_list(
     page: int = 1,
     page_size: int = 25,
 ):
-    """All payments list with filters (ACH + Stripe)."""
+    """All payments list with filters (ACH, card, and imported history)."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
@@ -104,15 +104,36 @@ async def payments_list(
             stripe_query = stripe_query.where(StripePayment.tenant_id == selected_tenant_id)
         stripe_query = stripe_query.order_by(desc(StripePayment.initiated_at))
 
+        # --- Imported third-party payments ---
+        external_query = (
+            select(ExternalPayment)
+            .options(
+                selectinload(ExternalPayment.tenant_ref),
+                selectinload(ExternalPayment.property_ref),
+            )
+        )
+        if selected_status:
+            external_query = external_query.where(ExternalPayment.status == selected_status.value)
+        if selected_property_id:
+            external_query = external_query.where(ExternalPayment.property_id == selected_property_id)
+        if selected_tenant_id:
+            external_query = external_query.where(ExternalPayment.tenant_id == selected_tenant_id)
+        if method:
+            external_query = external_query.where(ExternalPayment.payment_method == method)
+        external_query = external_query.order_by(desc(ExternalPayment.paid_on))
+
         # Execute both (skip one if method filter applied)
         ach_payments = []
         stripe_payments = []
+        external_payments = []
         if method != "card":
             ach_result = await session.execute(ach_query)
             ach_payments = ach_result.scalars().all()
         if method != "ach":
             stripe_result = await session.execute(stripe_query)
             stripe_payments = stripe_result.scalars().all()
+        external_result = await session.execute(external_query)
+        external_payments = external_result.scalars().all()
 
         # Merge into unified dicts
         all_payments = []
@@ -147,6 +168,23 @@ async def payments_list(
                 "convenience_fee": float(p.convenience_fee or 0),
                 "status": p.status,
                 "initiated_at": p.initiated_at,
+                "is_autopay": False,
+                "detail_url": None,
+            })
+        for p in external_payments:
+            all_payments.append({
+                "id": p.id,
+                "method": p.payment_method or "other",
+                "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
+                "property_address": p.property_ref.address if p.property_ref else "—",
+                "entity": p.property_ref.entity if p.property_ref and p.property_ref.entity else "Unassigned",
+                "description": p.description or f"{p.external_provider.title()} payment",
+                "payment_month": None,
+                "total_amount": float(p.amount or 0),
+                "late_fee": 0,
+                "convenience_fee": 0,
+                "status": PaymentStatus(p.status),
+                "initiated_at": datetime.combine(p.paid_on, datetime.min.time()),
                 "is_autopay": False,
                 "detail_url": None,
             })

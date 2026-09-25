@@ -11,6 +11,8 @@ from webapp.services.turbotenant_import import (
     TenantRecord,
     match_charges,
     match_deposits,
+    map_charge_type,
+    map_payment_method,
     normalize_address,
     normalize_name,
     read_rent_roll,
@@ -18,6 +20,14 @@ from webapp.services.turbotenant_import import (
 
 
 class TurboTenantImportTests(unittest.TestCase):
+    def test_maps_source_categories_and_methods(self):
+        self.assertEqual(map_charge_type("RENT"), "rent")
+        self.assertEqual(map_charge_type("UTILITY_CHARGE"), "utility")
+        self.assertEqual(map_charge_type("unknown"), "other")
+        self.assertEqual(map_payment_method("BANK_ACCOUNT"), "ach")
+        self.assertEqual(map_payment_method("DEBIT_CARD"), "card")
+        self.assertEqual(map_payment_method("PREPAID"), "card")
+
     def test_normalizes_names_and_addresses(self):
         self.assertEqual(normalize_name("Toney  Baker"), "toney baker")
         self.assertEqual(normalize_name("James Ingram Jr."), "james ingram")

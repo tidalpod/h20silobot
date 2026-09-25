@@ -1330,6 +1330,43 @@ class TenantLedgerEntry(Base):
         return f"<TenantLedgerEntry {self.entry_type} ${self.amount}>"
 
 
+class ExternalPayment(Base):
+    """Historical or third-party payment imported outside Plaid and Stripe."""
+    __tablename__ = "external_payments"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    external_provider = Column(String(30), nullable=False)
+    external_id = Column(String(255), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    payment_method = Column(String(30), nullable=True)
+    status = Column(String(20), nullable=False, default="completed")
+    description = Column(String(255), nullable=True)
+    note = Column(Text, nullable=True)
+    paid_on = Column(Date, nullable=False)
+    deposited_on = Column(Date, nullable=True)
+    source_lease = Column(String(255), nullable=True)
+    source_bank = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant_ref = relationship("Tenant")
+    property_ref = relationship("Property")
+
+    __table_args__ = (
+        Index("ix_external_payments_tenant_paid", "tenant_id", "paid_on"),
+        Index("ix_external_payments_property_paid", "property_id", "paid_on"),
+        UniqueConstraint(
+            "external_provider", "external_id",
+            name="uq_external_payment_provider_id",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<ExternalPayment {self.external_provider}:{self.external_id} ${self.amount}>"
+
+
 class PaymentProviderState(Base):
     """Durable cursors used to consume provider event streams once."""
     __tablename__ = "payment_provider_state"
