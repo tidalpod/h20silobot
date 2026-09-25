@@ -4,19 +4,24 @@
 
 {% block header %}
 <header class="bg-white shadow-sm">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-                <span>📄</span> Leases
-            </h1>
-            <p class="mt-1 text-sm text-gray-500">Lease document management</p>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 bd-page-header">
+        <div class="bd-page-heading">
+            <span class="bd-page-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7.25L19 8.5v11.75H7V3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75V8.5h5M10 12h6M10 15.5h6"/></svg>
+            </span>
+            <div>
+                <h1 class="bd-page-title">Leases</h1>
+                <p class="bd-page-subtitle">Lease document management</p>
+            </div>
         </div>
-        <div class="flex gap-2">
-            <a href="/leases/builder" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors">
-                <span class="mr-2">&#128221;</span> Build Lease
+        <div class="flex flex-wrap gap-2">
+            <a href="/leases/builder" class="bd-btn bg-emerald-600 text-white shadow-sm hover:bg-emerald-700">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h7.5L18 7.5v12.75H6.75V3.75Z"/><path stroke-linecap="round" d="M14.25 3.75V7.5H18M9.5 15.25l5.8-5.8 1.25 1.25-5.8 5.8-1.75.5.5-1.75Z"/></svg>
+                Build Lease
             </a>
-            <a href="/leases/new" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
-                <span class="mr-2">➕</span> Upload Lease
+            <a href="/leases/new" class="bd-btn bd-btn-primary">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M5 13v6.25h14V13"/></svg>
+                Upload Lease
             </a>
         </div>
     </div>
@@ -28,7 +33,9 @@
 {% if expiring_leases and not filter_expiring %}
 <div class="mb-6 bg-amber-50 rounded-xl border border-amber-200 p-4 flex items-center justify-between">
     <div class="flex items-center gap-3">
-        <span class="text-xl">⚠️</span>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700" aria-hidden="true">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.4 4.15 2.9 17.1A2 2 0 0 0 4.63 20h14.74a2 2 0 0 0 1.73-2.9L13.6 4.15a2 2 0 0 0-3.2 0Z"/><path stroke-linecap="round" d="M12 9v4M12 16.5h.01"/></svg>
+        </span>
         <div>
             <p class="text-sm font-medium text-amber-800">{{ expiring_leases|length }} lease{{ 's' if expiring_leases|length > 1 else '' }} expiring within 30 days</p>
             <p class="text-xs text-amber-600">Review and renew expiring leases</p>
@@ -65,7 +72,9 @@
             <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/leases/{{ lease.id }}'">
                 <td class="px-6 py-4">
                     <div class="flex items-center gap-3">
-                        <span class="text-lg">{% if lease.file_type == 'pdf' %}📕{% else %}📄{% endif %}</span>
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {% if lease.file_type == 'pdf' %}bg-red-50 text-red-600{% else %}bg-blue-50 text-blue-600{% endif %}" aria-hidden="true">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7.25L19 8.5v11.75H7V3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75V8.5h5M10 12h6M10 15.5h6"/></svg>
+                        </span>
                         <div>
                             <div class="text-sm font-medium text-gray-900">{{ lease.title }}</div>
                             <div class="text-xs text-gray-500">{{ lease.file_type|upper }}{% if lease.file_size %} &middot; {{ "%.1f"|format(lease.file_size / 1024 / 1024) }}MB{% endif %}</div>
@@ -104,11 +113,13 @@
 </div>
 {% else %}
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-    <span class="text-4xl">📄</span>
+    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600" aria-hidden="true">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7.25L19 8.5v11.75H7V3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75V8.5h5M10 12h6M10 15.5h6"/></svg>
+    </span>
     <h3 class="mt-3 text-lg font-semibold text-gray-900">No leases found</h3>
     <p class="mt-1 text-sm text-gray-500">Upload your first lease document to get started.</p>
-    <a href="/leases/new" class="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
-        <span class="mr-2">➕</span> Upload Lease
+    <a href="/leases/new" class="bd-btn bd-btn-primary mt-4">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M5 13v6.25h14V13"/></svg> Upload Lease
     </a>
 </div>
 {% endif %}
