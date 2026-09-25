@@ -2,6 +2,105 @@
 
 {% block title %}Payment Ledger{% endblock %}
 
+{% macro category_icon(charge_type, icon_class='h-5 w-5') %}
+    {% if charge_type == 'rent' %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+    {% elif charge_type in ['water', 'utility'] %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-2.485 3.85-6.75 8.154-6.75 12a6.75 6.75 0 1 0 13.5 0c0-3.846-4.265-8.15-6.75-12Z"/><path stroke-linecap="round" d="M9 15.75a3 3 0 0 0 3 3"/></svg>
+    {% elif charge_type == 'late_fee' %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/><path stroke-linecap="round" d="M12 2.25V.75"/></svg>
+    {% elif charge_type == 'security_deposit' %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m6-3c0 7.142-3.036 11.065-8.318 13.817a1.5 1.5 0 0 1-1.364 0C6.036 17.815 3 13.892 3 6.75 3 5.922 3.672 5.25 4.5 5.25c2.25 0 4.125-.75 5.25-2.25a2.812 2.812 0 0 1 4.5 0c1.125 1.5 3 2.25 5.25 2.25.828 0 1.5.672 1.5 1.5Z"/></svg>
+    {% elif charge_type == 'damage' %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m11.42 15.17-5.538 5.538a2.121 2.121 0 0 1-3-3l5.538-5.538m3-3 3.879-3.879a3 3 0 0 1 4.243 4.243l-3.879 3.879m-4.243-3 3 3"/></svg>
+    {% else %}
+    <svg class="{{ icon_class }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M9.75 3.75h4.5A2.25 2.25 0 0 1 16.5 6v.75h.75A2.25 2.25 0 0 1 19.5 9v10.5H4.5V9a2.25 2.25 0 0 1 2.25-2.25h.75V6a2.25 2.25 0 0 1 2.25-2.25Z"/></svg>
+    {% endif %}
+{% endmacro %}
+
+{% macro render_charge(charge) %}
+<article class="ledger-charge-row group border-l-4 px-4 py-4 sm:px-5 {% if charge.charge_type == 'rent' %}border-l-blue-500{% elif charge.charge_type in ['water', 'utility'] %}border-l-cyan-500{% elif charge.charge_type == 'late_fee' %}border-l-amber-500{% elif charge.charge_type == 'security_deposit' %}border-l-violet-500{% elif charge.charge_type == 'damage' %}border-l-rose-500{% else %}border-l-slate-400{% endif %}">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(17rem,1.8fr)_minmax(9rem,.72fr)_minmax(13rem,1fr)_minmax(9rem,.65fr)_auto] lg:items-center">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {% if charge.charge_type == 'rent' %}bg-blue-50 text-blue-700{% elif charge.charge_type in ['water', 'utility'] %}bg-cyan-50 text-cyan-700{% elif charge.charge_type == 'late_fee' %}bg-amber-50 text-amber-700{% elif charge.charge_type == 'security_deposit' %}bg-violet-50 text-violet-700{% elif charge.charge_type == 'damage' %}bg-rose-50 text-rose-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+                {{ category_icon(charge.charge_type) }}
+            </span>
+            <div class="min-w-0 pt-0.5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="truncate font-semibold text-slate-950">{{ charge.description }}</h3>
+                    {% if charge.is_recurring %}<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Monthly</span>{% endif %}
+                </div>
+                <p class="mt-1 truncate text-sm text-slate-500">
+                    <a href="/tenants/{{ charge.tenant_id }}" class="font-medium text-slate-700 hover:text-blue-700">{{ charge.tenant_name }}</a>
+                    <span class="mx-1 text-slate-300">/</span>
+                    <a href="/payments?property_id={{ charge.property_id }}" class="hover:text-blue-700">{{ charge.property_address }}</a>
+                </p>
+            </div>
+        </div>
+
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Due date</p>
+            <p class="mt-1 text-sm font-semibold {% if charge.status == 'overdue' %}text-red-700{% else %}text-slate-800{% endif %}">{{ charge.due_date.strftime('%b %d, %Y') }}</p>
+            <p class="mt-0.5 text-xs text-slate-500">
+                {% if charge.charge_type == 'late_fee' %}Late / daily fee{% elif charge.charge_type in ['water', 'utility'] %}Utility{% else %}{{ charge.charge_type.replace('_', ' ').title() }}{% endif %}
+            </p>
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between gap-3 text-xs">
+                <span class="font-medium text-slate-500">Applied</span>
+                <span class="font-semibold text-slate-700">${{ "{:,.2f}".format(charge.applied) }} / ${{ "{:,.2f}".format(charge.amount) }}</span>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Amount applied" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ charge.progress_percent|round|int }}">
+                <div class="h-full rounded-full {% if charge.status == 'paid' %}bg-emerald-500{% elif charge.status == 'overdue' %}bg-red-500{% else %}bg-blue-500{% endif %}" style="width: {{ charge.progress_percent }}%"></div>
+            </div>
+            {% if charge.pending > 0 %}<p class="mt-1.5 text-xs font-medium text-amber-700">${{ "{:,.2f}".format(charge.pending) }} pending</p>{% endif %}
+        </div>
+
+        <div class="lg:text-right">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Balance</p>
+            <p class="mt-1 text-lg font-bold {% if charge.status == 'overdue' %}text-red-700{% elif charge.outstanding == 0 %}text-emerald-700{% else %}text-slate-950{% endif %}">${{ "{:,.2f}".format(charge.outstanding) }}</p>
+            <div class="mt-1.5 lg:flex lg:justify-end">
+                {% if charge.status == 'paid' %}<span class="bd-badge bd-badge-success">Paid</span>
+                {% elif charge.status == 'partial' %}<span class="bd-badge bd-badge-info">Partially paid</span>
+                {% elif charge.status == 'overdue' %}<span class="bd-badge bd-badge-danger">Overdue{% if charge.is_partial %} · partial{% endif %}</span>
+                {% elif charge.status == 'void' %}<span class="bd-badge bg-slate-100 text-slate-600">Void</span>
+                {% else %}<span class="bd-badge bd-badge-warning">Open</span>{% endif %}
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            {% if charge.status != 'void' %}
+            <button type="button" class="bd-icon-button text-slate-400 hover:bg-blue-50 hover:text-blue-700" aria-label="Edit {{ charge.description }}"
+                onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})'>
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if charge.entries %}
+    <details class="ledger-disclosure mt-3 sm:ml-14">
+        <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+            <svg class="disclosure-chevron h-3.5 w-3.5 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+            {{ charge.entries|length }} ledger entr{{ 'y' if charge.entries|length == 1 else 'ies' }}
+        </summary>
+        <div class="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70">
+            {% for entry in charge.entries %}
+            <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-b border-slate-200/70 px-4 py-2.5 text-xs last:border-b-0 sm:grid-cols-[minmax(0,1fr)_8rem_7rem]">
+                <span class="min-w-0 truncate text-slate-700">{{ entry.description }}</span>
+                <span class="hidden text-slate-500 sm:block">{{ entry.occurred_on.strftime('%b %d, %Y') }}</span>
+                <span class="text-right font-semibold {% if entry.entry_type in ['payment', 'credit'] %}text-emerald-700{% elif entry.entry_type == 'reversal' %}text-red-700{% else %}text-slate-700{% endif %}">
+                    {% if entry.entry_type in ['payment', 'credit'] %}−{% elif entry.entry_type == 'reversal' %}+{% endif %}${{ "{:,.2f}".format(entry.amount) }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+</article>
+{% endmacro %}
+
 {% block head %}
 {{ super() }}
 <style>
@@ -12,36 +111,50 @@
         padding: 0.625rem 0.75rem;
         border-color: rgb(203 213 225);
     }
+    .ledger-charge-row { transition: background-color .15s ease; }
+    .ledger-charge-row:hover { background: rgba(248, 250, 252, .82); }
+    .ledger-disclosure > summary::-webkit-details-marker { display: none; }
+    .ledger-disclosure[open] .disclosure-chevron { transform: rotate(180deg); }
+    .ledger-payment-table tbody tr { transition: background-color .15s ease; }
 </style>
 {% endblock %}
 
 {% block header %}
 <header class="bg-white border-b border-slate-200">
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-            <p class="text-sm font-medium text-blue-600">Payment center</p>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Payment Ledger</h1>
-            <p class="mt-1 text-sm text-gray-500">
-                {% if selected_tenant %}{{ selected_tenant.name }} · {{ selected_tenant.property_ref.address }}
-                {% elif selected_property %}{{ selected_property.address }}
-                {% else %}Charges and payments across every property{% endif %}
-            </p>
-        </div>
-        <div class="flex items-center gap-3">
-            <div class="relative" id="actions-wrap">
-                <button type="button" onclick="toggleActions(this)" aria-expanded="false" aria-controls="actions-menu" class="inline-flex items-center gap-2 rounded-full border-2 border-blue-600 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-blue-700 hover:bg-blue-50">
-                    Actions
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
-                </button>
-                <div id="actions-menu" role="menu" class="hidden absolute right-0 z-30 mt-2 w-72 rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
-                    <button type="button" onclick="openActivity('payment')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Record payment</button>
-                    <button type="button" onclick="openActivity('credit')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Add credit</button>
-                    <button type="button" onclick="openActivity('refund')" class="w-full px-5 py-3 text-left text-base font-semibold text-blue-950 hover:bg-blue-50">Return security deposit</button>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div class="bd-page-heading">
+                <span class="bd-page-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[.16em] text-blue-600">Payment center</p>
+                    <h1 class="bd-page-title">Payment ledger</h1>
+                    <p class="bd-page-subtitle truncate">
+                        {% if selected_tenant %}{{ selected_tenant.name }} · {{ selected_tenant.property_ref.address }}
+                        {% elif selected_property %}{{ selected_property.address }}
+                        {% else %}Charges and payments across every property{% endif %}
+                    </p>
                 </div>
             </div>
-            <button type="button" onclick="openModal('charge-modal')" class="rounded-full bg-blue-950 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-blue-900">
-                Create charge
-            </button>
+            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                <div class="relative" id="actions-wrap">
+                    <button type="button" onclick="toggleActions(this)" aria-expanded="false" aria-controls="actions-menu" class="bd-btn bd-btn-secondary">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/></svg>
+                        More actions
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                    </button>
+                    <div id="actions-menu" role="menu" class="absolute right-0 z-30 mt-2 hidden w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl">
+                        <button type="button" onclick="openActivity('payment')" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-blue-50 hover:text-blue-800"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/></svg></span>Record payment</button>
+                        <button type="button" onclick="openActivity('credit')" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-blue-50 hover:text-blue-800"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25 11.25 16.5 15 11.25m6-4.5v10.5A2.25 2.25 0 0 1 18.75 19.5H5.25A2.25 2.25 0 0 1 3 17.25V6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75Z"/></svg></span>Add credit</button>
+                        <button type="button" onclick="openActivity('refund')" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-blue-50 hover:text-blue-800"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5h13.5a4.5 4.5 0 0 1 0 9H15M3 10.5l4.5-4.5M3 10.5 7.5 15"/></svg></span>Return security deposit</button>
+                    </div>
+                </div>
+                <button type="button" onclick="openModal('charge-modal')" class="bd-btn bd-btn-primary">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+                    New charge
+                </button>
+            </div>
         </div>
     </div>
 </header>
@@ -57,7 +170,16 @@
 </div>
 {% endif %}
 
-<section class="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+<section class="bd-card mb-5 p-4 sm:p-5">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+            <h2 class="text-sm font-semibold text-slate-900">Ledger scope</h2>
+            <p class="text-xs text-slate-500">Narrow charges and transactions by property or tenant.</p>
+        </div>
+        {% if filter_property_id or filter_tenant_id or filter_status or filter_method %}
+        <a href="/payments" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>Clear filters</a>
+        {% endif %}
+    </div>
     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1.25fr_1.25fr_.75fr_.75fr_auto]">
         <div>
             <label for="property-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Property</label>
@@ -78,7 +200,7 @@
             </select>
         </div>
         <div>
-            <label for="status-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Status</label>
+            <label for="status-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Payment status</label>
             <select id="status-filter" class="bd-input">
                 <option value="">All statuses</option>
                 {% for status in statuses %}<option value="{{ status.value }}" {% if filter_status == status.value %}selected{% endif %}>{{ status.value.replace('_', ' ').title() }}</option>{% endfor %}
@@ -92,134 +214,104 @@
                 <option value="card" {% if filter_method == 'card' %}selected{% endif %}>Card</option>
             </select>
         </div>
-        <button type="button" onclick="applyLedgerFilters()" class="h-[43px] self-end rounded-lg bg-gray-900 px-5 text-sm font-semibold text-white hover:bg-gray-800">View ledger</button>
+        <button type="button" onclick="applyLedgerFilters()" class="bd-btn bg-slate-900 text-white hover:bg-slate-800 xl:self-end"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5M6.75 9.75h10.5m-7.5 5.25h4.5"/></svg>Apply filters</button>
     </div>
 </section>
 
-<section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-    <article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-        <p class="text-sm text-gray-500">Unpaid charges</p>
-        <p class="mt-1 text-3xl font-bold text-blue-950">${{ "{:,.2f}".format(charge_totals.outstanding) }}</p>
-        <p class="mt-1 text-xs text-gray-400">Across {{ charges|selectattr('status', 'in', ['open', 'partial', 'overdue'])|list|length }} open items</p>
+<section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <article class="bd-card flex items-start gap-4 p-5">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25 11.25 16.5 15 11.25M9.75 3.75h4.5A2.25 2.25 0 0 1 16.5 6v.75h.75A2.25 2.25 0 0 1 19.5 9v10.5H4.5V9a2.25 2.25 0 0 1 2.25-2.25h.75V6a2.25 2.25 0 0 1 2.25-2.25Z"/></svg></span>
+        <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total billed</p><p class="mt-1 text-2xl font-bold tracking-tight text-slate-950">${{ "{:,.2f}".format(charge_totals.charged) }}</p><p class="mt-1 text-xs text-slate-500">{{ charges|length }} ledger charges</p></div>
     </article>
-    <article class="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-        <p class="text-sm text-gray-500">Payments & credits applied</p>
-        <p class="mt-1 text-3xl font-bold text-green-700">${{ "{:,.2f}".format(charge_totals.paid_or_credited) }}</p>
-        <p class="mt-1 text-xs text-gray-400">Against ledger charges</p>
+    <article class="bd-card flex items-start gap-4 p-5">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span>
+        <div class="min-w-0 flex-1"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Applied</p><p class="mt-1 text-2xl font-bold tracking-tight text-emerald-700">${{ "{:,.2f}".format(charge_totals.paid_or_credited) }}</p><div class="mt-2 h-1 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width: {{ collection_progress }}%"></div></div><p class="mt-1 text-xs text-slate-500">{{ "{:.0f}".format(collection_rate) }}% of charges</p></div>
     </article>
-    <article class="rounded-2xl border {% if charge_totals.overdue > 0 %}border-red-100{% else %}border-gray-100{% endif %} bg-white p-5 shadow-sm">
-        <p class="text-sm text-gray-500">Overdue</p>
-        <p class="mt-1 text-3xl font-bold {% if charge_totals.overdue > 0 %}text-red-600{% else %}text-gray-900{% endif %}">${{ "{:,.2f}".format(charge_totals.overdue) }}</p>
-        <p class="mt-1 text-xs text-gray-400">Past-due outstanding balance</p>
+    <article class="bd-card flex items-start gap-4 p-5">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg></span>
+        <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Outstanding</p><p class="mt-1 text-2xl font-bold tracking-tight text-blue-950">${{ "{:,.2f}".format(charge_totals.outstanding) }}</p><p class="mt-1 text-xs text-slate-500">Across {{ charge_counts.open }} open item{{ '' if charge_counts.open == 1 else 's' }}</p></div>
+    </article>
+    <article class="bd-card flex items-start gap-4 p-5 {% if charge_totals.overdue > 0 %}border-red-200{% endif %}">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {% if charge_totals.overdue > 0 %}bg-red-50 text-red-700{% else %}bg-slate-100 text-slate-500{% endif %}"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.052 3.38c.865-1.5 3.03-1.5 3.896 0l7.355 12.746ZM12 16.5h.008v.008H12V16.5Z"/></svg></span>
+        <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Overdue</p><p class="mt-1 text-2xl font-bold tracking-tight {% if charge_totals.overdue > 0 %}text-red-700{% else %}text-slate-950{% endif %}">${{ "{:,.2f}".format(charge_totals.overdue) }}</p><p class="mt-1 text-xs text-slate-500">{{ charge_counts.overdue }} past-due item{{ '' if charge_counts.overdue == 1 else 's' }}</p></div>
     </article>
 </section>
 
-<section class="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+<section class="bd-card mb-5 overflow-hidden">
+    <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <h2 class="text-xl font-bold text-blue-950">Charges</h2>
-            <p class="text-sm text-gray-500">Rent, deposits, utilities, fees, and other tenant receivables</p>
+            <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-950">Charges</h2><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ charges|length }}</span></div>
+            <p class="mt-0.5 text-sm text-slate-500">Open balances first, with paid history kept below.</p>
         </div>
-        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{{ charges|length }} total</span>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600" aria-label="Charge type legend">
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-blue-700">{{ category_icon('rent', 'h-3.5 w-3.5') }}Rent</span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-amber-700">{{ category_icon('late_fee', 'h-3.5 w-3.5') }}Late / daily fee</span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-cyan-50 px-2.5 py-1.5 text-cyan-700">{{ category_icon('utility', 'h-3.5 w-3.5') }}Utility</span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-violet-700">{{ category_icon('security_deposit', 'h-3.5 w-3.5') }}Deposit</span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-rose-700">{{ category_icon('damage', 'h-3.5 w-3.5') }}Damage</span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-slate-600">{{ category_icon('other', 'h-3.5 w-3.5') }}Other</span>
+        </div>
     </div>
 
     {% if charges %}
-    <div class="divide-y divide-gray-100">
-        {% for charge in charges %}
-        <article class="px-6 py-5 hover:bg-gray-50">
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:items-center">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-base">
-                            {% if charge.charge_type == 'rent' %}↻{% elif charge.charge_type == 'water' %}💧{% elif charge.charge_type == 'security_deposit' %}🔐{% else %}＋{% endif %}
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="truncate font-semibold text-gray-950">{{ charge.description }}</h3>
-                            <p class="truncate text-sm text-gray-500">
-                                <a href="/payments?tenant_id={{ charge.tenant_id }}" class="hover:text-blue-600">{{ charge.tenant_name }}</a>
-                                · <a href="/payments?property_id={{ charge.property_id }}" class="hover:text-blue-600">{{ charge.property_address }}</a>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-sm">
-                    <p class="font-medium text-gray-800">Due {{ charge.due_date.strftime('%b %d, %Y') }}</p>
-                    <p class="text-gray-500">{{ charge.charge_type.replace('_', ' ').title() }}{% if charge.is_recurring %} · Monthly{% endif %}</p>
-                </div>
-                <div class="lg:text-right">
-                    <p class="text-lg font-bold text-gray-950">${{ "{:,.2f}".format(charge.outstanding) }}</p>
-                    <p class="text-xs text-gray-500">of ${{ "{:,.2f}".format(charge.amount) }} unpaid</p>
-                </div>
-                <div class="flex items-center justify-between gap-3 lg:justify-end">
-                    {% if charge.status == 'paid' %}<span class="bd-badge bd-badge-success">Paid</span>
-                    {% elif charge.status == 'partial' %}<span class="bd-badge bd-badge-info">Partial</span>
-                    {% elif charge.status == 'overdue' %}<span class="bd-badge bd-badge-danger">Overdue{% if charge.is_partial %} · partial{% endif %}</span>
-                    {% elif charge.status == 'void' %}<span class="bd-badge bg-gray-100 text-gray-600">Void</span>
-                    {% else %}<span class="bd-badge bd-badge-warning">Open</span>{% endif %}
-                    {% if charge.status != 'void' %}
-                    <button type="button" class="rounded-lg p-2 text-blue-700 hover:bg-blue-50" aria-label="Edit {{ charge.description }}"
-                        onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})'>
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% if charge.entries %}
-            <details class="ml-11 mt-3">
-                <summary class="cursor-pointer text-xs font-medium text-blue-600">{{ charge.entries|length }} ledger entr{{ 'y' if charge.entries|length == 1 else 'ies' }}</summary>
-                <div class="mt-2 space-y-1.5 border-l-2 border-blue-100 pl-3">
-                    {% for entry in charge.entries %}
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-600">{{ entry.description }} · {{ entry.occurred_on.strftime('%b %d, %Y') }}</span>
-                        <span class="font-semibold {% if entry.entry_type in ['payment', 'credit'] %}text-green-700{% elif entry.entry_type == 'reversal' %}text-red-600{% else %}text-gray-700{% endif %}">
-                            {% if entry.entry_type in ['payment', 'credit'] %}−{% elif entry.entry_type == 'reversal' %}+{% endif %}${{ "{:,.2f}".format(entry.amount) }}
-                        </span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </details>
-            {% endif %}
-        </article>
-        {% endfor %}
+    <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 sm:px-6"><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Needs attention · {{ charge_counts.open }}</p></div>
+    {% if open_charges %}
+    <div class="divide-y divide-slate-100">
+        {% for charge in open_charges %}{{ render_charge(charge) }}{% endfor %}
     </div>
     {% else %}
+    <div class="flex items-center gap-3 border-b border-slate-100 px-6 py-5 text-sm text-emerald-700"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span>All charges in this view are settled.</div>
+    {% endif %}
+
+    {% if settled_charges %}
+    <details class="ledger-disclosure">
+        <summary class="flex cursor-pointer list-none items-center justify-between bg-slate-50/70 px-5 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 sm:px-6">
+            <span class="flex items-center gap-2"><svg class="disclosure-chevron h-4 w-4 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>Settled and voided charges</span>
+            <span class="rounded-full bg-white px-2.5 py-1 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">{{ charge_counts.settled }}</span>
+        </summary>
+        <div class="divide-y divide-slate-100 border-t border-slate-200">{% for charge in settled_charges %}{{ render_charge(charge) }}{% endfor %}</div>
+    </details>
+    {% endif %}
+    {% else %}
     <div class="px-6 py-14 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-2xl">🧾</div>
-        <h3 class="mt-3 font-semibold text-gray-900">No charges in this view</h3>
-        <p class="mt-1 text-sm text-gray-500">Create a charge to begin tracking this tenant's balance.</p>
+        <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700">{{ category_icon('other', 'h-6 w-6') }}</span>
+        <h3 class="mt-3 font-semibold text-slate-900">No charges in this view</h3>
+        <p class="mt-1 text-sm text-slate-500">Create a charge to begin tracking this tenant's balance.</p>
     </div>
     {% endif %}
 </section>
 
-<details class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" {% if not charges %}open{% endif %}>
-    <summary class="cursor-pointer px-6 py-5 text-lg font-bold text-blue-950">Payment activity <span class="ml-2 text-sm font-normal text-gray-400">{{ total_items }} transactions</span></summary>
+<section class="bd-card overflow-hidden">
+    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div><div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-950">Payment activity</h2><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ total_items }}</span></div><p class="mt-0.5 text-sm text-slate-500">Completed, pending, and failed transactions for this view.</p></div>
+        <div class="flex gap-5 text-sm"><div><p class="text-xs text-slate-400">Completed</p><p class="font-semibold text-emerald-700">${{ "{:,.2f}".format(completed_amount) }}</p></div><div><p class="text-xs text-slate-400">Pending</p><p class="font-semibold text-amber-700">{{ pending_count }} transaction{{ '' if pending_count == 1 else 's' }}</p></div></div>
+    </div>
     {% if payments %}
-    <div class="overflow-x-auto border-t border-gray-100">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>
-                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Tenant / Property</th>
-                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Description</th>
-                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Method</th>
-                <th class="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th>
-                <th class="px-5 py-3 text-right text-xs font-semibold uppercase text-gray-500">Amount</th>
+    <div class="overflow-x-auto">
+        <table class="ledger-payment-table min-w-[760px] w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50/80"><tr>
+                <th class="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:px-6">Tenant and property</th>
+                <th class="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Payment</th>
+                <th class="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Method</th>
+                <th class="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                <th class="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:px-6">Amount</th>
             </tr></thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-slate-100 bg-white">
                 {% for payment in payments %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-5 py-3"><p class="text-sm font-medium text-gray-900">{{ payment.tenant_name }}</p><p class="text-xs text-gray-500">{{ payment.property_address }}</p></td>
-                    <td class="px-5 py-3 text-sm text-gray-600">{{ payment.description }}<p class="text-xs text-gray-400">{{ payment.initiated_at.strftime('%b %d, %Y') }}</p></td>
-                    <td class="px-5 py-3 text-sm text-gray-600">{{ 'Card' if payment.method == 'card' else 'ACH' }}</td>
-                    <td class="px-5 py-3 text-sm text-gray-600">{{ payment.status.value.replace('_', ' ').title() }}</td>
-                    <td class="px-5 py-3 text-right text-sm font-semibold text-gray-900">${{ "{:,.2f}".format(payment.total_amount) }}</td>
+                <tr class="hover:bg-slate-50/80">
+                    <td class="px-5 py-3.5 sm:px-6"><a href="/tenants/{{ payment.tenant_id }}" class="text-sm font-semibold text-slate-900 hover:text-blue-700">{{ payment.tenant_name }}</a><a href="/payments?property_id={{ payment.property_id }}" class="mt-0.5 block text-xs text-slate-500 hover:text-blue-700">{{ payment.property_address }}</a></td>
+                    <td class="px-5 py-3.5"><p class="text-sm font-medium text-slate-700">{{ payment.description }}</p><p class="mt-0.5 text-xs text-slate-400">{{ payment.initiated_at.strftime('%b %d, %Y') }}</p></td>
+                    <td class="px-5 py-3.5"><span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold {% if payment.method == 'card' %}bg-violet-50 text-violet-700{% elif payment.method == 'ach' %}bg-blue-50 text-blue-700{% else %}bg-slate-100 text-slate-700{% endif %}">{% if payment.method == 'card' %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6"/><rect width="19.5" height="15" x="2.25" y="4.5" rx="2.25"/></svg>Card{% elif payment.method == 'ach' %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 10.5h15M5.25 6.75 12 3l6.75 3.75M6.75 10.5V18m3.5-7.5V18m3.5-7.5V18m3.5-7.5V18"/></svg>ACH{% else %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25 11.25 16.5 15 11.25M4.5 4.5h15v15h-15z"/></svg>{{ payment.method.replace('_', ' ').title() }}{% endif %}</span></td>
+                    <td class="px-5 py-3.5">{% if payment.status.value == 'completed' %}<span class="bd-badge bd-badge-success">Completed</span>{% elif payment.status.value in ['pending', 'processing'] %}<span class="bd-badge bd-badge-warning">{{ payment.status.value.title() }}</span>{% elif payment.status.value in ['failed', 'returned'] %}<span class="bd-badge bd-badge-danger">{{ payment.status.value.title() }}</span>{% else %}<span class="bd-badge bg-slate-100 text-slate-600">{{ payment.status.value.title() }}</span>{% endif %}</td>
+                    <td class="px-5 py-3.5 text-right text-sm font-bold text-slate-950 sm:px-6">${{ "{:,.2f}".format(payment.total_amount) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% else %}<div class="border-t border-gray-100 px-6 py-10 text-center text-sm text-gray-500">No payment activity in this view.</div>{% endif %}
+    {% else %}<div class="px-6 py-12 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg></span><p class="mt-3 text-sm font-semibold text-slate-800">No payment activity in this view</p><p class="mt-1 text-sm text-slate-500">Try a different filter or record an offline payment.</p></div>{% endif %}
     {% include "components/pagination.html" %}
-</details>
+</section>
 
 <!-- Create charge modal -->
 <div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="charge-title">
@@ -235,7 +327,7 @@
                     <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
                 </select></div>
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label for="create-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="create-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
+                    <div><label for="create-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="create-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="utility">Utility</option><option value="water">Water bill</option><option value="late_fee">Late / daily fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
                     <div><label for="create-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="create-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="0.00"></div>
                 </div>
                 <div><label for="create-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="create-description" name="description" required maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Monthly rent"></div>
@@ -272,7 +364,7 @@
     <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><form id="edit-form" method="POST">
         <input type="hidden" name="tenant_id" id="edit-tenant"><input type="hidden" name="property_id" id="edit-property">
         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="edit-title" class="text-xl font-bold text-gray-950">Edit charge</h2><p class="text-sm text-gray-500">Amounts cannot be reduced below money already applied.</p></div><button type="button" onclick="closeModal('edit-modal')" aria-label="Close edit charge dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
-        <div class="space-y-4 p-6"><div><label for="edit-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="water">Water / utility</option><option value="late_fee">Late fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label for="edit-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label for="edit-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
+        <div class="space-y-4 p-6"><div><label for="edit-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="utility">Utility</option><option value="water">Water bill</option><option value="late_fee">Late / daily fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label for="edit-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label for="edit-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
         <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Save changes</button></div>
     </form></div>
 </div>

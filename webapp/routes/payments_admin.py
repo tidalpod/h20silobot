@@ -140,6 +140,8 @@ async def payments_list(
         for p in ach_payments:
             all_payments.append({
                 "id": p.id,
+                "tenant_id": p.tenant_id,
+                "property_id": p.property_id,
                 "method": "ach",
                 "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
                 "property_address": p.property_ref.address if p.property_ref else "—",
@@ -157,6 +159,8 @@ async def payments_list(
         for p in stripe_payments:
             all_payments.append({
                 "id": p.id,
+                "tenant_id": p.tenant_id,
+                "property_id": p.property_id,
                 "method": "card",
                 "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
                 "property_address": p.property_ref.address if p.property_ref else "—",
@@ -174,6 +178,8 @@ async def payments_list(
         for p in external_payments:
             all_payments.append({
                 "id": p.id,
+                "tenant_id": p.tenant_id,
+                "property_id": p.property_id,
                 "method": p.payment_method or "other",
                 "tenant_name": p.tenant_ref.name if p.tenant_ref else "—",
                 "property_address": p.property_ref.address if p.property_ref else "—",
@@ -236,6 +242,18 @@ async def payments_list(
         include_paid=True,
     )
     charge_totals = ledger_service.totals(charges)
+    open_charges = [charge for charge in charges if charge["status"] not in {"paid", "void"}]
+    settled_charges = [charge for charge in charges if charge["status"] in {"paid", "void"}]
+    collection_rate = (
+        float(charge_totals["paid_or_credited"] / charge_totals["charged"] * 100)
+        if charge_totals["charged"] > 0 else 0.0
+    )
+    collection_progress = min(max(collection_rate, 0.0), 100.0)
+    charge_counts = {
+        "open": len(open_charges),
+        "overdue": sum(charge["status"] == "overdue" for charge in charges),
+        "settled": len(settled_charges),
+    }
     selected_tenant = next((tenant for tenant in tenants if tenant.id == selected_tenant_id), None)
     selected_property = next((prop for prop in properties if prop.id == selected_property_id), None)
 
@@ -260,7 +278,12 @@ async def payments_list(
             "properties": properties,
             "tenants": tenants,
             "charges": charges,
+            "open_charges": open_charges,
+            "settled_charges": settled_charges,
             "charge_totals": charge_totals,
+            "charge_counts": charge_counts,
+            "collection_rate": collection_rate,
+            "collection_progress": collection_progress,
             "selected_tenant": selected_tenant,
             "selected_property": selected_property,
             "total_amount": total_amount,

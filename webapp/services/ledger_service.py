@@ -54,6 +54,7 @@ def charge_snapshot(charge: TenantCharge) -> dict:
     applied = max(applied, Decimal("0.00"))
     amount = money(charge.amount)
     outstanding = max(amount - applied, Decimal("0.00"))
+    progress_percent = min(float(applied / amount * 100), 100.0) if amount > 0 else 0.0
 
     if charge.is_void:
         status = "void"
@@ -80,6 +81,7 @@ def charge_snapshot(charge: TenantCharge) -> dict:
         "pending": pending,
         "refunded": refunded,
         "outstanding": Decimal("0.00") if charge.is_void else outstanding,
+        "progress_percent": progress_percent,
         "due_date": charge.due_date,
         "service_start": charge.service_start,
         "service_end": charge.service_end,
