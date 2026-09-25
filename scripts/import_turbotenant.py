@@ -105,6 +105,7 @@ async def run(args: argparse.Namespace) -> dict:
         tenants=tenants,
         existing_charge_keys=charge_keys,
         existing_payment_ids=payment_ids,
+        excluded_property_addresses=args.exclude_property,
     )
 
 
@@ -114,6 +115,12 @@ def main() -> int:
     )
     parser.add_argument("source_dir", type=Path, help="Directory containing the three exported CSV files")
     parser.add_argument("--report", type=Path, help="JSON report path (defaults inside source_dir)")
+    parser.add_argument(
+        "--exclude-property",
+        action="append",
+        default=[],
+        help="TurboTenant property address to classify as out of scope; may be repeated",
+    )
     args = parser.parse_args()
 
     try:
@@ -134,13 +141,15 @@ def main() -> int:
     print(f"Dry run complete: {report_path}")
     print(
         "Deposits: "
-        f"{deposit_summary['matched']}/{deposit_summary['total']} matched "
-        f"(${deposit_summary['matched_amount']} of ${deposit_summary['total_amount']})"
+        f"{deposit_summary['matched']}/{deposit_summary['importable']} importable matched "
+        f"(${deposit_summary['matched_amount']} of ${deposit_summary['importable_amount']}); "
+        f"{deposit_summary['excluded']} excluded"
     )
     print(
         "Charges: "
-        f"{charge_summary['matched']}/{charge_summary['total']} matched "
-        f"(${charge_summary['matched_amount']} of ${charge_summary['total_amount']})"
+        f"{charge_summary['matched']}/{charge_summary['importable']} importable matched "
+        f"(${charge_summary['matched_amount']} of ${charge_summary['importable_amount']}); "
+        f"{charge_summary['excluded']} excluded"
     )
     print(
         "Needs review: "
@@ -152,4 +161,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

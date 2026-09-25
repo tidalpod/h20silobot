@@ -96,10 +96,14 @@ class Match:
 @dataclass(frozen=True)
 class MatchSummary:
     total: int
+    importable: int
     matched: int
     ambiguous: int
     unmatched: int
+    excluded: int
     matched_amount: str
+    importable_amount: str
+    excluded_amount: str
     total_amount: str
 
 
@@ -375,18 +379,24 @@ def match_deposits(
     deposits: Sequence[DepositRow],
     properties: Sequence[PropertyRecord],
     tenants: Sequence[TenantRecord],
+    excluded_properties: Sequence[PropertyRecord] = (),
 ) -> list[Match]:
     tenants_by_property: dict[int, list[TenantRecord]] = defaultdict(list)
     for tenant in tenants:
         tenants_by_property[tenant.property_id].append(tenant)
-    return [
-        _match_person_at_property(
-            tenant_name=row.tenant_name,
-            property_candidates=_property_candidates(row.lease_address, properties),
-            tenants_by_property=tenants_by_property,
+    matches = []
+    for row in deposits:
+        if _property_candidates(row.lease_address, excluded_properties):
+            matches.append(Match(None, None, "excluded", "property_out_of_scope"))
+            continue
+        matches.append(
+            _match_person_at_property(
+                tenant_name=row.tenant_name,
+                property_candidates=_property_candidates(row.lease_address, properties),
+                tenants_by_property=tenants_by_property,
+            )
         )
-        for row in deposits
-    ]
+    return matches
 
 
 def _lease_match_map(
@@ -417,6 +427,7 @@ def match_charges(
     deposit_matches: Sequence[Match],
     properties: Sequence[PropertyRecord],
     tenants: Sequence[TenantRecord],
+    excluded_properties: Sequence[PropertyRecord] = (),
 ) -> list[Match]:
     lease_map = _lease_match_map(deposits, deposit_matches)
     tenants_by_property: dict[int, list[TenantRecord]] = defaultdict(list)
@@ -425,9 +436,19 @@ def match_charges(
         tenants_by_property[tenant.property_id].append(tenant)
         tenants_by_name[normalize_name(tenant.name)].append(tenant)
 
+    excluded_lease_titles = {
+        normalize_name(row.lease_title)
+        for row, match in zip(deposits, deposit_matches)
+        if match.status == "excluded"
+    }
     matches: list[Match] = []
     for row in charges:
         lease_key = normalize_name(row.lease_title)
+        if lease_key in excluded_lease_titles or _charge_title_property_candidates(
+            row.lease_title, excluded_properties
+        ):
+            matches.append(Match(None, None, "excluded", "property_out_of_scope"))
+            continue
         linked = lease_map.get(lease_key, set())
         if len(linked) == 1:
             property_id, tenant_id = next(iter(linked))
@@ -476,13 +497,21 @@ def _summarize(rows: Iterable, matches: Sequence[Match], amount_attr: str) -> Ma
         (getattr(row, amount_attr) for row, match in zip(rows, matches) if match.status == "matched"),
         Decimal("0.00"),
     )
+    excluded_amount = sum(
+        (getattr(row, amount_attr) for row, match in zip(rows, matches) if match.status == "excluded"),
+        Decimal("0.00"),
+    )
     counts = Counter(match.status for match in matches)
     return MatchSummary(
         total=len(rows),
+        importable=len(rows) - counts["excluded"],
         matched=counts["matched"],
         ambiguous=counts["ambiguous"],
         unmatched=counts["unmatched"],
+        excluded=counts["excluded"],
         matched_amount=f"{matched_amount:.2f}",
+        importable_amount=f"{total_amount - excluded_amount:.2f}",
+        excluded_amount=f"{excluded_amount:.2f}",
         total_amount=f"{total_amount:.2f}",
     )
 
@@ -496,9 +525,16 @@ def build_report(
     tenants: Sequence[TenantRecord],
     existing_charge_keys: set[str] | None = None,
     existing_payment_ids: set[str] | None = None,
+    excluded_property_addresses: Sequence[str] = (),
 ) -> dict:
-    deposit_matches = match_deposits(deposits, properties, tenants)
-    charge_matches = match_charges(charges, deposits, deposit_matches, properties, tenants)
+    excluded_properties = [
+        PropertyRecord(-(index + 1), address)
+        for index, address in enumerate(excluded_property_addresses)
+    ]
+    deposit_matches = match_deposits(deposits, properties, tenants, excluded_properties)
+    charge_matches = match_charges(
+        charges, deposits, deposit_matches, properties, tenants, excluded_properties
+    )
     existing_charge_keys = existing_charge_keys or set()
     existing_payment_ids = existing_payment_ids or set()
 
@@ -510,7 +546,7 @@ def build_report(
     def issues(rows: Sequence, matches: Sequence[Match], label: str) -> list[dict]:
         output = []
         for row, match in zip(rows, matches):
-            if match.status == "matched":
+            if match.status in {"matched", "excluded"}:
                 continue
             item = {
                 "row": row.row_number,
@@ -534,12 +570,21 @@ def build_report(
         return output
 
     rent_roll_property_matches = [
-        _property_candidates(
+        [] if _property_candidates(
             " ".join(part for part in (row.property_address, row.unit) if part),
-            properties,
+            excluded_properties,
+        ) else _property_candidates(
+            " ".join(part for part in (row.property_address, row.unit) if part), properties
         )
         for row in rent_roll
     ]
+    excluded_rent_roll_rows = sum(
+        bool(_property_candidates(
+            " ".join(part for part in (row.property_address, row.unit) if part),
+            excluded_properties,
+        ))
+        for row in rent_roll
+    )
 
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -561,14 +606,17 @@ def build_report(
             "tenants": len(tenants),
             "active_tenants": sum(1 for tenant in tenants if tenant.is_active),
         },
+        "excluded_properties": list(excluded_property_addresses),
         "matches": {
             "deposits": asdict(_summarize(deposits, deposit_matches, "amount")),
             "charges": asdict(_summarize(charges, charge_matches, "amount")),
             "rent_roll_properties": {
                 "total": len(rent_roll_property_matches),
+                "importable": len(rent_roll_property_matches) - excluded_rent_roll_rows,
                 "matched": sum(len(items) == 1 for items in rent_roll_property_matches),
                 "ambiguous": sum(len(items) > 1 for items in rent_roll_property_matches),
-                "unmatched": sum(not items for items in rent_roll_property_matches),
+                "unmatched": sum(not items for items in rent_roll_property_matches) - excluded_rent_roll_rows,
+                "excluded": excluded_rent_roll_rows,
             },
         },
         "already_imported": {
