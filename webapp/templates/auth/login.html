@@ -1,85 +1,378 @@
 {% extends "base.html" %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Sign in{% endblock %}
+
+{% block head %}
+<style>
+    .login-stage {
+        min-height: calc(100vh - 3rem);
+        display: grid;
+        place-items: center;
+        position: relative;
+        isolation: isolate;
+        padding: 1.5rem 0;
+    }
+
+    .login-stage::before,
+    .login-stage::after {
+        content: "";
+        position: fixed;
+        z-index: -1;
+        border-radius: 9999px;
+        pointer-events: none;
+        filter: blur(2px);
+    }
+
+    .login-stage::before {
+        width: 32rem;
+        height: 32rem;
+        top: -13rem;
+        right: -9rem;
+        background: radial-gradient(circle, rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0));
+    }
+
+    .login-stage::after {
+        width: 38rem;
+        height: 38rem;
+        bottom: -20rem;
+        left: -13rem;
+        background: radial-gradient(circle, rgba(37, 99, 235, 0.13), rgba(37, 99, 235, 0));
+    }
+
+    .login-shell {
+        width: min(70rem, 100%);
+        min-height: 42rem;
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(28rem, 1.1fr);
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 1.75rem;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 32px 80px -38px rgba(15, 23, 42, 0.35), 0 16px 32px -24px rgba(37, 99, 235, 0.22);
+    }
+
+    .login-brand-panel {
+        position: relative;
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+        padding: 3.25rem;
+        color: white;
+        background:
+            radial-gradient(circle at 85% 15%, rgba(125, 211, 252, 0.32), transparent 26%),
+            radial-gradient(circle at 12% 92%, rgba(59, 130, 246, 0.42), transparent 34%),
+            linear-gradient(145deg, #172554 0%, #1e40af 50%, #0369a1 100%);
+    }
+
+    .login-brand-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.12;
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+        background-size: 34px 34px;
+        mask-image: linear-gradient(to bottom, black, transparent 82%);
+    }
+
+    .login-brand-panel::after {
+        content: "";
+        position: absolute;
+        width: 17rem;
+        height: 17rem;
+        right: -8rem;
+        bottom: -7rem;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 9999px;
+        box-shadow: 0 0 0 2.5rem rgba(255, 255, 255, 0.035), 0 0 0 5rem rgba(255, 255, 255, 0.025);
+    }
+
+    .login-panel-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-form-panel {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 3.25rem 3.75rem;
+    }
+
+    .login-input-wrap {
+        position: relative;
+    }
+
+    .login-input-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        width: 1.15rem;
+        height: 1.15rem;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    .login-input {
+        width: 100%;
+        min-height: 3.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.75rem;
+        background: #fff;
+        padding: 0.75rem 1rem 0.75rem 2.9rem;
+        color: #0f172a;
+        font-size: 0.9375rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+
+    .login-input:hover {
+        border-color: #94a3b8;
+    }
+
+    .login-input:focus {
+        border-color: #2563eb;
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.11);
+    }
+
+    .login-input::placeholder {
+        color: #94a3b8;
+    }
+
+    .login-password-input {
+        padding-right: 4.25rem;
+    }
+
+    .login-portal-link {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.625rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.7rem;
+        background: #fff;
+        transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .login-portal-link:hover {
+        border-color: #bfdbfe;
+        background: #f8fbff;
+        box-shadow: 0 8px 18px -14px rgba(30, 64, 175, 0.45);
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 960px) {
+        .login-shell {
+            grid-template-columns: 1fr;
+            width: min(40rem, 100%);
+        }
+
+        .login-brand-panel {
+            min-height: auto;
+            padding: 2rem 2.5rem;
+        }
+
+        .login-brand-copy,
+        .login-feature-list,
+        .login-security-note {
+            display: none;
+        }
+
+        .login-form-panel {
+            padding: 2.5rem;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .login-stage {
+            min-height: calc(100vh - 1.5rem);
+            padding: 0;
+        }
+
+        .login-shell {
+            min-height: 0;
+            border-radius: 1.25rem;
+        }
+
+        .login-brand-panel {
+            padding: 1.5rem;
+        }
+
+        .login-form-panel {
+            padding: 2rem 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="flex items-center justify-center gap-3">
-            <img src="/static/images/icons/icon-192x192.png" alt="Blue Deer" class="h-12 w-12 object-contain">
-            <h1 class="text-3xl font-bold text-blue-600">Blue Deer</h1>
-        </div>
-        <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
-            Sign in to your account
-        </h2>
-    </div>
+<div class="login-stage">
+    <section class="login-shell" aria-labelledby="login-title">
+        <aside class="login-brand-panel">
+            <div class="login-panel-content">
+                <a href="/" class="inline-flex items-center gap-3 text-white" aria-label="Blue Deer home">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/95 shadow-lg shadow-blue-950/20">
+                        <img src="/static/images/icons/icon-192x192.png" alt="" class="h-10 w-10 object-contain">
+                    </span>
+                    <span>
+                        <span class="block text-xl font-bold tracking-tight">Blue Deer</span>
+                        <span class="block text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-100">Property Management</span>
+                    </span>
+                </a>
 
-    <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
-        <div class="bg-white px-6 py-12 shadow sm:rounded-lg sm:px-12">
+                <div class="login-brand-copy mt-20 max-w-sm">
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Your operations workspace</p>
+                    <h2 class="mt-4 text-4xl font-bold leading-tight tracking-tight">Run your portfolio with clarity.</h2>
+                    <p class="mt-5 text-base leading-7 text-blue-100/90">
+                        One secure place to manage properties, tenants, payments, and day-to-day operations.
+                    </p>
+                </div>
+
+                <ul class="login-feature-list mt-10 space-y-4 text-sm text-blue-50">
+                    <li class="flex items-center gap-3">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5 9.2 17 19 7" /></svg>
+                        </span>
+                        Rent and payment tracking
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5 9.2 17 19 7" /></svg>
+                        </span>
+                        Tenant and lease records
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5 9.2 17 19 7" /></svg>
+                        </span>
+                        Maintenance and inspections
+                    </li>
+                </ul>
+            </div>
+
+            <div class="login-security-note login-panel-content mt-12 flex items-center gap-3 text-xs text-blue-100/80">
+                <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3 4.5 6v5.2c0 4.7 3.2 8 7.5 9.8 4.3-1.8 7.5-5.1 7.5-9.8V6L12 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="m9.25 12 1.8 1.8 3.7-4" /></svg>
+                Secure access for authorized Blue Deer team members
+            </div>
+        </aside>
+
+        <div class="login-form-panel">
+            <div>
+                <div class="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
+                    <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                    Team portal
+                </div>
+                <h1 id="login-title" class="mt-4 text-3xl font-bold tracking-tight text-slate-950">Welcome back</h1>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Sign in to continue to your property management workspace.</p>
+            </div>
+
             {% if error %}
-            <div class="mb-4 rounded-md bg-red-50 p-4">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-red-800">{{ error }}</p>
-                    </div>
+            <div class="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5" role="alert" aria-live="polite">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 4.5 2.8 17.5A1.7 1.7 0 0 0 4.3 20h15.4a1.7 1.7 0 0 0 1.5-2.5L13.7 4.5a2 2 0 0 0-3.4 0Z" /></svg>
+                <div>
+                    <p class="text-sm font-semibold text-red-900">We couldn't sign you in</p>
+                    <p class="mt-0.5 text-sm text-red-700">{{ error }}</p>
                 </div>
             </div>
             {% endif %}
 
-            <form class="space-y-6" action="/login" method="POST">
+            <form class="mt-7 space-y-5" action="/login" method="POST">
                 <input type="hidden" name="next" value="{{ next }}">
 
                 <div>
-                    <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
-                    <div class="mt-2">
-                        <input id="email" name="email" type="email" autocomplete="email" required class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                    <label for="email" class="block text-sm font-semibold text-slate-700">Email address</label>
+                    <div class="login-input-wrap mt-2">
+                        <svg class="login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6.75 10.4 12a2.75 2.75 0 0 0 3.2 0L21 6.75M5.25 19.5h13.5A2.25 2.25 0 0 0 21 17.25V6.75a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required autofocus value="{{ email or '' }}" placeholder="you@bluedeer.space" class="login-input">
                     </div>
                 </div>
 
                 <div>
-                    <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
-                    <div class="mt-2">
-                        <input id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3">
+                    <label for="password" class="block text-sm font-semibold text-slate-700">Password</label>
+                    <div class="login-input-wrap mt-2">
+                        <svg class="login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5V8.25a5.25 5.25 0 0 1 10.5 0v2.25m-11.25 0h12A1.5 1.5 0 0 1 19.5 12v7.5A1.5 1.5 0 0 1 18 21H6a1.5 1.5 0 0 1-1.5-1.5V12A1.5 1.5 0 0 1 6 10.5Z" /></svg>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" class="login-input login-password-input">
+                        <button id="password-toggle" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" aria-controls="password" aria-pressed="false">
+                            Show
+                        </button>
                     </div>
                 </div>
 
-                <div>
-                    <button type="submit" class="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-                        Sign in
-                    </button>
-                </div>
+                <button type="submit" class="bd-btn bd-btn-primary bd-btn-press group w-full !min-h-[3.25rem] !rounded-xl !text-[0.9375rem]">
+                    Sign in securely
+                    <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-5-5 5 5-5 5" /></svg>
+                </button>
             </form>
 
-            <div class="mt-6 border-t border-gray-200 pt-6">
-                <a href="/login/phone" class="flex w-full justify-center items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-                    </svg>
-                    Sign in with phone number
-                </a>
+            <div class="my-6 flex items-center gap-3" aria-hidden="true">
+                <span class="h-px flex-1 bg-slate-200"></span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Or</span>
+                <span class="h-px flex-1 bg-slate-200"></span>
+            </div>
+
+            <a href="/login/phone" class="bd-btn bd-btn-secondary group w-full !min-h-[3.1rem] !rounded-xl">
+                <svg class="h-4 w-4 text-slate-500 group-hover:text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3.75h7.5A2.25 2.25 0 0 1 18 6v12a2.25 2.25 0 0 1-2.25 2.25h-7.5A2.25 2.25 0 0 1 6 18V6a2.25 2.25 0 0 1 2.25-2.25Z" /><path stroke-linecap="round" d="M10.5 17.25h3" /></svg>
+                Sign in with phone number
+            </a>
+
+            <p class="mt-5 text-center text-xs text-slate-500">
+                Need team access? Contact your administrator.
+            </p>
+
+            <div class="mt-7 border-t border-slate-200 pt-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">Looking for another portal?</p>
+                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <a href="/portal/login" class="login-portal-link">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m3 11 9-7 9 7M5.5 9.5V20h13V9.5M9 20v-6h6v6" /></svg>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block text-xs font-semibold text-slate-800">Tenant</span>
+                            <span class="block truncate text-[10px] text-slate-500">Resident access</span>
+                        </span>
+                    </a>
+                    <a href="/vendor/login" class="login-portal-link">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.5 5.5l-7.4 7.4a2.1 2.1 0 1 0 3 3l7.4-7.4a4.2 4.2 0 0 1 5.5-5.5l-3 3-3-3Z" /></svg>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block text-xs font-semibold text-slate-800">Vendor</span>
+                            <span class="block truncate text-[10px] text-slate-500">Work orders</span>
+                        </span>
+                    </a>
+                    <a href="/listings" class="login-portal-link">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 10.5 12 3.75l8.25 6.75v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V10.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 20.25v-6h6v6" /></svg>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block text-xs font-semibold text-slate-800">Listings</span>
+                            <span class="block truncate text-[10px] text-slate-500">Available homes</span>
+                        </span>
+                    </a>
+                </div>
             </div>
         </div>
-
-        <p class="mt-10 text-center text-sm text-gray-500">
-            Contact your administrator for access.
-        </p>
-
-        <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/portal/login" class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-500 transition-colors">
-                <span>🏠</span> Tenant Portal
-            </a>
-            <a href="/vendor/login" class="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-purple-600 transition-colors">
-                <span>🔧</span> Vendor Portal
-            </a>
-            <a href="/listings" class="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
-                <span>🏡</span> Available Properties
-            </a>
-        </div>
-    </div>
+    </section>
 </div>
+
+<script>
+    (function () {
+        const passwordInput = document.getElementById('password');
+        const passwordToggle = document.getElementById('password-toggle');
+        if (!passwordInput || !passwordToggle) return;
+
+        passwordToggle.addEventListener('click', function () {
+            const reveal = passwordInput.type === 'password';
+            passwordInput.type = reveal ? 'text' : 'password';
+            passwordToggle.textContent = reveal ? 'Hide' : 'Show';
+            passwordToggle.setAttribute('aria-pressed', String(reveal));
+            passwordInput.focus();
+        });
+    })();
+</script>
 {% endblock %}

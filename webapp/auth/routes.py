@@ -81,7 +81,7 @@ async def login_page(request: Request, next: str = "/"):
 
     return templates.TemplateResponse(
         "auth/login.html",
-        {"request": request, "next": _safe_next_url(next), "error": None}
+        {"request": request, "next": _safe_next_url(next), "error": None, "email": ""}
     )
 
 
@@ -96,7 +96,7 @@ async def login(
     if _login_is_limited(request, email):
         return templates.TemplateResponse(
             "auth/login.html",
-            {"request": request, "next": _safe_next_url(next), "error": "Too many sign-in attempts. Please wait 15 minutes and try again."},
+            {"request": request, "next": _safe_next_url(next), "error": "Too many sign-in attempts. Please wait 15 minutes and try again.", "email": email},
             status_code=429,
         )
 
@@ -110,7 +110,7 @@ async def login(
             _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
-                {"request": request, "next": _safe_next_url(next), "error": "Invalid email or password"},
+                {"request": request, "next": _safe_next_url(next), "error": "Invalid email or password", "email": email},
                 status_code=400
             )
 
@@ -118,7 +118,7 @@ async def login(
             _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
-                {"request": request, "next": _safe_next_url(next), "error": "Account is disabled"},
+                {"request": request, "next": _safe_next_url(next), "error": "Account is disabled", "email": email},
                 status_code=400
             )
 
