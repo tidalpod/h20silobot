@@ -150,6 +150,11 @@
         .bd-btn-danger:hover { background: #b91c1c; }
         .bd-icon-button { display: inline-flex; width: 2.625rem; height: 2.625rem; align-items: center; justify-content: center; border-radius: .625rem; transition: background-color .15s ease; }
 
+        /* Use the available desktop canvas while retaining a readable ceiling on ultrawide displays. */
+        @media (min-width: 1280px) {
+            .max-w-7xl { max-width: min(118rem, calc(100vw - 3rem)) !important; }
+        }
+
         @media (max-width: 640px) {
             .bd-page-header { align-items: flex-start; flex-direction: column; }
             .bd-page-title { font-size: 1.5rem; line-height: 2rem; }
