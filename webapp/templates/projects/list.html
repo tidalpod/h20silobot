@@ -2,22 +2,26 @@
 
 {% block title %}Projects{% endblock %}
 
+{% block header %}
+<header>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Capital improvements</p>
+                <h1 class="bd-page-title mt-1">Projects</h1>
+                <p class="bd-page-subtitle">Plan renovations, control budgets, and coordinate field work.</p>
+            </div>
+            <a href="/projects/new" class="bd-btn bd-btn-primary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                New project
+            </a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-7xl mx-auto">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Projects</h1>
-            <p class="text-sm text-gray-500 mt-1">Rehab and renovation tracking</p>
-        </div>
-        <a href="/projects/new" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            New Project
-        </a>
-    </div>
-
     {% if not projects %}
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
         <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

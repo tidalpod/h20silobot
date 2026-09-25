@@ -2,40 +2,32 @@
 
 {% block title %}{{ vendor.name }}{% endblock %}
 
+{% block header %}
+<header>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="mb-3 flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+            <a href="/maintenance" class="hover:text-blue-700">Maintenance</a><span>/</span>
+            <a href="/maintenance/vendors" class="hover:text-blue-700">Vendors</a><span>/</span>
+            <span class="max-w-xs truncate text-slate-700">{{ vendor.name }}</span>
+        </nav>
+        <div class="bd-page-header">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Vendor profile</p>
+                <div class="mt-1 flex flex-wrap items-center gap-3">
+                    <h1 class="bd-page-title">{{ vendor.name }}</h1>
+                    <span class="bd-badge {{ 'bd-badge-success' if vendor.is_active else 'bg-slate-100 text-slate-600' }}">{{ 'Active' if vendor.is_active else 'Inactive' }}</span>
+                    {% if vendor.specialty %}<span class="bd-badge bd-badge-info">{{ vendor.specialty }}</span>{% endif %}
+                </div>
+                <p class="bd-page-subtitle">{{ vendor.company or 'Independent vendor' }}{% if vendor.phone %} · {{ vendor.phone }}{% endif %}{% if vendor.email %} · {{ vendor.email }}{% endif %}</p>
+            </div>
+            <a href="/maintenance/vendors/{{ vendor.id }}/edit" class="bd-btn bd-btn-secondary">Edit vendor</a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    <!-- Breadcrumb -->
-    <nav class="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <a href="/maintenance" class="hover:text-gray-700">Maintenance</a>
-        <span>/</span>
-        <a href="/maintenance/vendors" class="hover:text-gray-700">Vendors</a>
-        <span>/</span>
-        <span class="text-gray-900">{{ vendor.name }}</span>
-    </nav>
-
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                {{ vendor.name }}
-                {% if vendor.is_active %}
-                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
-                {% else %}
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
-                {% endif %}
-            </h1>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
-                {% if vendor.company %}<span>{{ vendor.company }}</span>{% endif %}
-                {% if vendor.specialty %}<span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{{ vendor.specialty }}</span>{% endif %}
-                {% if vendor.phone %}<a href="tel:{{ vendor.phone }}" class="text-blue-600 hover:text-blue-500">{{ vendor.phone }}</a>{% endif %}
-                {% if vendor.email %}<span class="truncate">{{ vendor.email }}</span>{% endif %}
-            </div>
-        </div>
-        <a href="/maintenance/vendors/{{ vendor.id }}/edit" class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors flex-shrink-0">
-            Edit Vendor
-        </a>
-    </div>
-
     <!-- Stat Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">

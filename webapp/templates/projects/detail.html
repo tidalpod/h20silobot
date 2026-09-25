@@ -2,33 +2,32 @@
 
 {% block title %}{{ project.name }}{% endblock %}
 
-{% block content %}
-<div class="max-w-6xl mx-auto">
-    <a href="/projects" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        Back to Projects
-    </a>
-
-    <!-- Header -->
-    <div class="flex items-start justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">{{ project.name }}</h1>
-            <p class="text-sm text-gray-500">{{ project.property_ref.address if project.property_ref else '' }}{% if project.vendor_ref %} &middot; {{ project.vendor_ref.name }}{% endif %}</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <span class="text-xs px-3 py-1 rounded-full font-semibold
-                {% if project.status == 'planning' %}bg-gray-100 text-gray-600
-                {% elif project.status == 'in_progress' %}bg-blue-100 text-blue-700
-                {% elif project.status == 'completed' %}bg-green-100 text-green-700
-                {% elif project.status == 'on_hold' %}bg-amber-100 text-amber-700
-                {% endif %}">{{ project.status|replace('_', ' ')|title }}</span>
-            <a href="/projects/{{ project.id }}/edit" class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-sm font-medium">Edit</a>
-            <form method="POST" action="/projects/{{ project.id }}/delete" onsubmit="return confirm('Delete this project? This cannot be undone.');" class="inline">
-                <button type="submit" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 text-sm font-medium">Delete</button>
-            </form>
+{% block header %}
+<header>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Project profile</p>
+                <div class="mt-1 flex flex-wrap items-center gap-3">
+                    <h1 class="bd-page-title">{{ project.name }}</h1>
+                    <span class="bd-badge {% if project.status == 'completed' %}bd-badge-success{% elif project.status == 'on_hold' %}bd-badge-warning{% elif project.status == 'in_progress' %}bd-badge-info{% else %}bg-slate-100 text-slate-600{% endif %}">{{ project.status|replace('_', ' ')|title }}</span>
+                </div>
+                <p class="bd-page-subtitle">{{ project.property_ref.address if project.property_ref else 'No property assigned' }}{% if project.vendor_ref %} · {{ project.vendor_ref.name }}{% endif %}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="/projects" class="bd-btn bd-btn-secondary">All projects</a>
+                <a href="/projects/{{ project.id }}/edit" class="bd-btn bd-btn-primary">Edit project</a>
+                <form method="POST" action="/projects/{{ project.id }}/delete" onsubmit="return confirm('Delete this project? This cannot be undone.');" class="inline">
+                    <button type="submit" class="bd-btn border border-red-200 bg-white text-red-600 hover:bg-red-50">Delete</button>
+                </form>
+            </div>
         </div>
     </div>
+</header>
+{% endblock %}
 
+{% block content %}
+<div class="max-w-6xl mx-auto">
     {% if project.description %}
     <p class="text-sm text-gray-700 mb-6">{{ project.description }}</p>
     {% endif %}

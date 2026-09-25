@@ -1,23 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Generate MSHDA Packet{% endblock %}
 
+{% block header %}
+<header>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Section 8 workflow</p>
+                <h1 class="bd-page-title mt-1">Generate MSHDA packet</h1>
+                <p class="bd-page-subtitle">Create a landlord packet from property and resident records.</p>
+            </div>
+            <a href="/packets" class="bd-btn bd-btn-secondary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+                Back to packets
+            </a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bd-fade-up">
-
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Generate MSHDA Packet</h1>
-            <p class="text-sm text-gray-500 mt-1">Fill in the details to generate a landlord packet for Section 8</p>
-        </div>
-        <a href="/packets" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-            </svg>
-            Back to Packets
-        </a>
-    </div>
-
     <!-- Error Messages -->
     {% set error = request.query_params.get('error', '') %}
     {% if error %}

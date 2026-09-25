@@ -5,10 +5,22 @@
 {% macro fmt2(val) %}{% if val is not none %}${{ "{:,.2f}".format(val|float) }}{% else %}—{% endif %}{% endmacro %}
 {% macro fmtpct(val) %}{% if val is not none %}{{ "{:.2f}".format(val|float) }}%{% else %}—{% endif %}{% endmacro %}
 
+{% block header %}
+<header>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Portfolio intelligence</p>
+                <h1 class="bd-page-title mt-1">Assets</h1>
+                <p class="bd-page-subtitle">Equity, debt, cash flow, and portfolio performance in one view.</p>
+            </div>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Assets</h1>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
