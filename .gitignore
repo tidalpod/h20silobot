@@ -27,6 +27,7 @@ logs/
 # Screenshots and discovery (local dev)
 screenshots/
 discovery_results/
+private_imports/
 
 # Database (local dev)
 *.db
