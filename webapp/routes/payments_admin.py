@@ -439,6 +439,42 @@ def _parse_date(value: str | None, fallback: date | None = None) -> date | None:
         return fallback
 
 
+def _late_fee_policy_from_form(form) -> dict:
+    """Validate and normalize late-fee controls submitted with a rent schedule."""
+    try:
+        initial_amount = ledger_service.money(Decimal(str(form.get("late_fee_initial_amount", "0") or "0")))
+        daily_amount = ledger_service.money(Decimal(str(form.get("late_fee_daily_amount", "0") or "0")))
+        grace_days = int(form.get("late_fee_grace_days", 0))
+        max_days = int(form.get("late_fee_max_days", 0))
+        max_amount = ledger_service.money(Decimal(str(form.get("late_fee_max_amount", "0") or "0")))
+    except (ValueError, InvalidOperation) as exc:
+        raise ValueError("Invalid late-fee policy") from exc
+
+    if (
+        initial_amount < 0
+        or daily_amount < 0
+        or not 0 <= grace_days <= 31
+        or not 0 <= max_days <= 31
+        or max_amount < 0
+    ):
+        raise ValueError("Invalid late-fee policy")
+
+    limit_type = str(form.get("late_fee_limit_type", "days"))
+    if limit_type not in {"days", "amount", "none"}:
+        limit_type = "days"
+
+    return {
+        "initial_enabled": form.get("late_fee_initial_enabled") == "on",
+        "initial_amount": initial_amount,
+        "daily_enabled": form.get("late_fee_daily_enabled") == "on",
+        "daily_amount": daily_amount,
+        "grace_days": grace_days,
+        "limit_type": limit_type,
+        "max_days": max_days,
+        "max_amount": max_amount if limit_type == "amount" else None,
+    }
+
+
 @router.get("/record", response_class=HTMLResponse)
 async def record_payment_page(
     request: Request,
@@ -622,6 +658,30 @@ async def create_charge(request: Request):
         tenant = tenant_result.scalar_one_or_none()
         if not tenant:
             return _ledger_redirect(form, error="tenant_not_found")
+
+        if repeat_monthly and charge_type == "rent":
+            tenant.rent_schedule_active = True
+            tenant.rent_due_day = due_date.day
+            tenant.rent_schedule_start_date = due_date
+            tenant.rent_schedule_end_date = end_date
+            if tenant.is_section8:
+                tenant.tenant_portion = amount
+            else:
+                tenant.current_rent = amount
+
+            if form.get("late_fee_policy_present") == "1":
+                try:
+                    fee_policy = _late_fee_policy_from_form(form)
+                except ValueError:
+                    return _ledger_redirect(form, error="invalid_schedule")
+                tenant.late_fee_initial_enabled = fee_policy["initial_enabled"]
+                tenant.late_fee_initial_amount = fee_policy["initial_amount"]
+                tenant.late_fee_daily_enabled = fee_policy["daily_enabled"]
+                tenant.late_fee_daily_amount = fee_policy["daily_amount"]
+                tenant.late_fee_grace_days = fee_policy["grace_days"]
+                tenant.late_fee_limit_type = fee_policy["limit_type"]
+                tenant.late_fee_max_days = fee_policy["max_days"]
+                tenant.late_fee_max_amount = fee_policy["max_amount"]
 
         recurrence_group = uuid.uuid4().hex if repeat_monthly else None
         cursor = due_date

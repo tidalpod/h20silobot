@@ -631,8 +631,8 @@
                 </button>
             </div>
             <div class="space-y-6 overflow-y-auto px-5 py-6 sm:px-7">
-                <div><label for="create-tenant" class="mb-2 block text-sm font-semibold text-slate-800">Charge to <span class="text-red-500">*</span></label><select id="create-tenant" name="tenant_id" required class="bd-input text-sm">
-                    <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
+                <div><label for="create-tenant" class="mb-2 block text-sm font-semibold text-slate-800">Charge to <span class="text-red-500">*</span></label><select id="create-tenant" name="tenant_id" required class="bd-input text-sm" onchange="loadCreateLateFeePolicy()">
+                    <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" data-late-initial-enabled="{{ 'true' if tenant.late_fee_initial_enabled else 'false' }}" data-late-initial-amount="{{ tenant.late_fee_initial_amount or 0 }}" data-late-daily-enabled="{{ 'false' if tenant.late_fee_daily_enabled is sameas false else 'true' }}" data-late-daily-amount="{{ tenant.late_fee_daily_amount or 15 }}" data-late-grace-days="{{ tenant.late_fee_grace_days if tenant.late_fee_grace_days is not none else 5 }}" data-late-limit-type="{{ tenant.late_fee_limit_type or 'days' }}" data-late-max-days="{{ tenant.late_fee_max_days if tenant.late_fee_max_days is not none else 5 }}" data-late-max-amount="{{ tenant.late_fee_max_amount or 0 }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
                 </select></div>
                 <fieldset>
                     <legend class="mb-2 block text-sm font-semibold text-slate-800">Category <span class="text-red-500">*</span></legend>
@@ -662,6 +662,18 @@
                     </div>
                 </div>
                 <div id="repeat-end" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4"><label for="repeat-end-date" class="mb-2 block text-sm font-semibold text-slate-800">Repeat through</label><input id="repeat-end-date" name="end_date" type="date" data-no-default="true" class="bd-input text-sm"><p class="mt-1.5 text-xs text-slate-500">Blue Deer will create monthly charges through this date, up to 36 months.</p></div>
+                <fieldset id="create-late-fee-settings" class="hidden space-y-4 border-t border-slate-200 pt-6">
+                    <legend class="text-lg font-bold text-slate-950">Automatic late fees</legend>
+                    <input type="hidden" name="late_fee_policy_present" value="1" disabled>
+                    <p class="-mt-3 text-sm text-slate-500">Set the late-fee policy now so it starts with this monthly rent schedule.</p>
+                    <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"><span><span class="block text-sm font-semibold text-slate-900">One-time initial fee</span><span class="mt-0.5 block text-xs text-slate-500">Added once when the grace period ends</span></span><span class="relative inline-flex h-6 w-11 shrink-0 items-center"><input id="create-late-initial-enabled" name="late_fee_initial_enabled" type="checkbox" class="peer sr-only" onchange="toggleCreateLateFeeFields()"><span class="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span></span></label>
+                    <div id="create-late-initial-fields" class="hidden rounded-2xl border border-blue-100 bg-blue-50/50 p-4"><label for="create-late-initial-amount" class="mb-2 block text-sm font-semibold text-slate-800">Initial fee amount</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="create-late-initial-amount" name="late_fee_initial_amount" type="number" min="0" step="0.01" value="0" class="bd-input pl-8"></div></div>
+                    <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"><span><span class="block text-sm font-semibold text-slate-900">Daily late fees</span><span class="mt-0.5 block text-xs text-slate-500">Calculated when rent remains unpaid after the grace period</span></span><span class="relative inline-flex h-6 w-11 shrink-0 items-center"><input id="create-late-daily-enabled" name="late_fee_daily_enabled" type="checkbox" class="peer sr-only" checked onchange="toggleCreateLateFeeFields()"><span class="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span></span></label>
+                    <div id="create-late-daily-fields" class="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                        <div class="grid gap-4 sm:grid-cols-2"><div><label for="create-late-daily-amount" class="mb-2 block text-sm font-semibold text-slate-800">Daily amount</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="create-late-daily-amount" name="late_fee_daily_amount" type="number" min="0" step="0.01" value="15" class="bd-input pl-8"></div></div><div><label for="create-late-grace-days" class="mb-2 block text-sm font-semibold text-slate-800">Starts after</label><div class="relative"><input id="create-late-grace-days" name="late_fee_grace_days" type="number" min="0" max="31" value="5" class="bd-input pr-14"><span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-sm text-slate-500">days</span></div></div></div>
+                        <div class="grid gap-4 sm:grid-cols-2"><div><label for="create-late-limit-type" class="mb-2 block text-sm font-semibold text-slate-800">Fee limit</label><select id="create-late-limit-type" name="late_fee_limit_type" class="bd-input" onchange="toggleCreateLateFeeLimit()"><option value="days">Stop after a number of days</option><option value="amount">Cap at a dollar amount</option><option value="none">No configured limit</option></select></div><div id="create-late-limit-days"><label for="create-late-max-days" class="mb-2 block text-sm font-semibold text-slate-800">Maximum fee days</label><div class="relative"><input id="create-late-max-days" name="late_fee_max_days" type="number" min="0" max="31" value="5" class="bd-input pr-14"><span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-sm text-slate-500">days</span></div></div><div id="create-late-limit-amount" class="hidden"><label for="create-late-max-amount" class="mb-2 block text-sm font-semibold text-slate-800">Maximum late fees</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="create-late-max-amount" name="late_fee_max_amount" type="number" min="0" step="0.01" value="0" class="bd-input pl-8"></div></div></div>
+                    </div>
+                </fieldset>
             </div>
             <div class="grid grid-cols-1 gap-3 border-t border-slate-200 bg-slate-50/80 px-5 py-4 sm:grid-cols-2 sm:px-7"><button type="button" onclick="closeModal('charge-modal')" class="bd-btn bd-btn-secondary rounded-xl border-blue-900 py-3 text-blue-950 hover:bg-blue-50">Cancel</button><button class="bd-btn bd-btn-primary rounded-xl py-3"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Create charge</button></div>
         </form>
@@ -711,6 +723,7 @@
 <script>
 function openModal(id) {
     const el = document.getElementById(id);
+    if (id === 'charge-modal') loadCreateLateFeePolicy();
     el.classList.remove('hidden'); el.classList.add('flex');
     const first = el.querySelector('input:not([type=hidden]), select, textarea, button');
     if (first) setTimeout(() => first.focus(), 30);
@@ -728,6 +741,7 @@ const chargeDescriptionPlaceholders = {
 function updateChargeCategory(input) {
     const description = document.getElementById('create-description');
     description.placeholder = chargeDescriptionPlaceholders[input.value] || chargeDescriptionPlaceholders.other;
+    syncCreateLateFeeSettings();
 }
 function updateChargeDescriptionCount() {
     const description = document.getElementById('create-description');
@@ -739,6 +753,44 @@ function toggleRecurringCharge(checkbox) {
     panel.classList.toggle('hidden', !checkbox.checked);
     endDate.required = checkbox.checked;
     if (checkbox.checked && !endDate.value) endDate.value = document.getElementById('create-due').value;
+    syncCreateLateFeeSettings();
+}
+function loadCreateLateFeePolicy() {
+    const tenant = document.getElementById('create-tenant');
+    const option = tenant?.options[tenant.selectedIndex];
+    const data = option?.dataset || {};
+    document.getElementById('create-late-initial-enabled').checked = data.lateInitialEnabled === 'true';
+    document.getElementById('create-late-initial-amount').value = data.lateInitialAmount || '0';
+    document.getElementById('create-late-daily-enabled').checked = data.lateDailyEnabled !== 'false';
+    document.getElementById('create-late-daily-amount').value = data.lateDailyAmount || '15';
+    document.getElementById('create-late-grace-days').value = data.lateGraceDays || '5';
+    document.getElementById('create-late-limit-type').value = data.lateLimitType || 'days';
+    document.getElementById('create-late-max-days').value = data.lateMaxDays || '5';
+    document.getElementById('create-late-max-amount').value = data.lateMaxAmount || '0';
+    toggleCreateLateFeeFields();
+    syncCreateLateFeeSettings();
+}
+function syncCreateLateFeeSettings() {
+    const panel = document.getElementById('create-late-fee-settings');
+    if (!panel) return;
+    const category = document.querySelector('#charge-modal input[name="charge_type"]:checked')?.value;
+    const repeatMonthly = document.getElementById('repeat-monthly')?.checked;
+    const show = category === 'rent' && repeatMonthly;
+    panel.classList.toggle('hidden', !show);
+    panel.querySelectorAll('input, select').forEach(function(field) { field.disabled = !show; });
+    if (show) toggleCreateLateFeeFields();
+}
+function toggleCreateLateFeeFields() {
+    const initial = document.getElementById('create-late-initial-enabled');
+    const daily = document.getElementById('create-late-daily-enabled');
+    document.getElementById('create-late-initial-fields')?.classList.toggle('hidden', !initial?.checked);
+    document.getElementById('create-late-daily-fields')?.classList.toggle('hidden', !daily?.checked);
+    toggleCreateLateFeeLimit();
+}
+function toggleCreateLateFeeLimit() {
+    const value = document.getElementById('create-late-limit-type')?.value;
+    document.getElementById('create-late-limit-days')?.classList.toggle('hidden', value !== 'days');
+    document.getElementById('create-late-limit-amount')?.classList.toggle('hidden', value !== 'amount');
 }
 function openChargeForTenant(chargeType) {
     const tenant = document.getElementById('create-tenant');
@@ -924,5 +976,6 @@ document.getElementById('create-due')?.addEventListener('change', function() {
 });
 toggleRentFeeSettings();
 toggleLateFeeLimit();
+loadCreateLateFeePolicy();
 </script>
 {% endblock %}
