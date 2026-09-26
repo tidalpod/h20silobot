@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from database.models import (
     ExternalPayment,
     Property,
+    RentPayment,
+    StripePayment,
     Tenant,
     TenantCharge,
     TenantLedgerEntry,
@@ -45,6 +47,50 @@ def get_database_url() -> str:
     if database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return database_url
+
+
+async def remove_empty_generated_rent_conflict(session, *, tenant_id: int, due_date) -> bool:
+    """Remove a system projection superseded by an authoritative import row.
+
+    Manager-created charges and charges with any ledger or provider activity are
+    deliberately left alone.  The generated unique key makes this reconciliation
+    narrower than a description or amount comparison.
+    """
+    month = due_date.replace(day=1)
+    result = await session.execute(
+        select(TenantCharge).where(
+            TenantCharge.tenant_id == tenant_id,
+            TenantCharge.unique_key == f"rent:{tenant_id}:{month.isoformat()}",
+            TenantCharge.charge_type == "rent",
+            TenantCharge.is_recurring == True,
+            TenantCharge.is_void == False,
+        )
+    )
+    generated = result.scalar_one_or_none()
+    if not generated:
+        return False
+
+    entry_id = (
+        await session.execute(
+            select(TenantLedgerEntry.id).where(TenantLedgerEntry.charge_id == generated.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    ach_id = (
+        await session.execute(
+            select(RentPayment.id).where(RentPayment.charge_id == generated.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    card_id = (
+        await session.execute(
+            select(StripePayment.id).where(StripePayment.charge_id == generated.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if entry_id or ach_id or card_id:
+        return False
+
+    await session.delete(generated)
+    await session.flush()
+    return True
 
 
 async def load_database_snapshot(engine) -> tuple[list[PropertyRecord], list[TenantRecord], set[str], set[str]]:
@@ -136,6 +182,7 @@ async def apply_matches(
         "charges_amount": "0.00",
         "charge_payments_inserted": 0,
         "charge_payments_amount": "0.00",
+        "generated_rent_conflicts_removed": 0,
     }
     payment_amount = 0
     charge_amount = 0
@@ -192,13 +239,23 @@ async def apply_matches(
             for row, match in zip(charges, charge_matches):
                 if match.status != "matched":
                     continue
+                charge_type = map_charge_type(row.category)
+                if (
+                    charge_type == "rent"
+                    and match.tenant_id
+                    and await remove_empty_generated_rent_conflict(
+                        session,
+                        tenant_id=match.tenant_id,
+                        due_date=row.due_date,
+                    )
+                ):
+                    stats["generated_rent_conflicts_removed"] += 1
                 if row.source_key in existing_charge_keys:
                     stats["charges_skipped_existing"] += 1
                     continue
                 if not match.property_id or not match.tenant_id:
                     raise RuntimeError(f"Matched charge row {row.row_number} has no database target")
 
-                charge_type = map_charge_type(row.category)
                 description = row.description or row.category.replace("_", " ").title()
                 charge = TenantCharge(
                     tenant_id=match.tenant_id,
@@ -348,6 +405,10 @@ def main() -> int:
             "Already present: "
             f"{applied['payments_skipped_existing']} payments, "
             f"{applied['charges_skipped_existing']} charges"
+        )
+        print(
+            "Reconciled: "
+            f"{applied['generated_rent_conflicts_removed']} empty generated rent charge(s) removed"
         )
     return 0
 
