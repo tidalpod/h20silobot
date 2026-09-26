@@ -1,5 +1,7 @@
 """Shared tenant charge ledger used by managers and the tenant portal."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import date, datetime
@@ -34,8 +36,9 @@ def money(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(MONEY, rounding=ROUND_HALF_UP)
 
 
-def charge_snapshot(charge: TenantCharge) -> dict:
+def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
     """Return display and balance information for one loaded charge."""
+    today = as_of or date.today()
     applied = Decimal("0.00")
     pending = Decimal("0.00")
     refunded = Decimal("0.00")
@@ -55,12 +58,15 @@ def charge_snapshot(charge: TenantCharge) -> dict:
     amount = money(charge.amount)
     outstanding = max(amount - applied, Decimal("0.00"))
     progress_percent = min(float(applied / amount * 100), 100.0) if amount > 0 else 0.0
+    is_future_rent = charge.charge_type == "rent" and charge.due_date > today
 
     if charge.is_void:
         status = "void"
     elif outstanding <= 0:
         status = "paid"
-    elif charge.due_date < date.today():
+    elif is_future_rent:
+        status = "upcoming"
+    elif charge.due_date < today:
         status = "overdue"
     elif applied > 0:
         status = "partial"
@@ -86,6 +92,7 @@ def charge_snapshot(charge: TenantCharge) -> dict:
         "service_start": charge.service_start,
         "service_end": charge.service_end,
         "status": status,
+        "is_future_rent": is_future_rent,
         "is_partial": applied > 0 and outstanding > 0,
         "is_recurring": charge.is_recurring,
         "entries": sorted(charge.ledger_entries, key=lambda item: item.created_at or datetime.min, reverse=True),
@@ -118,7 +125,7 @@ async def list_charges(
 
     if include_paid:
         return snapshots
-    return [item for item in snapshots if item["status"] not in {"paid", "void"}]
+    return [item for item in snapshots if item["status"] in {"open", "partial", "overdue"}]
 
 
 async def get_charge(charge_id: int, *, tenant_id: int | None = None) -> dict | None:
@@ -411,11 +418,15 @@ async def reverse_external_payment(
 
 
 def totals(charges: Iterable[dict]) -> dict:
-    """Aggregate snapshots for summary cards."""
+    """Aggregate amounts that are due as of today for summary cards."""
     rows = list(charges)
+    due_rows = [
+        row for row in rows
+        if row["status"] != "void" and not row.get("is_future_rent", False)
+    ]
     return {
-        "charged": sum((row["amount"] for row in rows if row["status"] != "void"), Decimal("0.00")),
-        "paid_or_credited": sum((row["applied"] for row in rows if row["status"] != "void"), Decimal("0.00")),
-        "outstanding": sum((row["outstanding"] for row in rows), Decimal("0.00")),
-        "overdue": sum((row["outstanding"] for row in rows if row["status"] == "overdue"), Decimal("0.00")),
+        "charged": sum((row["amount"] for row in due_rows), Decimal("0.00")),
+        "paid_or_credited": sum((row["applied"] for row in due_rows), Decimal("0.00")),
+        "outstanding": sum((row["outstanding"] for row in due_rows), Decimal("0.00")),
+        "overdue": sum((row["outstanding"] for row in due_rows if row["status"] == "overdue"), Decimal("0.00")),
     }

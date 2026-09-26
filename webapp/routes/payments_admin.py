@@ -242,7 +242,8 @@ async def payments_list(
         include_paid=True,
     )
     charge_totals = ledger_service.totals(charges)
-    open_charges = [charge for charge in charges if charge["status"] not in {"paid", "void"}]
+    open_charges = [charge for charge in charges if charge["status"] in {"open", "partial", "overdue"}]
+    upcoming_charges = [charge for charge in charges if charge["status"] == "upcoming"]
     settled_charges = [charge for charge in charges if charge["status"] in {"paid", "void"}]
     collection_rate = (
         float(charge_totals["paid_or_credited"] / charge_totals["charged"] * 100)
@@ -252,6 +253,11 @@ async def payments_list(
     charge_counts = {
         "open": len(open_charges),
         "overdue": sum(charge["status"] == "overdue" for charge in charges),
+        "upcoming": len(upcoming_charges),
+        "due": sum(
+            charge["status"] != "void" and not charge.get("is_future_rent", False)
+            for charge in charges
+        ),
         "settled": len(settled_charges),
     }
     selected_tenant = next((tenant for tenant in tenants if tenant.id == selected_tenant_id), None)
@@ -279,6 +285,7 @@ async def payments_list(
             "tenants": tenants,
             "charges": charges,
             "open_charges": open_charges,
+            "upcoming_charges": upcoming_charges,
             "settled_charges": settled_charges,
             "charge_totals": charge_totals,
             "charge_counts": charge_counts,

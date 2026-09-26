@@ -81,7 +81,7 @@ async def initiate_payment(
     charge = None
     if charge_id:
         charge = await ledger_service.get_charge(charge_id, tenant_id=tenant_id)
-        if not charge or charge["status"] in {"paid", "void"}:
+        if not charge or charge["status"] in {"paid", "void", "upcoming"}:
             return {"error": "Charge is no longer payable"}
         amount = ledger_service.money(amount)
         if amount <= 0 or amount > charge["outstanding"]:

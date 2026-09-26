@@ -121,7 +121,7 @@ async def submit_payment(request: Request):
         return RedirectResponse(url="/portal/pay?error=no_bank", status_code=303)
 
     charge = await ledger_service.get_charge(charge_id, tenant_id=tenant["id"])
-    if not charge or charge["status"] in {"paid", "void"}:
+    if not charge or charge["status"] in {"paid", "void", "upcoming"}:
         return RedirectResponse(url="/portal/pay?error=already_paid", status_code=303)
 
     result = await payment_service.initiate_payment(
@@ -256,7 +256,7 @@ async def stripe_pay_rent(request: Request):
     except (TypeError, ValueError):
         charge_id = 0
     charge = await ledger_service.get_charge(charge_id, tenant_id=tenant["id"])
-    if not charge or charge["status"] in {"paid", "void"}:
+    if not charge or charge["status"] in {"paid", "void", "upcoming"}:
         return RedirectResponse(url="/portal/pay?error=already_paid", status_code=303)
 
     async with get_session() as session:
