@@ -179,6 +179,11 @@ class MonthlyChargeSummaryTests(unittest.TestCase):
 
 
 class ChargeVoidTests(unittest.TestCase):
+    def test_void_check_does_not_require_display_relationships(self):
+        charge = SimpleNamespace(is_void=False, ledger_entries=[])
+
+        self.assertTrue(ledger_service.can_void_charge(charge))
+
     def test_unapplied_charge_can_be_voided(self):
         charge = make_charge(due_date=date(2026, 9, 1))
 

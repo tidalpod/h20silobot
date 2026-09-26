@@ -37,14 +37,13 @@ def money(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(MONEY, rounding=ROUND_HALF_UP)
 
 
-def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
-    """Return display and balance information for one loaded charge."""
-    today = as_of or date.today()
+def _activity_totals(entries) -> tuple[Decimal, Decimal, Decimal]:
+    """Calculate charge activity without touching unrelated ORM relationships."""
     applied = Decimal("0.00")
     pending = Decimal("0.00")
     refunded = Decimal("0.00")
 
-    for entry in charge.ledger_entries:
+    for entry in entries:
         amount = money(entry.amount)
         if entry.status == "pending" and entry.entry_type == "payment":
             pending += amount
@@ -55,7 +54,13 @@ def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
         elif entry.status == "posted" and entry.entry_type == "refund":
             refunded += amount
 
-    applied = max(applied, Decimal("0.00"))
+    return max(applied, Decimal("0.00")), pending, refunded
+
+
+def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
+    """Return display and balance information for one loaded charge."""
+    today = as_of or date.today()
+    applied, pending, refunded = _activity_totals(charge.ledger_entries)
     amount = money(charge.amount)
     outstanding = max(amount - applied, Decimal("0.00"))
     progress_percent = min(float(applied / amount * 100), 100.0) if amount > 0 else 0.0
@@ -105,11 +110,11 @@ def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
 
 def can_void_charge(charge: TenantCharge) -> bool:
     """A charge can be voided only before money or pending payment is attached."""
-    snapshot = charge_snapshot(charge)
+    applied, pending, _ = _activity_totals(charge.ledger_entries)
     return (
         not charge.is_void
-        and snapshot["applied"] <= 0
-        and snapshot["pending"] <= 0
+        and applied <= 0
+        and pending <= 0
     )
 
 
