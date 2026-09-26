@@ -343,8 +343,18 @@
     </div>
     <div class="hidden lg:block">
     <div class="grid grid-cols-[8rem_minmax(15rem,1.4fr)_8rem_minmax(10rem,.75fr)_9rem_1.5rem] gap-4 border-b border-slate-200 bg-slate-50/80 px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><span>Due date</span><span>Charge</span><span>Status</span><span>Latest activity</span><span class="text-right">Amount / balance</span><span></span></div>
-    <div class="divide-y divide-slate-100">
-        {% for charge in sent_charges %}
+    <div>
+        {% for month_group in sent_charge_months %}
+        <section class="border-b border-slate-200 last:border-b-0">
+            <div class="flex items-center justify-between border-b border-blue-100 bg-gradient-to-r from-slate-50 via-white to-blue-50/60 px-6 py-3">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 9.75h16.5m-15-4.5h13.5A1.5 1.5 0 0 1 20.25 6.75v12a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-12a1.5 1.5 0 0 1 1.5-1.5Z"/></svg></span>
+                    <h3 class="text-sm font-bold text-slate-900">{{ month_group.month.strftime('%B %Y') }}</h3>
+                </div>
+                <span class="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200">{{ month_group.charges|length }} charge{{ '' if month_group.charges|length == 1 else 's' }}</span>
+            </div>
+            <div class="divide-y divide-slate-100">
+        {% for charge in month_group.charges %}
         {% set latest_entry = charge.entries[0] if charge.entries else none %}
         <details class="ledger-disclosure group">
             <summary class="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-4 transition hover:bg-slate-50/80 sm:px-6 lg:grid-cols-[8rem_minmax(15rem,1.4fr)_8rem_minmax(10rem,.75fr)_9rem_1.5rem] lg:items-center">
@@ -365,6 +375,9 @@
                 <div class="mt-4 flex flex-wrap items-center justify-end gap-2">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})' class="bd-btn bd-btn-secondary">Edit charge</button>{% endif %}</div>
             </div>
         </details>
+        {% endfor %}
+            </div>
+        </section>
         {% endfor %}
     </div>
     </div>
