@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Record Payment{% endblock %}
+
+{% macro charge_icon(charge_type) %}
+    {% if charge_type == 'rent' %}
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+    {% elif charge_type in ['water', 'utility'] %}
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-2.485 3.85-6.75 8.154-6.75 12a6.75 6.75 0 1 0 13.5 0c0-3.846-4.265-8.15-6.75-12Z"/><path stroke-linecap="round" d="M9 15.75a3 3 0 0 0 3 3"/></svg>
+    {% elif charge_type == 'late_fee' %}
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+    {% elif charge_type == 'security_deposit' %}
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m6-3c0 7.142-3.036 11.065-8.318 13.817a1.5 1.5 0 0 1-1.364 0C6.036 17.815 3 13.892 3 6.75 3 5.922 3.672 5.25 4.5 5.25c2.25 0 4.125-.75 5.25-2.25a2.812 2.812 0 0 1 4.5 0c1.125 1.5 3 2.25 5.25 2.25.828 0 1.5.672 1.5 1.5Z"/></svg>
+    {% else %}
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.75h4.5A2.25 2.25 0 0 1 16.5 6v.75h.75A2.25 2.25 0 0 1 19.5 9v10.5H4.5V9a2.25 2.25 0 0 1 2.25-2.25h.75V6a2.25 2.25 0 0 1 2.25-2.25Z"/></svg>
+    {% endif %}
+{% endmacro %}
+
+{% macro payment_method_icon(method) %}
+    {% if method == 'check' %}
+    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6.75h18v10.5H3zM6 14.25h4.5M16.5 9.75h1.5"/><path stroke-linecap="round" d="m6 10.5 1.25 1.25L10 9"/></svg>
+    {% elif method == 'cash' %}
+    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75h19.5v10.5H2.25zM6 9a2.25 2.25 0 0 1-2.25 2.25v1.5A2.25 2.25 0 0 1 6 15h12a2.25 2.25 0 0 1 2.25-2.25v-1.5A2.25 2.25 0 0 1 18 9H6Z"/><circle cx="12" cy="12" r="2.25"/></svg>
+    {% elif method in ['venmo', 'zelle', 'cash_app', 'paypal'] %}
+    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 6.75h9a3.75 3.75 0 0 1 0 7.5H12l-2.25 3v-3H7.5a3.75 3.75 0 0 1 0-7.5Z"/><path stroke-linecap="round" d="M9.75 10.5h4.5"/></svg>
+    {% elif method == 'section_8' %}
+    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h7.5l3 3v13.5H6.75zM14.25 3.75v3h3M9 12h6M9 15h4.5"/><path stroke-linecap="round" d="M11 9.25c.5-.7 2.1-.6 2.1.45 0 1.1-2.1.85-2.1 2 0 1.05 1.7 1.15 2.25.4"/></svg>
+    {% else %}
+    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M8.25 12h7.5M12 8.25v7.5"/></svg>
+    {% endif %}
+{% endmacro %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .allocation-row:has(.allocation-checkbox:checked) { border-color: #93c5fd; background: linear-gradient(135deg, #eff6ff, #f8fbff); box-shadow: 0 0 0 3px rgba(37, 99, 235, .07); }
+    .method-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .method-card { display: flex; min-height: 6.25rem; cursor: pointer; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; border: 1px solid #cbd5e1; border-radius: .875rem; background: #fff; color: #475569; transition: .15s ease; }
+    .method-card:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; transform: translateY(-1px); }
+    .method-option input:checked + .method-card { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+    .method-option input:focus-visible + .method-card { outline: 3px solid rgba(37, 99, 235, .3); outline-offset: 2px; }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="bg-white border-b border-slate-200">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="bd-page-header">
+            <div class="bd-page-heading">
+                <span class="bd-page-icon bg-emerald-600">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5h15v15h-15z"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[.16em] text-emerald-700">Payment center</p>
+                    <h1 class="bd-page-title">Record payment</h1>
+                    <p class="bd-page-subtitle">Apply an external payment accurately across one or more charges.</p>
+                </div>
+            </div>
+            <a href="/payments{% if selected_tenant %}?tenant_id={{ selected_tenant.id }}{% endif %}" class="bd-btn bd-btn-secondary shrink-0">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 19.5-7.5-7.5 7.5-7.5"/></svg>
+                Back to ledger
+            </a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+{% if request.query_params.get('error') %}
+<div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+    {% if request.query_params.get('error') == 'missing_fields' %}Select at least one charge, a payment method, and the date paid.
+    {% else %}One or more payment allocations are invalid. Confirm each amount does not exceed its charge balance.{% endif %}
+</div>
+{% endif %}
+
+<section class="bd-card mb-5 p-5 sm:p-6">
+    <div class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0"/></svg>
+        </span>
+        <div class="min-w-0 flex-1">
+            <label for="record-tenant" class="block text-sm font-semibold text-slate-900">Which tenant made the payment?</label>
+            <p class="mt-0.5 text-xs text-slate-500">Choose the tenant first so Blue Deer can show the correct charges.</p>
+            <select id="record-tenant" class="searchable-select mt-3 w-full sm:max-w-xl" data-placeholder="Search by tenant or property">
+                <option value="">Choose tenant</option>
+                {% for tenant in tenants %}<option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+</section>
+
+{% if selected_tenant %}
+<form id="record-payment-form" method="POST" action="/payments/record" class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <input type="hidden" name="tenant_id" value="{{ selected_tenant.id }}">
+    <div class="space-y-5">
+        <section class="bd-card overflow-hidden">
+            <div class="border-b border-slate-200 px-5 py-5 sm:px-6">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><p class="text-xs font-semibold uppercase tracking-[.14em] text-blue-600">Step 1</p><h2 class="mt-1 text-xl font-bold text-slate-950">Select charges to pay</h2><p class="mt-1 text-sm text-slate-500">Adjust an amount to record a partial payment.</p></div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ charges|length }} available</span>
+                </div>
+            </div>
+            {% if charges %}
+            <div class="space-y-3 p-4 sm:p-5">
+                {% for charge in charges %}
+                <article class="allocation-row rounded-2xl border border-slate-200 bg-white p-4 transition sm:p-5" data-charge-id="{{ charge.id }}">
+                    <div class="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_10rem] sm:items-center">
+                        <div class="flex items-center gap-3 sm:contents">
+                            <input id="charge-{{ charge.id }}" class="allocation-checkbox h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600" type="checkbox" name="charge_ids" value="{{ charge.id }}" {% if charge.id == selected_charge_id %}checked{% endif %}>
+                            <label for="charge-{{ charge.id }}" class="flex min-w-0 cursor-pointer items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {% if charge.charge_type == 'rent' %}bg-blue-50 text-blue-700{% elif charge.charge_type in ['water', 'utility'] %}bg-cyan-50 text-cyan-700{% elif charge.charge_type == 'late_fee' %}bg-amber-50 text-amber-700{% elif charge.charge_type == 'security_deposit' %}bg-violet-50 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ charge_icon(charge.charge_type) }}</span>
+                                <span class="min-w-0"><span class="block font-semibold text-slate-950">{{ charge.description }}</span><span class="mt-1 block text-xs {% if charge.status == 'overdue' %}font-semibold text-red-700{% else %}text-slate-500{% endif %}">Due {{ charge.due_date.strftime('%b %d, %Y') }} · {{ charge.status.replace('_', ' ').title() }}</span></span>
+                            </label>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between sm:block sm:text-right"><span class="text-xs font-semibold uppercase tracking-wider text-slate-400 sm:block">Balance</span><span class="font-bold text-slate-950 sm:mt-1 sm:block">${{ "{:,.2f}".format(charge.outstanding) }}</span></div>
+                            <label for="amount-{{ charge.id }}" class="mt-3 block text-xs font-semibold text-slate-600 sm:text-left">Payment amount</label>
+                            <div class="relative mt-1"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">$</span><input id="amount-{{ charge.id }}" name="amount_{{ charge.id }}" type="number" min="0.01" max="{{ charge.outstanding }}" step="0.01" value="{{ charge.outstanding }}" data-balance="{{ charge.outstanding }}" class="allocation-amount bd-input pl-7 text-right font-semibold" {% if charge.id != selected_charge_id %}disabled{% endif %}></div>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 4.5 4.5L19.5 6.75"/></svg></span><h3 class="mt-4 font-semibold text-slate-900">No open charges</h3><p class="mt-1 text-sm text-slate-500">{{ selected_tenant.name }} has no balance available for payment.</p></div>
+            {% endif %}
+        </section>
+
+        {% if charges %}
+        <section class="bd-card p-5 sm:p-6">
+            <p class="text-xs font-semibold uppercase tracking-[.14em] text-blue-600">Step 2</p>
+            <h2 class="mt-1 text-xl font-bold text-slate-950">How did they pay?</h2>
+            <p class="mt-1 text-sm text-slate-500">This records an external payment; no money will be moved.</p>
+            <fieldset class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <legend class="sr-only">Payment method</legend>
+                {% for method, label in payment_methods.items() %}
+                <label class="method-option relative"><input type="radio" name="payment_method" value="{{ method }}" required><span class="method-card">{{ payment_method_icon(method) }}<span class="text-sm font-semibold">{{ label }}</span></span></label>
+                {% endfor %}
+            </fieldset>
+        </section>
+
+        <section class="bd-card p-5 sm:p-6">
+            <p class="text-xs font-semibold uppercase tracking-[.14em] text-blue-600">Step 3</p>
+            <h2 class="mt-1 text-xl font-bold text-slate-950">Payment details</h2>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                <div><label for="paid-on" class="mb-2 block text-sm font-semibold text-slate-800">Date paid <span class="text-red-500">*</span></label><input id="paid-on" name="occurred_on" type="date" required value="{{ today.isoformat() }}" class="bd-input"></div>
+                <div><label for="payment-note" class="mb-2 block text-sm font-semibold text-slate-800">Internal note <span class="font-normal text-slate-400">(optional)</span></label><input id="payment-note" name="note" maxlength="500" class="bd-input" placeholder="Check number, confirmation, or context"></div>
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    {% if charges %}
+    <aside class="bd-card overflow-hidden lg:sticky lg:top-5">
+        <div class="border-b border-slate-200 bg-gradient-to-br from-blue-950 to-blue-800 p-5 text-white">
+            <p class="text-xs font-semibold uppercase tracking-[.14em] text-blue-200">Payment summary</p>
+            <p id="payment-total" class="mt-2 text-3xl font-bold">$0.00</p>
+            <p id="selected-count" class="mt-1 text-sm text-blue-200">No charges selected</p>
+        </div>
+        <div class="space-y-4 p-5">
+            <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tenant</p><p class="mt-1 font-semibold text-slate-900">{{ selected_tenant.name }}</p><p class="mt-1 text-xs text-slate-500">{{ selected_tenant.property_ref.address }}</p></div>
+            <p class="text-xs leading-5 text-slate-500">The selected amount will be posted immediately to each charge. You can reverse individual entries later from the charge activity.</p>
+            <button id="record-payment-submit" type="submit" disabled class="bd-btn bd-btn-primary w-full py-3 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 4.5 4.5L19.5 6.75"/></svg>
+                Record payment
+            </button>
+            <a href="/payments?tenant_id={{ selected_tenant.id }}" class="bd-btn bd-btn-secondary w-full">Cancel</a>
+        </div>
+    </aside>
+    {% endif %}
+</form>
+{% else %}
+<section class="bd-card px-6 py-16 text-center"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0"/></svg></span><h2 class="mt-4 text-lg font-semibold text-slate-900">Choose a tenant to begin</h2><p class="mt-1 text-sm text-slate-500">Their outstanding and upcoming charges will appear here.</p></section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('record-tenant')?.addEventListener('change', function() {
+    if (this.value) window.location.href = '/payments/record?tenant_id=' + encodeURIComponent(this.value);
+});
+
+function updatePaymentSummary() {
+    const checked = Array.from(document.querySelectorAll('.allocation-checkbox:checked'));
+    let total = 0;
+    let valid = checked.length > 0
+        && Boolean(document.querySelector('input[name="payment_method"]:checked'))
+        && Boolean(document.getElementById('paid-on')?.value);
+    checked.forEach(function(checkbox) {
+        const row = checkbox.closest('.allocation-row');
+        const input = row.querySelector('.allocation-amount');
+        const amount = Number(input.value || 0);
+        const balance = Number(input.dataset.balance || 0);
+        if (amount <= 0 || amount > balance) valid = false;
+        total += Number.isFinite(amount) ? amount : 0;
+    });
+    const totalNode = document.getElementById('payment-total');
+    const countNode = document.getElementById('selected-count');
+    const submit = document.getElementById('record-payment-submit');
+    if (totalNode) totalNode.textContent = total.toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+    if (countNode) countNode.textContent = checked.length ? checked.length + (checked.length === 1 ? ' charge selected' : ' charges selected') : 'No charges selected';
+    if (submit) submit.disabled = !valid;
+}
+
+document.querySelectorAll('.allocation-checkbox').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function() {
+        const input = this.closest('.allocation-row').querySelector('.allocation-amount');
+        input.disabled = !this.checked;
+        if (this.checked && !input.value) input.value = input.dataset.balance;
+        updatePaymentSummary();
+    });
+});
+document.querySelectorAll('.allocation-amount').forEach(function(input) { input.addEventListener('input', updatePaymentSummary); });
+document.querySelectorAll('input[name="payment_method"]').forEach(function(input) { input.addEventListener('change', updatePaymentSummary); });
+document.getElementById('paid-on')?.addEventListener('change', updatePaymentSummary);
+document.getElementById('record-payment-form')?.addEventListener('submit', function() {
+    const submit = document.getElementById('record-payment-submit');
+    if (submit) { submit.disabled = true; submit.textContent = 'Recording payment…'; }
+});
+updatePaymentSummary();
+</script>
+{% endblock %}

@@ -13,10 +13,12 @@ def make_charge(
     amount: str = "632.00",
     is_void: bool = False,
     ledger_entries=None,
+    charge_id: int = 1,
+    tenant_id: int = 10,
 ):
     return SimpleNamespace(
-        id=1,
-        tenant_id=10,
+        id=charge_id,
+        tenant_id=tenant_id,
         property_id=20,
         tenant_ref=SimpleNamespace(name="Cierra Trotter"),
         property_ref=SimpleNamespace(address="7251 Studebaker Ave."),
@@ -242,6 +244,48 @@ class LateFeeControlTests(unittest.TestCase):
         self.assertTrue(changed)
         self.assertFalse(tenant.late_fee_initial_enabled)
         self.assertFalse(tenant.late_fee_daily_enabled)
+
+
+class ManualPaymentAllocationTests(unittest.TestCase):
+    def test_validates_multiple_partial_allocations(self):
+        charges = [
+            make_charge(due_date=date(2026, 9, 1), amount="632.00", charge_id=1),
+            make_charge(due_date=date(2026, 9, 18), amount="123.00", charge_id=2, charge_type="utility"),
+        ]
+
+        allocations = ledger_service.validate_payment_allocations(
+            charges,
+            tenant_id=10,
+            charge_ids=[1, 2],
+            amounts={1: "100.00", 2: "23.50"},
+        )
+
+        self.assertEqual([(charge.id, amount) for charge, amount in allocations], [
+            (1, Decimal("100.00")),
+            (2, Decimal("23.50")),
+        ])
+
+    def test_rejects_amount_above_balance(self):
+        charge = make_charge(due_date=date(2026, 9, 1), amount="632.00")
+
+        with self.assertRaises(ValueError):
+            ledger_service.validate_payment_allocations(
+                [charge],
+                tenant_id=10,
+                charge_ids=[1],
+                amounts={1: "632.01"},
+            )
+
+    def test_rejects_charge_from_another_tenant(self):
+        charge = make_charge(due_date=date(2026, 9, 1), tenant_id=99)
+
+        with self.assertRaises(ValueError):
+            ledger_service.validate_payment_allocations(
+                [charge],
+                tenant_id=10,
+                charge_ids=[1],
+                amounts={1: "100.00"},
+            )
 
 
 if __name__ == "__main__":

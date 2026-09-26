@@ -130,6 +130,35 @@ def stop_automatic_late_fees(tenant) -> bool:
     return changed
 
 
+def validate_payment_allocations(
+    charges: Iterable[TenantCharge],
+    *,
+    tenant_id: int,
+    charge_ids: Iterable[int],
+    amounts: dict[int, object],
+) -> list[tuple[TenantCharge, Decimal]]:
+    """Validate a manual payment split against live charge balances."""
+    ordered_ids = list(dict.fromkeys(charge_ids))
+    charge_by_id = {charge.id: charge for charge in charges}
+    if not ordered_ids or len(charge_by_id) != len(ordered_ids):
+        raise ValueError("Unknown charge")
+
+    allocations = []
+    for charge_id in ordered_ids:
+        charge = charge_by_id.get(charge_id)
+        if not charge or charge.tenant_id != tenant_id or charge.is_void:
+            raise ValueError("Charge does not belong to tenant")
+        try:
+            amount = money(Decimal(str(amounts.get(charge_id, "0"))))
+        except Exception as exc:
+            raise ValueError("Invalid allocation") from exc
+        outstanding = charge_snapshot(charge)["outstanding"]
+        if amount <= 0 or amount > outstanding:
+            raise ValueError("Invalid allocation")
+        allocations.append((charge, amount))
+    return allocations
+
+
 def _ordinal_day(day: int) -> str:
     if 10 <= day % 100 <= 20:
         suffix = "th"

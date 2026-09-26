@@ -40,6 +40,17 @@ CHARGE_TYPE_LABELS = {
     "other": "Other charge",
 }
 
+EXTERNAL_PAYMENT_METHODS = {
+    "check": "Check",
+    "cash": "Cash",
+    "venmo": "Venmo",
+    "zelle": "Zelle",
+    "cash_app": "Cash App",
+    "paypal": "PayPal",
+    "section_8": "Section 8",
+    "other": "Other",
+}
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -426,6 +437,155 @@ def _parse_date(value: str | None, fallback: date | None = None) -> date | None:
         return date.fromisoformat(value)
     except ValueError:
         return fallback
+
+
+@router.get("/record", response_class=HTMLResponse)
+async def record_payment_page(
+    request: Request,
+    tenant_id: str = "",
+    charge_id: str = "",
+):
+    """Show a tenant-level external payment allocation workflow."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    try:
+        selected_tenant_id = int(tenant_id) if tenant_id.strip() else None
+    except (TypeError, ValueError):
+        selected_tenant_id = None
+    try:
+        selected_charge_id = int(charge_id) if charge_id.strip() else None
+    except (TypeError, ValueError):
+        selected_charge_id = None
+
+    selected_charge = None
+    if selected_charge_id:
+        selected_charge = await ledger_service.get_charge(selected_charge_id)
+        if selected_charge and selected_charge["status"] not in {"paid", "void"}:
+            selected_tenant_id = selected_charge["tenant_id"]
+        else:
+            selected_charge = None
+            selected_charge_id = None
+
+    async with get_session() as session:
+        tenant_result = await session.execute(
+            select(Tenant)
+            .where(Tenant.is_active == True)
+            .options(selectinload(Tenant.property_ref))
+            .order_by(Tenant.name)
+        )
+        tenants = tenant_result.scalars().all()
+        selected_tenant = next(
+            (tenant for tenant in tenants if tenant.id == selected_tenant_id),
+            None,
+        )
+
+    charges = []
+    if selected_tenant:
+        tenant_charges = await ledger_service.list_charges(
+            tenant_id=selected_tenant.id,
+            include_paid=True,
+        )
+        charges = sorted(
+            (
+                charge for charge in tenant_charges
+                if charge["status"] not in {"paid", "void"}
+                and charge["outstanding"] > 0
+            ),
+            key=lambda charge: (charge["due_date"], charge["id"]),
+        )
+        if selected_charge_id and not any(charge["id"] == selected_charge_id for charge in charges):
+            selected_charge_id = None
+
+    return templates.TemplateResponse(
+        "payments/record.html",
+        {
+            "request": request,
+            "user": user,
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "charges": charges,
+            "selected_charge_id": selected_charge_id,
+            "payment_methods": EXTERNAL_PAYMENT_METHODS,
+            "today": date.today(),
+        },
+    )
+
+
+@router.post("/record")
+async def record_allocated_payment(request: Request):
+    """Record one external payment allocated across one or more tenant charges."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    tenant_value = str(form.get("tenant_id", "")).strip()
+    selected_values = list(dict.fromkeys(str(value) for value in form.getlist("charge_ids")))
+    payment_method = str(form.get("payment_method", "")).strip()
+    occurred_on = _parse_date(form.get("occurred_on"))
+    note = str(form.get("note", "")).strip() or None
+
+    try:
+        tenant_id = int(tenant_value)
+        charge_ids = [int(value) for value in selected_values]
+    except (TypeError, ValueError):
+        tenant_id = 0
+        charge_ids = []
+
+    query = urlencode({"tenant_id": tenant_id}) if tenant_id else ""
+    error_url = f"/payments/record{'?' + query if query else ''}"
+    if not tenant_id or not charge_ids or not occurred_on or payment_method not in EXTERNAL_PAYMENT_METHODS:
+        return RedirectResponse(url=f"{error_url}{'&' if query else '?'}error=missing_fields", status_code=303)
+
+    try:
+        async with get_session() as session:
+            result = await session.execute(
+                select(TenantCharge)
+                .where(TenantCharge.id.in_(charge_ids))
+                .options(
+                    selectinload(TenantCharge.tenant_ref),
+                    selectinload(TenantCharge.property_ref),
+                    selectinload(TenantCharge.ledger_entries),
+                )
+            )
+            loaded_charges = result.scalars().all()
+            allocations = ledger_service.validate_payment_allocations(
+                loaded_charges,
+                tenant_id=tenant_id,
+                charge_ids=charge_ids,
+                amounts={
+                    charge_id: form.get(f"amount_{charge_id}", "0")
+                    for charge_id in charge_ids
+                },
+            )
+
+            batch_id = uuid.uuid4().hex
+            method_label = EXTERNAL_PAYMENT_METHODS[payment_method]
+            for charge, amount in allocations:
+                session.add(TenantLedgerEntry(
+                    tenant_id=tenant_id,
+                    property_id=charge.property_id,
+                    charge_id=charge.id,
+                    entry_type="payment",
+                    amount=amount,
+                    status="posted",
+                    payment_method=payment_method,
+                    description=f"Recorded {method_label} payment",
+                    note=note,
+                    external_provider="manual",
+                    external_id=f"{batch_id}:{charge.id}",
+                    occurred_on=occurred_on,
+                    created_by_user_id=user["id"],
+                ))
+    except (InvalidOperation, ValueError):
+        return RedirectResponse(url=f"{error_url}{'&' if query else '?'}error=invalid_allocation", status_code=303)
+
+    return RedirectResponse(
+        url=f"/payments?{urlencode({'tenant_id': tenant_id, 'success': 'payment_recorded'})}",
+        status_code=303,
+    )
 
 
 @router.post("/charges")
