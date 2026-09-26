@@ -36,9 +36,15 @@
        class="group inline-flex items-center gap-1.5 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded {% if align == 'right' %}justify-end w-full{% elif align == 'center' %}justify-center w-full{% endif %}"
        title="Sort by {{ label }}">
         <span>{{ label }}</span>
-        <span aria-hidden="true" class="text-sm leading-none {% if sort_key == key %}text-blue-600{% else %}text-gray-300 group-hover:text-blue-400{% endif %}">
-            {% if sort_key == key %}{{ '↑' if sort_direction == 'asc' else '↓' }}{% else %}↕{% endif %}
-        </span>
+        <svg aria-hidden="true"
+             class="h-3.5 w-3.5 flex-none {% if sort_key == key %}text-blue-600{% else %}text-gray-300 group-hover:text-blue-400{% endif %}"
+             fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            {% if sort_key == key and sort_direction == 'asc' %}
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19.5v-15m0 0-6 6m6-6 6 6" />
+            {% else %}
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0 6-6m-6 6-6-6" />
+            {% endif %}
+        </svg>
         <span class="sr-only">
             {% if sort_key == key %}
                 Sorted {{ 'ascending' if sort_direction == 'asc' else 'descending' }}; activate to sort {{ 'descending' if sort_direction == 'asc' else 'ascending' }}
