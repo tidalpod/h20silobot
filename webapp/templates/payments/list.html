@@ -617,6 +617,33 @@ function applyLedgerFilters() {
     {% if charge_view %}params.set('charge_view', '{{ charge_view }}');{% endif %}
     window.location = '/payments' + (params.toString() ? '?' + params.toString() : '');
 }
+function enableLedgerFilterKeyboardSubmit() {
+    ['property-filter', 'tenant-filter'].forEach(function(id) {
+        const select = document.getElementById(id);
+        const searchInput = select?.tomselect?.control_input;
+        if (!searchInput) return;
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' || event.isComposing) return;
+            // Tom Select handles the keystroke first and commits the highlighted
+            // match. Apply on the next task so the underlying select is current.
+            setTimeout(function() {
+                // Keep an unmatched query in place rather than applying an old
+                // or empty selection.
+                if (searchInput.value.trim()) return;
+                applyLedgerFilters();
+            }, 0);
+        });
+    });
+
+    ['status-filter', 'method-filter'].forEach(function(id) {
+        document.getElementById(id)?.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' || event.isComposing) return;
+            event.preventDefault();
+            applyLedgerFilters();
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', enableLedgerFilterKeyboardSubmit);
 function openActivity(type) {
     closeActionsMenu();
     document.getElementById('activity-type').value = type;
