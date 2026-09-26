@@ -21,6 +21,7 @@
 {% macro sent_charge_context_and_actions(charge, tenant) %}
 {% if charge.status != 'void' %}
 {% set latest_entry = charge.entries[0] if charge.entries else none %}
+<div class="max-w-5xl">
 <div class="space-y-5">
     <p class="text-sm italic leading-6 text-slate-700 sm:text-base">
         {% if latest_entry %}
@@ -86,6 +87,7 @@
         </form>
         {% endif %}
     </div>
+</div>
 </div>
 {% endif %}
 {% endmacro %}
