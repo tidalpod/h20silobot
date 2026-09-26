@@ -620,19 +620,37 @@ function applyLedgerFilters() {
 function enableLedgerFilterKeyboardSubmit() {
     ['property-filter', 'tenant-filter'].forEach(function(id) {
         const select = document.getElementById(id);
-        const searchInput = select?.tomselect?.control_input;
+        const tomSelect = select?.tomselect;
+        const searchInput = tomSelect?.control_input;
         if (!searchInput) return;
         searchInput.addEventListener('keydown', function(event) {
             if (event.key !== 'Enter' || event.isComposing) return;
-            // Tom Select handles the keystroke first and commits the highlighted
-            // match. Apply on the next task so the underlying select is current.
-            setTimeout(function() {
-                // Keep an unmatched query in place rather than applying an old
-                // or empty selection.
-                if (searchInput.value.trim()) return;
-                applyLedgerFilters();
-            }, 0);
-        });
+            const query = searchInput.value.trim().toLocaleLowerCase();
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            if (query) {
+                const labelField = tomSelect.settings.labelField;
+                const choices = Object.entries(tomSelect.options)
+                    .filter(([value]) => value !== '')
+                    .map(([value, option]) => ({
+                        value: value,
+                        text: String(option[labelField] || '').trim(),
+                        normalized: String(option[labelField] || '').trim().toLocaleLowerCase(),
+                    }));
+                const match = choices.find(choice => choice.normalized === query)
+                    || choices.find(choice => choice.normalized.startsWith(query + ' ·'))
+                    || choices.find(choice => choice.normalized.startsWith(query))
+                    || choices.find(choice => choice.normalized.includes(query));
+                if (!match) {
+                    showToast('Choose a matching ' + (id === 'tenant-filter' ? 'tenant' : 'property') + ' before applying filters.', 'warning');
+                    return;
+                }
+                tomSelect.setValue(match.value, true);
+                tomSelect.close();
+            }
+            applyLedgerFilters();
+        }, true);
     });
 
     ['status-filter', 'method-filter'].forEach(function(id) {
