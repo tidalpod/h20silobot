@@ -44,6 +44,8 @@ async def payments_list(
     method: str = None,
     page: int = 1,
     page_size: int = 25,
+    charge_view: str = "",
+    charge_page: int = 1,
 ):
     """All payments list with filters (ACH, card, and imported history)."""
     user = await get_current_user(request)
@@ -61,6 +63,10 @@ async def payments_list(
 
     page = max(page, 1)
     page_size = page_size if page_size in {25, 50, 100} else 25
+    charge_view = charge_view.strip().lower()
+    if charge_view not in {"unpaid", "paid", "overdue"}:
+        charge_view = ""
+    charge_page = max(charge_page, 1)
     try:
         selected_property_id = int(property_id) if property_id.strip() else None
     except (TypeError, ValueError):
@@ -243,6 +249,8 @@ async def payments_list(
     )
     charge_totals = ledger_service.totals(charges)
     open_charges = [charge for charge in charges if charge["status"] in {"open", "partial", "overdue"}]
+    paid_charges = [charge for charge in charges if charge["status"] == "paid"]
+    overdue_charges = [charge for charge in charges if charge["status"] == "overdue"]
     upcoming_charges = [charge for charge in charges if charge["status"] == "upcoming"]
     settled_charges = [charge for charge in charges if charge["status"] in {"paid", "void"}]
     collection_rate = (
@@ -252,7 +260,8 @@ async def payments_list(
     collection_progress = min(max(collection_rate, 0.0), 100.0)
     charge_counts = {
         "open": len(open_charges),
-        "overdue": sum(charge["status"] == "overdue" for charge in charges),
+        "paid": len(paid_charges),
+        "overdue": len(overdue_charges),
         "upcoming": len(upcoming_charges),
         "due": sum(
             charge["status"] != "void" and not charge.get("is_future_rent", False)
@@ -260,6 +269,50 @@ async def payments_list(
         ),
         "settled": len(settled_charges),
     }
+    paid_charge_total = sum((charge["amount"] for charge in paid_charges), Decimal("0.00"))
+
+    focused_charge_sets = {
+        "unpaid": sorted(
+            open_charges,
+            key=lambda charge: (
+                0 if charge["status"] == "overdue" else 1,
+                charge["due_date"],
+                charge["tenant_name"].lower(),
+            ),
+        ),
+        "paid": sorted(
+            paid_charges,
+            key=lambda charge: (charge["due_date"], charge["id"]),
+            reverse=True,
+        ),
+        "overdue": sorted(
+            overdue_charges,
+            key=lambda charge: (charge["due_date"], charge["tenant_name"].lower()),
+        ),
+    }
+    all_focused_charges = focused_charge_sets.get(charge_view, [])
+    charge_page_size = 50
+    charge_total_items = len(all_focused_charges)
+    charge_total_pages = max(1, (charge_total_items + charge_page_size - 1) // charge_page_size)
+    charge_page = min(charge_page, charge_total_pages)
+    charge_start = (charge_page - 1) * charge_page_size
+    focused_charges = all_focused_charges[charge_start:charge_start + charge_page_size]
+
+    ledger_scope_params = {
+        key: value for key, value in {
+            "status": status or "",
+            "property_id": selected_property_id or "",
+            "tenant_id": selected_tenant_id or "",
+            "method": method or "",
+        }.items() if value != ""
+    }
+    charge_view_urls = {
+        view: f"/payments?{urlencode({**ledger_scope_params, 'charge_view': view})}#charges"
+        for view in ("unpaid", "paid", "overdue")
+    }
+    all_charge_query = urlencode(ledger_scope_params)
+    charge_view_urls["all"] = f"/payments{'?' + all_charge_query if all_charge_query else ''}#charges"
+    charge_pagination_base = f"/payments?{urlencode({**ledger_scope_params, 'charge_view': charge_view})}&"
     selected_tenant = next((tenant for tenant in tenants if tenant.id == selected_tenant_id), None)
     selected_property = next((prop for prop in properties if prop.id == selected_property_id), None)
 
@@ -272,6 +325,7 @@ async def payments_list(
         "property_id": selected_property_id or "",
         "tenant_id": selected_tenant_id or "",
         "method": method or "",
+        "charge_view": charge_view,
     }
     pagination_base = f"/payments?{urlencode(pagination_params)}&"
 
@@ -285,10 +339,13 @@ async def payments_list(
             "tenants": tenants,
             "charges": charges,
             "open_charges": open_charges,
+            "paid_charges": paid_charges,
+            "overdue_charges": overdue_charges,
             "upcoming_charges": upcoming_charges,
             "settled_charges": settled_charges,
             "charge_totals": charge_totals,
             "charge_counts": charge_counts,
+            "paid_charge_total": paid_charge_total,
             "collection_rate": collection_rate,
             "collection_progress": collection_progress,
             "selected_tenant": selected_tenant,
@@ -301,6 +358,15 @@ async def payments_list(
             "filter_property_id": selected_property_id,
             "filter_tenant_id": selected_tenant_id,
             "filter_method": method,
+            "charge_view": charge_view,
+            "charge_view_urls": charge_view_urls,
+            "focused_charges": focused_charges,
+            "charge_page": charge_page,
+            "charge_page_size": charge_page_size,
+            "charge_total_items": charge_total_items,
+            "charge_total_pages": charge_total_pages,
+            "charge_start": charge_start,
+            "charge_pagination_base": charge_pagination_base,
             "statuses": PaymentStatus,
             "page": page,
             "page_size": page_size,
