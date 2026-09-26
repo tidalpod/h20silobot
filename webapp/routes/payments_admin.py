@@ -315,6 +315,15 @@ async def payments_list(
     charge_pagination_base = f"/payments?{urlencode({**ledger_scope_params, 'charge_view': charge_view})}&"
     selected_tenant = next((tenant for tenant in tenants if tenant.id == selected_tenant_id), None)
     selected_property = next((prop for prop in properties if prop.id == selected_property_id), None)
+    monthly_charge_summaries = (
+        ledger_service.monthly_charge_summaries(charges, selected_tenant)
+        if selected_tenant else []
+    )
+    sent_charges = sorted(
+        charges,
+        key=lambda charge: (charge["due_date"], charge["id"]),
+        reverse=True,
+    ) if selected_tenant else []
 
     total_items = len(all_payments)
     total_pages = max(1, (total_items + page_size - 1) // page_size)
@@ -367,6 +376,8 @@ async def payments_list(
             "charge_total_pages": charge_total_pages,
             "charge_start": charge_start,
             "charge_pagination_base": charge_pagination_base,
+            "monthly_charge_summaries": monthly_charge_summaries,
+            "sent_charges": sent_charges,
             "statuses": PaymentStatus,
             "page": page,
             "page_size": page_size,

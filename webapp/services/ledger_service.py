@@ -95,8 +95,109 @@ def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
         "is_future_rent": is_future_rent,
         "is_partial": applied > 0 and outstanding > 0,
         "is_recurring": charge.is_recurring,
+        "recurrence_group": getattr(charge, "recurrence_group", None),
+        "created_at": getattr(charge, "created_at", None),
         "entries": sorted(charge.ledger_entries, key=lambda item: item.created_at or datetime.min, reverse=True),
     }
+
+
+def _ordinal_day(day: int) -> str:
+    if 10 <= day % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def monthly_charge_summaries(
+    charges: Iterable[dict],
+    tenant,
+    *,
+    as_of: date | None = None,
+) -> list[dict]:
+    """Collapse recurring charge instances into tenant-facing monthly schedules."""
+    rows = list(charges)
+    groups: dict[str, list[dict]] = {}
+    for charge in rows:
+        if not charge.get("is_recurring") or charge["status"] == "void":
+            continue
+        group_key = charge.get("recurrence_group") or (
+            f"{charge['charge_type']}:{charge['amount']}:{charge['due_date'].day}"
+        )
+        groups.setdefault(group_key, []).append(charge)
+
+    summaries = []
+    today = as_of or date.today()
+    for group_key, group_rows in groups.items():
+        ordered = sorted(group_rows, key=lambda charge: (charge["due_date"], charge["id"]))
+        future_rows = [charge for charge in ordered if charge["due_date"] > today]
+        representative = future_rows[0] if future_rows else ordered[-1]
+        charge_type = representative["charge_type"]
+        start_date = min((charge.get("service_start") or charge["due_date"] for charge in ordered))
+        end_date = max((charge.get("service_end") or charge["due_date"] for charge in ordered))
+        if charge_type == "rent":
+            start_date = getattr(tenant, "lease_start_date", None) or start_date
+            end_date = getattr(tenant, "lease_end_date", None) or (end_date if len(ordered) > 1 else None)
+        elif len(ordered) == 1 and not representative.get("service_end"):
+            end_date = None
+
+        description = representative["description"].split(" — ", 1)[0]
+        summaries.append({
+            "key": group_key,
+            "charge_type": charge_type,
+            "description": "Rent" if charge_type == "rent" else description,
+            "amount": representative["amount"],
+            "due_day": representative["due_date"].day,
+            "due_label": _ordinal_day(representative["due_date"].day),
+            "start_date": start_date,
+            "end_date": end_date,
+            "next_due_date": future_rows[0]["due_date"] if future_rows else None,
+            "open_balance": sum(
+                (charge["outstanding"] for charge in ordered if charge["status"] in {"open", "partial", "overdue"}),
+                Decimal("0.00"),
+            ),
+            "charge_count": len(ordered),
+            "representative": representative,
+            "source": "Recurring charge series",
+        })
+
+    if not any(summary["charge_type"] == "rent" for summary in summaries):
+        rent_rows = [
+            charge for charge in rows
+            if charge["charge_type"] == "rent" and charge["status"] != "void"
+        ]
+        representative = max(rent_rows, key=lambda charge: charge["due_date"]) if rent_rows else None
+        rent_source = getattr(tenant, "current_rent", None)
+        if getattr(tenant, "is_section8", False) and getattr(tenant, "tenant_portion", None) is not None:
+            rent_source = tenant.tenant_portion
+        if rent_source is None and representative:
+            rent_source = representative["amount"]
+        rent_amount = money(rent_source)
+        if rent_amount > 0:
+            due_day = representative["due_date"].day if representative else 1
+            summaries.append({
+                "key": f"lease-rent:{getattr(tenant, 'id', 'tenant')}",
+                "charge_type": "rent",
+                "description": "Rent",
+                "amount": rent_amount,
+                "due_day": due_day,
+                "due_label": _ordinal_day(due_day),
+                "start_date": getattr(tenant, "lease_start_date", None),
+                "end_date": getattr(tenant, "lease_end_date", None),
+                "next_due_date": None,
+                "open_balance": sum(
+                    (charge["outstanding"] for charge in rent_rows if charge["status"] in {"open", "partial", "overdue"}),
+                    Decimal("0.00"),
+                ),
+                "charge_count": len(rent_rows),
+                "representative": representative,
+                "source": "Lease rent schedule",
+            })
+
+    return sorted(
+        summaries,
+        key=lambda summary: (0 if summary["charge_type"] == "rent" else 1, summary["description"].lower()),
+    )
 
 
 async def list_charges(

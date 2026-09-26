@@ -234,6 +234,68 @@
     </a>
 </section>
 
+{% if selected_tenant and not charge_view %}
+<section id="charges" class="bd-card mb-5 scroll-mt-4 overflow-hidden">
+    <div class="border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/40 to-sky-100/60 px-5 py-5 sm:px-6">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div><div class="flex items-center gap-2"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">{{ category_icon('rent', 'h-5 w-5') }}</span><h2 class="text-lg font-bold text-slate-950">Monthly charges</h2></div><p class="mt-1 pl-11 text-sm text-slate-500">Recurring charges that define {{ selected_tenant.name }}'s monthly schedule.</p></div>
+            <span class="self-start rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100">{{ monthly_charge_summaries|length }} active schedule{{ '' if monthly_charge_summaries|length == 1 else 's' }}</span>
+        </div>
+    </div>
+    {% if monthly_charge_summaries %}
+    <div class="grid gap-4 p-5 sm:p-6">
+        {% for schedule in monthly_charge_summaries %}
+        <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="grid gap-5 p-5 md:grid-cols-[minmax(14rem,1.25fr)_minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(8rem,.55fr)] md:items-center">
+                <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {% if schedule.charge_type == 'rent' %}bg-blue-50 text-blue-700{% elif schedule.charge_type in ['water', 'utility'] %}bg-cyan-50 text-cyan-700{% else %}bg-violet-50 text-violet-700{% endif %}">{{ category_icon(schedule.charge_type) }}</span><div><div class="flex flex-wrap items-center gap-2"><h3 class="font-bold text-slate-950">{{ schedule.description }}</h3><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Active</span></div><p class="mt-1 text-sm font-medium text-slate-600">Due on the {{ schedule.due_label }} of each month</p><p class="mt-1 text-xs text-slate-400">{{ schedule.source }}</p></div></div>
+                <div><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Schedule period</p><p class="mt-1 text-sm font-semibold text-slate-800">{% if schedule.start_date %}{{ schedule.start_date.strftime('%b %Y') }}{% else %}Current{% endif %} – {% if schedule.end_date %}{{ schedule.end_date.strftime('%b %Y') }}{% else %}Ongoing{% endif %}</p><p class="mt-1 text-xs text-slate-500">{{ schedule.charge_count }} charge{{ '' if schedule.charge_count == 1 else 's' }} created</p></div>
+                <div><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Delivery</p><p class="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800"><svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75v-1.5A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25v-1.5M9 12h12m0 0-3-3m3 3-3 3"/></svg>Tenant portal</p>{% if schedule.next_due_date %}<p class="mt-1 text-xs text-blue-600">Next: {{ schedule.next_due_date.strftime('%b %d, %Y') }}</p>{% else %}<p class="mt-1 text-xs text-slate-500">Generated monthly</p>{% endif %}</div>
+                <div class="md:text-right"><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Monthly amount</p><p class="mt-1 text-2xl font-bold tracking-tight text-blue-950">${{ "{:,.2f}".format(schedule.amount) }}</p>{% if schedule.open_balance > 0 %}<p class="mt-1 text-xs font-semibold text-amber-700">${{ "{:,.2f}".format(schedule.open_balance) }} currently due</p>{% else %}<p class="mt-1 text-xs font-medium text-emerald-600">Current</p>{% endif %}</div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-6 py-10 text-center"><p class="text-sm font-semibold text-slate-800">No monthly schedule configured</p><p class="mt-1 text-sm text-slate-500">Create a repeating charge to add one.</p></div>
+    {% endif %}
+</section>
+
+<section class="bd-card mb-5 overflow-hidden">
+    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div><div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-950">Sent charges</h2><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ sent_charges|length }}</span></div><p class="mt-0.5 text-sm text-slate-500">Every charge delivered to this tenant, with payment activity available on demand.</p></div>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600"><span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-blue-700">{{ category_icon('rent', 'h-3.5 w-3.5') }}Rent</span><span class="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-amber-700">{{ category_icon('late_fee', 'h-3.5 w-3.5') }}Fees</span><span class="inline-flex items-center gap-1.5 rounded-lg bg-cyan-50 px-2.5 py-1.5 text-cyan-700">{{ category_icon('utility', 'h-3.5 w-3.5') }}Utilities</span></div>
+    </div>
+    {% if sent_charges %}
+    <div class="hidden grid-cols-[8rem_minmax(15rem,1.4fr)_8rem_minmax(10rem,.75fr)_9rem_1.5rem] gap-4 border-b border-slate-200 bg-slate-50/80 px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 lg:grid"><span>Due date</span><span>Charge</span><span>Status</span><span>Latest activity</span><span class="text-right">Amount / balance</span><span></span></div>
+    <div class="divide-y divide-slate-100">
+        {% for charge in sent_charges %}
+        {% set latest_entry = charge.entries[0] if charge.entries else none %}
+        <details class="ledger-disclosure group">
+            <summary class="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-4 transition hover:bg-slate-50/80 sm:px-6 lg:grid-cols-[8rem_minmax(15rem,1.4fr)_8rem_minmax(10rem,.75fr)_9rem_1.5rem] lg:items-center">
+                <div><span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 lg:hidden">Due</span><p class="mt-0.5 whitespace-nowrap text-sm font-semibold {% if charge.status == 'overdue' %}text-red-700{% else %}text-slate-700{% endif %}">{{ charge.due_date.strftime('%b %d, %Y') }}</p></div>
+                <div class="min-w-0"><div class="flex items-center gap-2.5"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {% if charge.charge_type == 'rent' %}bg-blue-50 text-blue-700{% elif charge.charge_type in ['water', 'utility'] %}bg-cyan-50 text-cyan-700{% elif charge.charge_type == 'late_fee' %}bg-amber-50 text-amber-700{% elif charge.charge_type == 'security_deposit' %}bg-violet-50 text-violet-700{% elif charge.charge_type == 'damage' %}bg-rose-50 text-rose-700{% else %}bg-slate-100 text-slate-600{% endif %}">{{ category_icon(charge.charge_type, 'h-4 w-4') }}</span><div class="min-w-0"><p class="truncate text-sm font-bold text-slate-900">{{ charge.description }}</p><p class="mt-0.5 text-xs text-slate-500">{% if charge.charge_type == 'late_fee' %}Late / daily fee{% elif charge.charge_type in ['water', 'utility'] %}Utility{% else %}{{ charge.charge_type.replace('_', ' ').title() }}{% endif %}</p></div></div></div>
+                <div class="col-start-1 lg:col-auto">{% if charge.status == 'paid' %}<span class="bd-badge bd-badge-success">Paid</span>{% elif charge.status == 'partial' %}<span class="bd-badge bd-badge-info">Partial</span>{% elif charge.status == 'overdue' %}<span class="bd-badge bd-badge-danger">Overdue</span>{% elif charge.status == 'upcoming' %}<span class="bd-badge bg-blue-50 text-blue-700">Scheduled</span>{% elif charge.status == 'void' %}<span class="bd-badge bg-slate-100 text-slate-600">Void</span>{% else %}<span class="bd-badge bd-badge-warning">Unpaid</span>{% endif %}</div>
+                <div class="hidden lg:block">{% if latest_entry %}<p class="text-sm font-semibold text-slate-700">{{ latest_entry.occurred_on.strftime('%b %d, %Y') }}</p><p class="mt-0.5 text-xs text-slate-500">{{ (latest_entry.payment_method or latest_entry.entry_type).replace('_', ' ').title() }}</p>{% else %}<p class="text-sm text-slate-400">No activity</p>{% endif %}</div>
+                <div class="col-start-2 row-start-3 text-right lg:col-auto lg:row-auto"><p class="text-sm font-bold text-slate-950">${{ "{:,.2f}".format(charge.amount) }}</p><p class="mt-0.5 text-xs {% if charge.status == 'upcoming' %}text-blue-600{% elif charge.outstanding > 0 %}text-amber-700{% else %}text-emerald-600{% endif %}">{% if charge.status == 'upcoming' %}Scheduled{% else %}Due: ${{ "{:,.2f}".format(charge.outstanding) }}{% endif %}</p></div>
+                <svg class="disclosure-chevron col-start-2 row-start-1 h-5 w-5 self-center text-slate-400 transition-transform lg:col-auto lg:row-auto" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+            </summary>
+            <div class="border-t border-blue-100 bg-gradient-to-br from-blue-50/70 to-sky-50/40 px-5 py-5 sm:px-6">
+                <div class="grid gap-3 sm:grid-cols-3"><div class="rounded-xl bg-white/90 p-3.5 shadow-sm ring-1 ring-blue-100"><p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Charged</p><p class="mt-1 text-lg font-bold text-slate-950">${{ "{:,.2f}".format(charge.amount) }}</p></div><div class="rounded-xl bg-white/90 p-3.5 shadow-sm ring-1 ring-blue-100"><p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Payments & credits</p><p class="mt-1 text-lg font-bold text-emerald-700">${{ "{:,.2f}".format(charge.applied) }}</p></div><div class="rounded-xl bg-white/90 p-3.5 shadow-sm ring-1 ring-blue-100"><p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Remaining</p><p class="mt-1 text-lg font-bold {% if charge.outstanding > 0 %}text-blue-950{% else %}text-emerald-700{% endif %}">${{ "{:,.2f}".format(charge.outstanding) }}</p></div></div>
+                {% if charge.entries %}
+                <div class="mt-4 space-y-2"><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ledger activity</p>{% for entry in charge.entries %}<article class="grid gap-3 rounded-xl border border-blue-100 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_9rem_7rem] sm:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="text-sm font-semibold text-slate-900">{{ entry.description }}</p><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">{{ entry.entry_type.replace('_', ' ') }}</span></div><p class="mt-1 text-xs text-slate-500">{{ (entry.payment_method or 'Manual').replace('_', ' ').title() }}{% if entry.note %} · {{ entry.note }}{% endif %}</p></div><p class="text-sm text-slate-600 sm:text-right">{{ entry.occurred_on.strftime('%b %d, %Y') }}</p><p class="text-lg font-bold sm:text-right {% if entry.entry_type in ['payment', 'credit'] %}text-emerald-700{% elif entry.entry_type in ['reversal', 'refund'] %}text-red-700{% else %}text-slate-900{% endif %}">{% if entry.entry_type in ['payment', 'credit'] %}−{% elif entry.entry_type == 'reversal' %}+{% endif %}${{ "{:,.2f}".format(entry.amount) }}</p></article>{% endfor %}</div>
+                {% else %}
+                <div class="mt-4 rounded-xl border border-dashed border-blue-200 bg-white/60 px-4 py-5 text-center text-sm text-slate-500">No payments or credits have been applied to this charge yet.</div>
+                {% endif %}
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})' class="bd-btn bd-btn-secondary">Edit charge</button>{% endif %}</div>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700">{{ category_icon('other', 'h-6 w-6') }}</span><h3 class="mt-3 font-semibold text-slate-900">No charges sent yet</h3><p class="mt-1 text-sm text-slate-500">Create a charge to begin this tenant's ledger.</p></div>
+    {% endif %}
+</section>
+{% else %}
 <section id="charges" class="bd-card mb-5 scroll-mt-4 overflow-hidden">
     <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         {% if charge_view %}
@@ -331,7 +393,9 @@
     </div>
     {% endif %}
 </section>
+{% endif %}
 
+{% if not selected_tenant or charge_view %}
 <section class="bd-card overflow-hidden">
     <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div><div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-950">Payment activity</h2><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ total_items }}</span></div><p class="mt-0.5 text-sm text-slate-500">Completed, pending, and failed transactions for this view.</p></div>
@@ -363,6 +427,7 @@
     {% else %}<div class="px-6 py-12 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"/></svg></span><p class="mt-3 text-sm font-semibold text-slate-800">No payment activity in this view</p><p class="mt-1 text-sm text-slate-500">Try a different filter or record an offline payment.</p></div>{% endif %}
     {% include "components/pagination.html" %}
 </section>
+{% endif %}
 
 <!-- Create charge modal -->
 <div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="charge-title">
@@ -459,6 +524,12 @@ function openActivity(type) {
     document.getElementById('activity-tenant-wrap').classList.toggle('hidden', type !== 'refund');
     document.getElementById('activity-charge').required = type !== 'refund';
     openModal('activity-modal');
+}
+function openActivityForCharge(chargeId, balance) {
+    openActivity('payment');
+    const chargeSelect = document.getElementById('activity-charge');
+    chargeSelect.value = String(chargeId);
+    document.getElementById('activity-amount').value = balance;
 }
 function openEdit(id, description, type, amount, dueDate, tenantId, propertyId) {
     document.getElementById('edit-form').action = '/payments/charges/' + id + '/edit';

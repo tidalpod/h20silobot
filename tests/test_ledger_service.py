@@ -21,6 +21,8 @@ def make_charge(*, due_date: date, charge_type: str = "rent", amount: str = "632
         service_end=None,
         is_void=False,
         is_recurring=charge_type == "rent",
+        recurrence_group="rent:10" if charge_type == "rent" else None,
+        created_at=None,
         ledger_entries=[],
     )
 
@@ -63,6 +65,56 @@ class LedgerDueDateTests(unittest.TestCase):
 
         self.assertEqual(snapshot["status"], "open")
         self.assertFalse(snapshot["is_future_rent"])
+
+
+class MonthlyChargeSummaryTests(unittest.TestCase):
+    def test_recurring_instances_collapse_into_one_monthly_schedule(self):
+        tenant = SimpleNamespace(
+            id=10,
+            is_section8=False,
+            current_rent=Decimal("632.00"),
+            tenant_portion=None,
+            lease_start_date=date(2026, 1, 1),
+            lease_end_date=date(2026, 12, 31),
+        )
+        charges = [
+            ledger_service.charge_snapshot(
+                make_charge(due_date=date(2026, 9, 1)),
+                as_of=date(2026, 9, 25),
+            ),
+            ledger_service.charge_snapshot(
+                make_charge(due_date=date(2026, 10, 1)),
+                as_of=date(2026, 9, 25),
+            ),
+        ]
+
+        summaries = ledger_service.monthly_charge_summaries(
+            charges,
+            tenant,
+            as_of=date(2026, 9, 25),
+        )
+
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0]["description"], "Rent")
+        self.assertEqual(summaries[0]["due_label"], "1st")
+        self.assertEqual(summaries[0]["charge_count"], 2)
+        self.assertEqual(summaries[0]["end_date"], date(2026, 12, 31))
+
+    def test_lease_rent_configuration_is_shown_without_recurring_instances(self):
+        tenant = SimpleNamespace(
+            id=10,
+            is_section8=True,
+            current_rent=Decimal("1500.00"),
+            tenant_portion=Decimal("283.00"),
+            lease_start_date=date(2026, 1, 1),
+            lease_end_date=date(2026, 12, 31),
+        )
+
+        summaries = ledger_service.monthly_charge_summaries([], tenant)
+
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0]["amount"], Decimal("283.00"))
+        self.assertEqual(summaries[0]["source"], "Lease rent schedule")
 
 
 if __name__ == "__main__":
