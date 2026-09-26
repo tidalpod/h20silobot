@@ -338,6 +338,7 @@ async def payments_list(
         key=lambda charge: (charge["due_date"], charge["id"]),
         reverse=True,
     ) if selected_tenant else []
+    sent_charge_months = ledger_service.group_charges_by_month(sent_charges)
 
     total_items = len(all_payments)
     total_pages = max(1, (total_items + page_size - 1) // page_size)
@@ -393,6 +394,7 @@ async def payments_list(
             "monthly_charge_summaries": monthly_charge_summaries,
             "rent_schedule_summary": rent_schedule_summary,
             "sent_charges": sent_charges,
+            "sent_charge_months": sent_charge_months,
             "statuses": PaymentStatus,
             "page": page,
             "page_size": page_size,

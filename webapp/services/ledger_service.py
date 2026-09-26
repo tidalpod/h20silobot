@@ -134,6 +134,22 @@ def tenant_rent_amount(tenant) -> Decimal:
     return money(value)
 
 
+def group_charges_by_month(charges: Iterable[dict]) -> list[dict]:
+    """Return newest-first charge groups keyed by the first day of each month."""
+    ordered = sorted(
+        charges,
+        key=lambda charge: (charge["due_date"], charge.get("id", 0)),
+        reverse=True,
+    )
+    groups: list[dict] = []
+    for charge in ordered:
+        month = charge["due_date"].replace(day=1)
+        if not groups or groups[-1]["month"] != month:
+            groups.append({"month": month, "charges": []})
+        groups[-1]["charges"].append(charge)
+    return groups
+
+
 def scheduled_rent_due_date(tenant, month: date) -> date:
     """Return a valid configured rent due date inside ``month``."""
     due_day = max(1, min(int(getattr(tenant, "rent_due_day", 1) or 1), 31))

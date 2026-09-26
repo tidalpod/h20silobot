@@ -75,6 +75,20 @@ class LedgerDueDateTests(unittest.TestCase):
         self.assertFalse(snapshot["is_future_rent"])
 
 
+class ChargeMonthGroupingTests(unittest.TestCase):
+    def test_groups_charges_by_due_month_newest_first(self):
+        charges = [
+            {"id": 1, "due_date": date(2026, 9, 1)},
+            {"id": 3, "due_date": date(2026, 10, 1)},
+            {"id": 2, "due_date": date(2026, 9, 18)},
+        ]
+
+        groups = ledger_service.group_charges_by_month(charges)
+
+        self.assertEqual([group["month"] for group in groups], [date(2026, 10, 1), date(2026, 9, 1)])
+        self.assertEqual([charge["id"] for charge in groups[1]["charges"]], [2, 1])
+
+
 class MonthlyChargeSummaryTests(unittest.TestCase):
     def test_recurring_instances_collapse_into_one_monthly_schedule(self):
         tenant = SimpleNamespace(
