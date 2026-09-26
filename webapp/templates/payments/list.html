@@ -159,7 +159,7 @@
                         <button type="button" onclick="openActivity('refund')" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-blue-50 hover:text-blue-800"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5h13.5a4.5 4.5 0 0 1 0 9H15M3 10.5l4.5-4.5M3 10.5 7.5 15"/></svg></span>Return security deposit</button>
                     </div>
                 </div>
-                <button type="button" onclick="openModal('charge-modal')" class="bd-btn bd-btn-primary">
+                <button type="button" onclick="openChargeForTenant('rent')" class="bd-btn bd-btn-primary">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
                     New charge
                 </button>
@@ -251,24 +251,31 @@
     <div class="border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/40 to-sky-100/60 px-5 py-5 sm:px-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div><div class="flex items-center gap-2"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">{{ category_icon('rent', 'h-5 w-5') }}</span><h2 class="text-lg font-bold text-slate-950">Monthly charges</h2></div><p class="mt-1 pl-11 text-sm text-slate-500">Recurring charges that define {{ selected_tenant.name }}'s monthly schedule.</p></div>
-            <span class="self-start rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100">{{ monthly_charge_summaries|length }} active schedule{{ '' if monthly_charge_summaries|length == 1 else 's' }}</span>
+            <div class="flex items-center gap-2"><span class="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100">{{ monthly_charge_summaries|length }} active schedule{{ '' if monthly_charge_summaries|length == 1 else 's' }}</span>{% if not rent_schedule_summary %}<button type="button" onclick="openModal('rent-schedule-modal')" class="bd-btn bd-btn-primary py-2">Set up monthly rent</button>{% endif %}</div>
         </div>
     </div>
     {% if monthly_charge_summaries %}
     <div class="grid gap-4 p-5 sm:p-6">
         {% for schedule in monthly_charge_summaries %}
-        <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="grid gap-5 p-5 md:grid-cols-[minmax(14rem,1.25fr)_minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(8rem,.55fr)] md:items-center">
+        <details class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <summary class="grid cursor-pointer list-none gap-5 p-5 transition hover:bg-slate-50/70 md:grid-cols-[minmax(14rem,1.25fr)_minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(10rem,.65fr)_auto] md:items-center">
                 <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {% if schedule.charge_type == 'rent' %}bg-blue-50 text-blue-700{% elif schedule.charge_type in ['water', 'utility'] %}bg-cyan-50 text-cyan-700{% else %}bg-violet-50 text-violet-700{% endif %}">{{ category_icon(schedule.charge_type) }}</span><div><div class="flex flex-wrap items-center gap-2"><h3 class="font-bold text-slate-950">{{ schedule.description }}</h3><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Active</span></div><p class="mt-1 text-sm font-medium text-slate-600">Due on the {{ schedule.due_label }} of each month</p><p class="mt-1 text-xs text-slate-400">{{ schedule.source }}</p></div></div>
                 <div><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Schedule period</p><p class="mt-1 text-sm font-semibold text-slate-800">{% if schedule.start_date %}{{ schedule.start_date.strftime('%b %Y') }}{% else %}Current{% endif %} – {% if schedule.end_date %}{{ schedule.end_date.strftime('%b %Y') }}{% else %}Ongoing{% endif %}</p><p class="mt-1 text-xs text-slate-500">{{ schedule.charge_count }} charge{{ '' if schedule.charge_count == 1 else 's' }} created</p></div>
                 <div><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Delivery</p><p class="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800"><svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75v-1.5A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25v-1.5M9 12h12m0 0-3-3m3 3-3 3"/></svg>Tenant portal</p>{% if schedule.next_due_date %}<p class="mt-1 text-xs text-blue-600">Next: {{ schedule.next_due_date.strftime('%b %d, %Y') }}</p>{% else %}<p class="mt-1 text-xs text-slate-500">Generated monthly</p>{% endif %}</div>
                 <div class="md:text-right"><p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Monthly amount</p><p class="mt-1 text-2xl font-bold tracking-tight text-blue-950">${{ "{:,.2f}".format(schedule.amount) }}</p>{% if schedule.open_balance > 0 %}<p class="mt-1 text-xs font-semibold text-amber-700">${{ "{:,.2f}".format(schedule.open_balance) }} currently due</p>{% else %}<p class="mt-1 text-xs font-medium text-emerald-600">Current</p>{% endif %}</div>
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition group-open:rotate-180 group-open:bg-blue-50 group-open:text-blue-700"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg></span>
+            </summary>
+            <div class="border-t border-slate-200 bg-slate-50/70 px-5 py-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>{% if schedule.charge_type == 'rent' %}<p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Late-fee policy</p><p class="mt-1 text-sm font-medium text-slate-700">{% if selected_tenant.late_fee_daily_enabled %}${{ "{:,.2f}".format(selected_tenant.late_fee_daily_amount or 0) }}/day after {{ selected_tenant.late_fee_grace_days or 0 }} day{{ '' if selected_tenant.late_fee_grace_days == 1 else 's' }}{% else %}Automatic daily fees are off{% endif %}{% if selected_tenant.late_fee_initial_enabled %} · ${{ "{:,.2f}".format(selected_tenant.late_fee_initial_amount or 0) }} initial fee{% endif %}</p>{% else %}<p class="text-sm text-slate-600">Manage this recurring charge or add a related one-time fee.</p>{% endif %}</div>
+                    <div class="flex flex-wrap gap-2">{% if schedule.charge_type == 'rent' %}<button type="button" onclick="openModal('rent-schedule-modal')" class="bd-btn bd-btn-primary"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 3.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 15.07a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.862 3.487Z"/></svg>Edit rent schedule</button><button type="button" onclick="openChargeForTenant('late_fee')" class="bd-btn bd-btn-secondary">{{ category_icon('late_fee', 'h-4 w-4') }}Add late fee</button>{% endif %}</div>
+                </div>
             </div>
-        </article>
+        </details>
         {% endfor %}
     </div>
     {% else %}
-    <div class="px-6 py-10 text-center"><p class="text-sm font-semibold text-slate-800">No monthly schedule configured</p><p class="mt-1 text-sm text-slate-500">Create a repeating charge to add one.</p></div>
+    <div class="px-6 py-10 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">{{ category_icon('rent', 'h-6 w-6') }}</span><p class="mt-3 text-sm font-semibold text-slate-800">No monthly rent schedule configured</p><p class="mt-1 text-sm text-slate-500">Set the rent amount, due date, lease period, and late-fee policy here.</p><button type="button" onclick="openModal('rent-schedule-modal')" class="bd-btn bd-btn-primary mt-4">Set up monthly rent</button></div>
     {% endif %}
 </section>
 
@@ -441,6 +448,44 @@
 </section>
 {% endif %}
 
+{% if selected_tenant %}
+<!-- Recurring rent schedule modal -->
+<div id="rent-schedule-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-labelledby="rent-schedule-title">
+    <div class="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl" style="max-height: calc(100vh - 2rem);">
+        <form method="POST" action="/payments/monthly-charges/{{ selected_tenant.id }}" class="flex max-h-[calc(100vh-2rem)] flex-col">
+            <input type="hidden" name="tenant_id" value="{{ selected_tenant.id }}">
+            <input type="hidden" name="property_id" value="{{ selected_tenant.property_id }}">
+            <div class="relative flex items-center justify-between overflow-hidden border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/40 to-sky-100/70 px-5 py-5 sm:px-7 sm:py-6">
+                <div class="absolute -right-14 -top-24 h-48 w-48 rounded-full border border-blue-200/50 shadow-[0_0_0_2rem_rgba(37,99,235,.035),0_0_0_4rem_rgba(37,99,235,.02)]" aria-hidden="true"></div>
+                <div class="relative flex items-center gap-3.5"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">{{ category_icon('rent', 'h-5 w-5') }}</span><div><p class="text-[11px] font-semibold uppercase tracking-[.16em] text-blue-600">Recurring receivable</p><h2 id="rent-schedule-title" class="text-2xl font-bold tracking-tight text-slate-950">{% if rent_schedule_summary %}Edit monthly rent{% else %}Set up monthly rent{% endif %}</h2><p class="mt-0.5 text-sm text-slate-500">{{ selected_tenant.name }} · {{ selected_tenant.property_ref.address }}</p></div></div>
+                <button type="button" onclick="closeModal('rent-schedule-modal')" aria-label="Close monthly rent dialog" class="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white hover:text-slate-900 hover:shadow-sm"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="space-y-6 overflow-y-auto px-5 py-6 sm:px-7">
+                <div class="flex gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950"><svg class="mt-0.5 h-5 w-5 shrink-0 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25 12 10.5m0 0 .75-.75M12 10.5v5.25m0-13.5a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Z"/></svg><p><span class="font-semibold">Future schedule only.</span> Changes update upcoming, unapplied rent projections. Charges that are already due or have payment activity keep their original amounts.</p></div>
+                <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                    <div><label for="schedule-amount" class="mb-2 block text-sm font-semibold text-slate-800">Monthly rent <span class="text-red-500">*</span></label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-lg font-semibold text-slate-500">$</span><input id="schedule-amount" name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required value="{% if selected_tenant.is_section8 %}{{ selected_tenant.tenant_portion or '' }}{% else %}{{ selected_tenant.current_rent or '' }}{% endif %}" class="bd-input pl-9 text-lg font-semibold" placeholder="0.00"></div><p class="mt-1.5 text-xs text-slate-500">{% if selected_tenant.is_section8 %}This is the tenant-paid portion; the voucher amount stays separate.{% else %}This becomes the recurring tenant rent amount.{% endif %}</p></div>
+                    <div><label for="schedule-due-day" class="mb-2 block text-sm font-semibold text-slate-800">Due each month <span class="text-red-500">*</span></label><select id="schedule-due-day" name="due_day" class="bd-input" required>{% for day in range(1, 32) %}<option value="{{ day }}" {% if (selected_tenant.rent_due_day or 1) == day %}selected{% endif %}>{{ day }}{% if day in [1, 21, 31] %}st{% elif day in [2, 22] %}nd{% elif day in [3, 23] %}rd{% else %}th{% endif %}</option>{% endfor %}</select></div>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div><label for="schedule-start" class="mb-2 block text-sm font-semibold text-slate-800">Schedule starts</label><input id="schedule-start" name="start_date" type="date" value="{% if selected_tenant.rent_schedule_start_date %}{{ selected_tenant.rent_schedule_start_date.isoformat() }}{% elif selected_tenant.lease_start_date %}{{ selected_tenant.lease_start_date.isoformat() }}{% endif %}" class="bd-input" data-no-default="true"><p class="mt-1.5 text-xs text-slate-500">Leave blank to start now.</p></div>
+                    <div><label for="schedule-end" class="mb-2 block text-sm font-semibold text-slate-800">Schedule ends</label><input id="schedule-end" name="end_date" type="date" value="{% if selected_tenant.rent_schedule_end_date %}{{ selected_tenant.rent_schedule_end_date.isoformat() }}{% elif selected_tenant.lease_end_date %}{{ selected_tenant.lease_end_date.isoformat() }}{% endif %}" class="bd-input" data-no-default="true"><p class="mt-1.5 text-xs text-slate-500">Leave blank for an ongoing schedule.</p></div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 10.5h15M5.25 6.75 12 3l6.75 3.75M6.75 10.5V18m3.5-7.5V18m3.5-7.5V18m3.5-7.5V18"/></svg></span><div><p class="text-sm font-semibold text-slate-900">Payment destination</p><p class="mt-0.5 text-sm text-slate-600">Payments use the default account assigned to this property's entity.</p><a href="/payments/bank-accounts" class="mt-1 inline-block text-xs font-semibold text-blue-700 hover:text-blue-900">Manage bank accounts →</a></div></div></div>
+                <fieldset class="space-y-4 border-t border-slate-200 pt-6"><legend class="text-lg font-bold text-slate-950">Automatic late fees</legend><p class="-mt-3 text-sm text-slate-500">Set the policy Blue Deer applies when this month's rent remains unpaid.</p>
+                    <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"><span><span class="block text-sm font-semibold text-slate-900">One-time initial fee</span><span class="mt-0.5 block text-xs text-slate-500">Added once when the grace period ends</span></span><span class="relative inline-flex h-6 w-11 shrink-0 items-center"><input id="late-initial-enabled" name="late_fee_initial_enabled" type="checkbox" class="peer sr-only" {% if selected_tenant.late_fee_initial_enabled %}checked{% endif %} onchange="toggleRentFeeSettings()"><span class="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span></span></label>
+                    <div id="late-initial-fields" class="{% if not selected_tenant.late_fee_initial_enabled %}hidden {% endif %}rounded-2xl border border-blue-100 bg-blue-50/50 p-4"><label for="late-initial-amount" class="mb-2 block text-sm font-semibold text-slate-800">Initial fee amount</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="late-initial-amount" name="late_fee_initial_amount" type="number" min="0" step="0.01" value="{{ selected_tenant.late_fee_initial_amount or 0 }}" class="bd-input pl-8"></div></div>
+                    <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"><span><span class="block text-sm font-semibold text-slate-900">Daily late fees</span><span class="mt-0.5 block text-xs text-slate-500">Calculated when the tenant pays overdue rent</span></span><span class="relative inline-flex h-6 w-11 shrink-0 items-center"><input id="late-daily-enabled" name="late_fee_daily_enabled" type="checkbox" class="peer sr-only" {% if selected_tenant.late_fee_daily_enabled is not sameas false %}checked{% endif %} onchange="toggleRentFeeSettings()"><span class="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span></span></label>
+                    <div id="late-daily-fields" class="{% if selected_tenant.late_fee_daily_enabled is sameas false %}hidden {% endif %}space-y-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4"><div class="grid gap-4 sm:grid-cols-2"><div><label for="late-daily-amount" class="mb-2 block text-sm font-semibold text-slate-800">Daily amount</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="late-daily-amount" name="late_fee_daily_amount" type="number" min="0" step="0.01" value="{{ selected_tenant.late_fee_daily_amount or 15 }}" class="bd-input pl-8"></div></div><div><label for="late-grace-days" class="mb-2 block text-sm font-semibold text-slate-800">Starts after</label><div class="relative"><input id="late-grace-days" name="late_fee_grace_days" type="number" min="0" max="31" value="{{ selected_tenant.late_fee_grace_days if selected_tenant.late_fee_grace_days is not none else 5 }}" class="bd-input pr-14"><span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-sm text-slate-500">days</span></div></div></div>
+                        <div class="grid gap-4 sm:grid-cols-2"><div><label for="late-limit-type" class="mb-2 block text-sm font-semibold text-slate-800">Fee limit</label><select id="late-limit-type" name="late_fee_limit_type" class="bd-input" onchange="toggleLateFeeLimit()"><option value="days" {% if (selected_tenant.late_fee_limit_type or 'days') == 'days' %}selected{% endif %}>Stop after a number of days</option><option value="amount" {% if selected_tenant.late_fee_limit_type == 'amount' %}selected{% endif %}>Cap at a dollar amount</option><option value="none" {% if selected_tenant.late_fee_limit_type == 'none' %}selected{% endif %}>No configured limit</option></select></div><div id="late-limit-days"><label for="late-max-days" class="mb-2 block text-sm font-semibold text-slate-800">Maximum fee days</label><div class="relative"><input id="late-max-days" name="late_fee_max_days" type="number" min="0" max="31" value="{{ selected_tenant.late_fee_max_days if selected_tenant.late_fee_max_days is not none else 5 }}" class="bd-input pr-14"><span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-sm text-slate-500">days</span></div></div><div id="late-limit-amount" class="hidden"><label for="late-max-amount" class="mb-2 block text-sm font-semibold text-slate-800">Maximum late fees</label><div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">$</span><input id="late-max-amount" name="late_fee_max_amount" type="number" min="0" step="0.01" value="{{ selected_tenant.late_fee_max_amount or 0 }}" class="bd-input pl-8"></div></div></div>
+                    </div>
+                </fieldset>
+            </div>
+            <div class="border-t border-slate-200 bg-slate-50/90 px-5 py-4 sm:px-7"><div class="grid grid-cols-1 gap-3 sm:grid-cols-2"><button type="button" onclick="closeModal('rent-schedule-modal')" class="bd-btn bd-btn-secondary rounded-xl border-blue-900 py-3 text-blue-950 hover:bg-blue-50">Cancel</button><button name="schedule_action" value="save" class="bd-btn bd-btn-primary rounded-xl py-3">Save monthly rent</button></div>{% if rent_schedule_summary %}<button name="schedule_action" value="end" formnovalidate onclick="return window.confirm('End this monthly rent schedule? Future unapplied rent projections will be removed, while ledger history stays intact.')" class="mx-auto mt-3 block px-4 py-2 text-sm font-semibold text-red-700 hover:text-red-900">End monthly schedule</button>{% endif %}</div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <!-- Create charge modal -->
 <div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-labelledby="charge-title">
     <div class="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl" style="max-height: calc(100vh - 2rem);">
@@ -567,6 +612,34 @@ function toggleRecurringCharge(checkbox) {
     panel.classList.toggle('hidden', !checkbox.checked);
     endDate.required = checkbox.checked;
     if (checkbox.checked && !endDate.value) endDate.value = document.getElementById('create-due').value;
+}
+function openChargeForTenant(chargeType) {
+    const tenant = document.getElementById('create-tenant');
+    {% if selected_tenant %}tenant.value = '{{ selected_tenant.id }}';{% endif %}
+    const category = document.querySelector('#charge-modal input[name="charge_type"][value="' + chargeType + '"]');
+    if (category) {
+        category.checked = true;
+        updateChargeCategory(category);
+    }
+    const amount = document.getElementById('create-amount');
+    amount.value = chargeType === 'late_fee' ? '{% if selected_tenant %}{{ selected_tenant.late_fee_initial_amount or selected_tenant.late_fee_daily_amount or '' }}{% endif %}' : '';
+    document.getElementById('create-description').value = '';
+    updateChargeDescriptionCount();
+    const repeat = document.getElementById('repeat-monthly');
+    repeat.checked = false;
+    toggleRecurringCharge(repeat);
+    openModal('charge-modal');
+}
+function toggleRentFeeSettings() {
+    const initial = document.getElementById('late-initial-enabled');
+    const daily = document.getElementById('late-daily-enabled');
+    document.getElementById('late-initial-fields')?.classList.toggle('hidden', !initial?.checked);
+    document.getElementById('late-daily-fields')?.classList.toggle('hidden', !daily?.checked);
+}
+function toggleLateFeeLimit() {
+    const value = document.getElementById('late-limit-type')?.value;
+    document.getElementById('late-limit-days')?.classList.toggle('hidden', value !== 'days');
+    document.getElementById('late-limit-amount')?.classList.toggle('hidden', value !== 'amount');
 }
 function closeActionsMenu() {
     const menu = document.getElementById('actions-menu');
@@ -728,5 +801,7 @@ document.getElementById('create-due')?.addEventListener('change', function() {
     const endDate = document.getElementById('repeat-end-date');
     if (repeat.checked && (!endDate.value || endDate.value < this.value)) endDate.value = this.value;
 });
+toggleRentFeeSettings();
+toggleLateFeeLimit();
 </script>
 {% endblock %}

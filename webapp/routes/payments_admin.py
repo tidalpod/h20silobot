@@ -329,6 +329,10 @@ async def payments_list(
         ledger_service.monthly_charge_summaries(charges, selected_tenant)
         if selected_tenant else []
     )
+    rent_schedule_summary = next(
+        (summary for summary in monthly_charge_summaries if summary["charge_type"] == "rent"),
+        None,
+    )
     sent_charges = sorted(
         charges,
         key=lambda charge: (charge["due_date"], charge["id"]),
@@ -387,6 +391,7 @@ async def payments_list(
             "charge_start": charge_start,
             "charge_pagination_base": charge_pagination_base,
             "monthly_charge_summaries": monthly_charge_summaries,
+            "rent_schedule_summary": rent_schedule_summary,
             "sent_charges": sent_charges,
             "statuses": PaymentStatus,
             "page": page,
@@ -479,6 +484,122 @@ async def create_charge(request: Request):
             cursor += relativedelta(months=1)
 
     return _ledger_redirect(form, success="charge_created")
+
+
+@router.post("/monthly-charges/{tenant_id}")
+async def update_monthly_charge(request: Request, tenant_id: int):
+    """Create, update, or end the authoritative recurring rent schedule."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    form = await request.form()
+    action = str(form.get("schedule_action", "save")).strip().lower()
+    today = date.today()
+
+    async with get_session() as session:
+        tenant_result = await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+        tenant = tenant_result.scalar_one_or_none()
+        if not tenant:
+            return _ledger_redirect(form, error="tenant_not_found")
+
+        future_result = await session.execute(
+            select(TenantCharge)
+            .where(
+                TenantCharge.tenant_id == tenant_id,
+                TenantCharge.charge_type == "rent",
+                TenantCharge.is_recurring == True,
+                TenantCharge.is_void == False,
+                TenantCharge.due_date > today,
+            )
+            .options(selectinload(TenantCharge.ledger_entries))
+        )
+        future_charges = list(future_result.scalars().all())
+
+        if action == "end":
+            tenant.rent_schedule_active = False
+            tenant.rent_schedule_end_date = today
+            for charge in future_charges:
+                if ledger_service.can_void_charge(charge):
+                    charge.is_void = True
+                    charge.void_reason = f"Recurring rent schedule ended by staff user {user['id']}"
+                    charge.updated_at = datetime.utcnow()
+            return _ledger_redirect(form, success="rent_schedule_ended")
+
+        try:
+            amount = ledger_service.money(Decimal(str(form.get("amount", "0"))))
+            due_day = int(form.get("due_day", 1))
+            initial_amount = ledger_service.money(Decimal(str(form.get("late_fee_initial_amount", "0") or "0")))
+            daily_amount = ledger_service.money(Decimal(str(form.get("late_fee_daily_amount", "0") or "0")))
+            grace_days = int(form.get("late_fee_grace_days", 0))
+            max_days = int(form.get("late_fee_max_days", 0))
+            max_amount = ledger_service.money(Decimal(str(form.get("late_fee_max_amount", "0") or "0")))
+        except (ValueError, InvalidOperation):
+            return _ledger_redirect(form, error="invalid_schedule")
+
+        start_date = _parse_date(form.get("start_date"), today)
+        end_date = _parse_date(form.get("end_date"))
+        if (
+            amount <= 0
+            or not 1 <= due_day <= 31
+            or not start_date
+            or (end_date and end_date < start_date)
+            or initial_amount < 0
+            or daily_amount < 0
+            or not 0 <= grace_days <= 31
+            or not 0 <= max_days <= 31
+            or max_amount < 0
+        ):
+            return _ledger_redirect(form, error="invalid_schedule")
+
+        limit_type = str(form.get("late_fee_limit_type", "days"))
+        if limit_type not in {"days", "amount", "none"}:
+            limit_type = "days"
+
+        tenant.rent_schedule_active = True
+        tenant.rent_due_day = due_day
+        tenant.rent_schedule_start_date = start_date
+        tenant.rent_schedule_end_date = end_date
+        if tenant.is_section8:
+            tenant.tenant_portion = amount
+        else:
+            tenant.current_rent = amount
+        tenant.late_fee_initial_enabled = form.get("late_fee_initial_enabled") == "on"
+        tenant.late_fee_initial_amount = initial_amount
+        tenant.late_fee_daily_enabled = form.get("late_fee_daily_enabled") == "on"
+        tenant.late_fee_daily_amount = daily_amount
+        tenant.late_fee_grace_days = grace_days
+        tenant.late_fee_limit_type = limit_type
+        tenant.late_fee_max_days = max_days
+        tenant.late_fee_max_amount = max_amount if limit_type == "amount" else None
+
+        # Future, unapplied recurring rows are schedule projections and can be
+        # brought in line. Due or paid history remains untouched.
+        scheduled_months = set()
+        for charge in sorted(future_charges, key=lambda item: (item.due_date, item.id)):
+            projected_due = ledger_service.scheduled_rent_due_date(tenant, charge.due_date.replace(day=1))
+            month_key = (projected_due.year, projected_due.month)
+            if not ledger_service.can_void_charge(charge):
+                scheduled_months.add(month_key)
+                continue
+            if month_key in scheduled_months:
+                charge.is_void = True
+                charge.void_reason = f"Duplicate future rent projection removed by staff user {user['id']}"
+            elif projected_due < start_date or (end_date and projected_due > end_date):
+                charge.is_void = True
+                charge.void_reason = f"Outside updated rent schedule by staff user {user['id']}"
+            else:
+                scheduled_months.add(month_key)
+                charge.amount = amount
+                charge.due_date = projected_due
+                charge.service_start = projected_due.replace(day=1)
+                charge.description = f"Rent — {projected_due.strftime('%B %Y')}"
+                charge.recurrence_group = f"rent:{tenant.id}"
+            charge.updated_at = datetime.utcnow()
+
+    current_month = today.replace(day=1)
+    await ledger_service.ensure_monthly_rent_charge(tenant_id, current_month)
+    return _ledger_redirect(form, success="rent_schedule_updated")
 
 
 @router.post("/entries")

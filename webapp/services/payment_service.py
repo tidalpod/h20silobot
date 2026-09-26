@@ -1,7 +1,9 @@
 """Payment business logic — balance calculation, payment initiation, autopay, webhooks"""
 
+from __future__ import annotations
+
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -23,21 +25,52 @@ LATE_FEE_PER_DAY = Decimal("15.00")
 MAX_PENALTY_DAYS = 5  # $75 max
 
 
-def calculate_late_fee(for_date: date = None) -> Decimal:
-    """Calculate late fee based on current date.
-
-    Rent due on the 1st. 5-day grace period.
-    $15/day starting day 6, max 5 penalty days ($75).
-    """
+def calculate_late_fee(
+    for_date: date = None,
+    *,
+    due_date: date | None = None,
+    initial_enabled: bool = False,
+    initial_amount: Decimal = Decimal("0.00"),
+    daily_enabled: bool = True,
+    daily_amount: Decimal = LATE_FEE_PER_DAY,
+    grace_days: int = GRACE_PERIOD_DAYS,
+    limit_type: str = "days",
+    max_days: int = MAX_PENALTY_DAYS,
+    max_amount: Decimal | None = None,
+) -> Decimal:
+    """Calculate a configured late fee without mutating the ledger."""
     if for_date is None:
         for_date = date.today()
-
-    day = for_date.day
-    if day <= GRACE_PERIOD_DAYS:
+    due_date = due_date or for_date.replace(day=1)
+    first_fee_date = due_date + timedelta(days=max(0, int(grace_days)))
+    if for_date < first_fee_date:
         return Decimal("0.00")
+    penalty_days = (for_date - first_fee_date).days + 1
+    fee = Decimal(str(initial_amount or 0)) if initial_enabled else Decimal("0.00")
+    if daily_enabled:
+        daily_days = penalty_days
+        if limit_type == "days":
+            daily_days = min(daily_days, max(0, int(max_days)))
+        fee += Decimal(str(daily_amount or 0)) * daily_days
+    if limit_type == "amount" and max_amount is not None:
+        fee = min(fee, Decimal(str(max_amount)))
+    return ledger_service.money(max(fee, Decimal("0.00")))
 
-    penalty_days = min(day - GRACE_PERIOD_DAYS, MAX_PENALTY_DAYS)
-    return LATE_FEE_PER_DAY * penalty_days
+
+def calculate_tenant_late_fee(tenant, due_date: date, for_date: date | None = None) -> Decimal:
+    """Calculate one tenant's policy with backwards-compatible defaults."""
+    return calculate_late_fee(
+        for_date,
+        due_date=due_date,
+        initial_enabled=bool(getattr(tenant, "late_fee_initial_enabled", False)),
+        initial_amount=Decimal(str(getattr(tenant, "late_fee_initial_amount", 0) or 0)),
+        daily_enabled=bool(getattr(tenant, "late_fee_daily_enabled", True)),
+        daily_amount=Decimal(str(getattr(tenant, "late_fee_daily_amount", LATE_FEE_PER_DAY) or 0)),
+        grace_days=int(getattr(tenant, "late_fee_grace_days", GRACE_PERIOD_DAYS) or 0),
+        limit_type=str(getattr(tenant, "late_fee_limit_type", "days") or "days"),
+        max_days=int(getattr(tenant, "late_fee_max_days", MAX_PENALTY_DAYS) or 0),
+        max_amount=getattr(tenant, "late_fee_max_amount", None),
+    )
 
 
 async def calculate_balance_due(tenant_id: int) -> dict:
@@ -56,7 +89,13 @@ async def calculate_balance_due(tenant_id: int) -> dict:
         ),
         None,
     )
-    late_fee = calculate_late_fee(today) if current_rent and current_rent["outstanding"] > 0 else Decimal("0.00")
+    late_fee = Decimal("0.00")
+    if current_rent and current_rent["outstanding"] > 0:
+        async with get_session() as session:
+            tenant_result = await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+            tenant = tenant_result.scalar_one_or_none()
+        if tenant:
+            late_fee = calculate_tenant_late_fee(tenant, current_rent["due_date"], today)
 
     return {
         "rent_amount": current_rent["outstanding"] if current_rent else Decimal("0.00"),
@@ -117,15 +156,17 @@ async def initiate_payment(
             if pending_result.scalar_one_or_none():
                 return {"error": "A bank payment is already processing for this charge"}
 
-        # Preserve the existing late-fee policy only for the current rent charge.
+        # Apply this tenant's configured policy only to the current rent period.
         late_fee = Decimal("0.00")
+        today = date.today()
         if (not charge_id) or (
             charge
             and charge["charge_type"] == "rent"
-            and charge["due_date"].year == date.today().year
-            and charge["due_date"].month == date.today().month
+            and charge["due_date"].year == today.year
+            and charge["due_date"].month == today.month
         ):
-            late_fee = calculate_late_fee()
+            due_date = charge["due_date"] if charge else ledger_service.scheduled_rent_due_date(tenant, today.replace(day=1))
+            late_fee = calculate_tenant_late_fee(tenant, due_date, today)
         total_amount = amount + late_fee
 
         # Look up entity bank account for payment routing

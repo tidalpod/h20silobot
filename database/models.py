@@ -539,6 +539,20 @@ class Tenant(Base):
     voucher_amount = Column(Numeric(10, 2), nullable=True)  # Section 8 voucher amount
     tenant_portion = Column(Numeric(10, 2), nullable=True)  # Tenant's portion of rent
 
+    # Recurring rent schedule and tenant-specific late-fee policy
+    rent_schedule_active = Column(Boolean, default=True, nullable=False)
+    rent_due_day = Column(Integer, default=1, nullable=False)
+    rent_schedule_start_date = Column(Date, nullable=True)
+    rent_schedule_end_date = Column(Date, nullable=True)
+    late_fee_initial_enabled = Column(Boolean, default=False, nullable=False)
+    late_fee_initial_amount = Column(Numeric(10, 2), nullable=True)
+    late_fee_daily_enabled = Column(Boolean, default=True, nullable=False)
+    late_fee_daily_amount = Column(Numeric(10, 2), default=15, nullable=False)
+    late_fee_grace_days = Column(Integer, default=5, nullable=False)
+    late_fee_limit_type = Column(String(20), default="days", nullable=False)
+    late_fee_max_days = Column(Integer, default=5, nullable=False)
+    late_fee_max_amount = Column(Numeric(10, 2), nullable=True)
+
     # Notes
     notes = Column(Text, nullable=True)
 

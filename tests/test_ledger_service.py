@@ -122,7 +122,60 @@ class MonthlyChargeSummaryTests(unittest.TestCase):
 
         self.assertEqual(len(summaries), 1)
         self.assertEqual(summaries[0]["amount"], Decimal("283.00"))
-        self.assertEqual(summaries[0]["source"], "Lease rent schedule")
+        self.assertEqual(summaries[0]["source"], "Blue Deer rent schedule")
+
+    def test_tenant_schedule_overrides_projected_rent_amount_and_due_day(self):
+        tenant = SimpleNamespace(
+            id=10,
+            is_section8=False,
+            current_rent=Decimal("1300.00"),
+            tenant_portion=None,
+            rent_schedule_active=True,
+            rent_due_day=5,
+            rent_schedule_start_date=date(2026, 9, 1),
+            rent_schedule_end_date=None,
+            lease_start_date=date(2026, 1, 1),
+            lease_end_date=None,
+        )
+        charges = [
+            ledger_service.charge_snapshot(
+                make_charge(due_date=date(2026, 10, 1), amount="1250.00"),
+                as_of=date(2026, 9, 25),
+            )
+        ]
+
+        summary = ledger_service.monthly_charge_summaries(charges, tenant, as_of=date(2026, 9, 25))[0]
+
+        self.assertEqual(summary["amount"], Decimal("1300.00"))
+        self.assertEqual(summary["due_day"], 5)
+        self.assertEqual(summary["due_label"], "5th")
+
+    def test_inactive_rent_schedule_is_not_shown(self):
+        tenant = SimpleNamespace(
+            id=10,
+            is_section8=False,
+            current_rent=Decimal("1300.00"),
+            tenant_portion=None,
+            rent_schedule_active=False,
+            lease_start_date=None,
+            lease_end_date=None,
+        )
+        charges = [
+            ledger_service.charge_snapshot(
+                make_charge(due_date=date(2026, 10, 1)),
+                as_of=date(2026, 9, 25),
+            )
+        ]
+
+        self.assertEqual(ledger_service.monthly_charge_summaries(charges, tenant), [])
+
+    def test_due_day_is_clamped_to_month_end(self):
+        tenant = SimpleNamespace(rent_due_day=31)
+
+        self.assertEqual(
+            ledger_service.scheduled_rent_due_date(tenant, date(2027, 2, 1)),
+            date(2027, 2, 28),
+        )
 
 
 class ChargeVoidTests(unittest.TestCase):

@@ -88,6 +88,19 @@ async def run_migrations(engine):
         ("entity_documents", "doc_label", "VARCHAR(100)"),
         ("entity_documents", "expiration_date", "DATE"),
         ("entity_documents", "notes", "TEXT"),
+        # Tenant rent schedule and late-fee policy
+        ("tenants", "rent_schedule_active", "BOOLEAN DEFAULT true"),
+        ("tenants", "rent_due_day", "INTEGER DEFAULT 1"),
+        ("tenants", "rent_schedule_start_date", "DATE"),
+        ("tenants", "rent_schedule_end_date", "DATE"),
+        ("tenants", "late_fee_initial_enabled", "BOOLEAN DEFAULT false"),
+        ("tenants", "late_fee_initial_amount", "NUMERIC(10,2)"),
+        ("tenants", "late_fee_daily_enabled", "BOOLEAN DEFAULT true"),
+        ("tenants", "late_fee_daily_amount", "NUMERIC(10,2) DEFAULT 15.00"),
+        ("tenants", "late_fee_grace_days", "INTEGER DEFAULT 5"),
+        ("tenants", "late_fee_limit_type", "VARCHAR(20) DEFAULT 'days'"),
+        ("tenants", "late_fee_max_days", "INTEGER DEFAULT 5"),
+        ("tenants", "late_fee_max_amount", "NUMERIC(10,2)"),
     ]
 
     async with engine.begin() as conn:
@@ -103,7 +116,7 @@ async def run_migrations(engine):
                 print(f"[DB] Adding column '{column}' to '{table}'...")
                 await conn.execute(text(f"""
                     ALTER TABLE {table}
-                    ADD COLUMN {column} {col_type}
+                    ADD COLUMN IF NOT EXISTS {column} {col_type}
                 """))
                 print(f"[DB] Column '{column}' added successfully")
 

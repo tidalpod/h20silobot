@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -120,6 +121,21 @@ def _ordinal_day(day: int) -> str:
     return f"{day}{suffix}"
 
 
+def tenant_rent_amount(tenant) -> Decimal:
+    """Return the tenant-facing portion used for recurring rent charges."""
+    value = getattr(tenant, "current_rent", None)
+    if getattr(tenant, "is_section8", False) and getattr(tenant, "tenant_portion", None) is not None:
+        value = tenant.tenant_portion
+    return money(value)
+
+
+def scheduled_rent_due_date(tenant, month: date) -> date:
+    """Return a valid configured rent due date inside ``month``."""
+    due_day = max(1, min(int(getattr(tenant, "rent_due_day", 1) or 1), 31))
+    last_day = calendar.monthrange(month.year, month.month)[1]
+    return month.replace(day=min(due_day, last_day))
+
+
 def monthly_charge_summaries(
     charges: Iterable[dict],
     tenant,
@@ -129,11 +145,16 @@ def monthly_charge_summaries(
     """Collapse recurring charge instances into tenant-facing monthly schedules."""
     rows = list(charges)
     groups: dict[str, list[dict]] = {}
+    rent_schedule_active = getattr(tenant, "rent_schedule_active", True) is not False
     for charge in rows:
         if not charge.get("is_recurring") or charge["status"] == "void":
             continue
-        group_key = charge.get("recurrence_group") or (
-            f"{charge['charge_type']}:{charge['amount']}:{charge['due_date'].day}"
+        if charge.get("charge_type") == "rent" and not rent_schedule_active:
+            continue
+        group_key = (
+            f"rent:{getattr(tenant, 'id', 'tenant')}"
+            if charge.get("charge_type") == "rent"
+            else charge.get("recurrence_group") or f"{charge['charge_type']}:{charge['amount']}:{charge['due_date'].day}"
         )
         groups.setdefault(group_key, []).append(charge)
 
@@ -147,8 +168,20 @@ def monthly_charge_summaries(
         start_date = min((charge.get("service_start") or charge["due_date"] for charge in ordered))
         end_date = max((charge.get("service_end") or charge["due_date"] for charge in ordered))
         if charge_type == "rent":
-            start_date = getattr(tenant, "lease_start_date", None) or start_date
-            end_date = getattr(tenant, "lease_end_date", None) or (end_date if len(ordered) > 1 else None)
+            configured_amount = tenant_rent_amount(tenant)
+            if configured_amount > 0:
+                representative = {**representative, "amount": configured_amount}
+            configured_due_day = int(getattr(tenant, "rent_due_day", representative["due_date"].day) or 1)
+            start_date = (
+                getattr(tenant, "rent_schedule_start_date", None)
+                or getattr(tenant, "lease_start_date", None)
+                or start_date
+            )
+            end_date = (
+                getattr(tenant, "rent_schedule_end_date", None)
+                or getattr(tenant, "lease_end_date", None)
+                or (end_date if len(ordered) > 1 else None)
+            )
         elif len(ordered) == 1 and not representative.get("service_end"):
             end_date = None
 
@@ -158,8 +191,8 @@ def monthly_charge_summaries(
             "charge_type": charge_type,
             "description": "Rent" if charge_type == "rent" else description,
             "amount": representative["amount"],
-            "due_day": representative["due_date"].day,
-            "due_label": _ordinal_day(representative["due_date"].day),
+            "due_day": configured_due_day if charge_type == "rent" else representative["due_date"].day,
+            "due_label": _ordinal_day(configured_due_day if charge_type == "rent" else representative["due_date"].day),
             "start_date": start_date,
             "end_date": end_date,
             "next_due_date": future_rows[0]["due_date"] if future_rows else None,
@@ -169,23 +202,21 @@ def monthly_charge_summaries(
             ),
             "charge_count": len(ordered),
             "representative": representative,
-            "source": "Recurring charge series",
+            "source": "Blue Deer rent schedule" if charge_type == "rent" else "Recurring charge series",
         })
 
-    if not any(summary["charge_type"] == "rent" for summary in summaries):
+    if rent_schedule_active and not any(summary["charge_type"] == "rent" for summary in summaries):
         rent_rows = [
             charge for charge in rows
             if charge["charge_type"] == "rent" and charge["status"] != "void"
         ]
         representative = max(rent_rows, key=lambda charge: charge["due_date"]) if rent_rows else None
-        rent_source = getattr(tenant, "current_rent", None)
-        if getattr(tenant, "is_section8", False) and getattr(tenant, "tenant_portion", None) is not None:
-            rent_source = tenant.tenant_portion
-        if rent_source is None and representative:
+        rent_source = tenant_rent_amount(tenant)
+        if rent_source <= 0 and representative:
             rent_source = representative["amount"]
         rent_amount = money(rent_source)
         if rent_amount > 0:
-            due_day = representative["due_date"].day if representative else 1
+            due_day = int(getattr(tenant, "rent_due_day", None) or (representative["due_date"].day if representative else 1))
             summaries.append({
                 "key": f"lease-rent:{getattr(tenant, 'id', 'tenant')}",
                 "charge_type": "rent",
@@ -193,8 +224,8 @@ def monthly_charge_summaries(
                 "amount": rent_amount,
                 "due_day": due_day,
                 "due_label": _ordinal_day(due_day),
-                "start_date": getattr(tenant, "lease_start_date", None),
-                "end_date": getattr(tenant, "lease_end_date", None),
+                "start_date": getattr(tenant, "rent_schedule_start_date", None) or getattr(tenant, "lease_start_date", None),
+                "end_date": getattr(tenant, "rent_schedule_end_date", None) or getattr(tenant, "lease_end_date", None),
                 "next_due_date": None,
                 "open_balance": sum(
                     (charge["outstanding"] for charge in rent_rows if charge["status"] in {"open", "partial", "overdue"}),
@@ -202,7 +233,7 @@ def monthly_charge_summaries(
                 ),
                 "charge_count": len(rent_rows),
                 "representative": representative,
-                "source": "Lease rent schedule",
+                "source": "Blue Deer rent schedule",
             })
 
     return sorted(
@@ -291,7 +322,15 @@ async def ensure_monthly_rent_charge(tenant_id: int, for_month: date | None = No
 
             tenant_result = await session.execute(select(Tenant).where(Tenant.id == tenant_id))
             tenant = tenant_result.scalar_one_or_none()
-            if not tenant or not tenant.is_active:
+            if not tenant or not tenant.is_active or getattr(tenant, "rent_schedule_active", True) is False:
+                return None
+
+            due_date = scheduled_rent_due_date(tenant, month)
+            schedule_start = getattr(tenant, "rent_schedule_start_date", None) or tenant.lease_start_date
+            schedule_end = getattr(tenant, "rent_schedule_end_date", None) or tenant.lease_end_date
+            if schedule_start and due_date < schedule_start:
+                return None
+            if schedule_end and due_date > schedule_end:
                 return None
 
             # Do not generate a new receivable over a successful pre-ledger payment.
@@ -321,10 +360,7 @@ async def ensure_monthly_rent_charge(tenant_id: int, for_month: date | None = No
             if legacy_ach.scalar_one_or_none() or legacy_card.scalar_one_or_none():
                 return None
 
-            rent_source = tenant.current_rent
-            if tenant.is_section8 and tenant.tenant_portion is not None:
-                rent_source = tenant.tenant_portion
-            amount = money(rent_source)
+            amount = tenant_rent_amount(tenant)
             if amount <= 0:
                 return None
 
@@ -334,7 +370,7 @@ async def ensure_monthly_rent_charge(tenant_id: int, for_month: date | None = No
                 charge_type="rent",
                 description=f"Rent — {month.strftime('%B %Y')}",
                 amount=amount,
-                due_date=month,
+                due_date=due_date,
                 service_start=month,
                 is_recurring=True,
                 recurrence_group=f"rent:{tenant.id}",

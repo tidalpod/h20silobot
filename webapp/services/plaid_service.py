@@ -1,5 +1,7 @@
 """Plaid API wrapper for ACH payments using aiohttp"""
 
+from __future__ import annotations
+
 import logging
 from typing import Optional
 
