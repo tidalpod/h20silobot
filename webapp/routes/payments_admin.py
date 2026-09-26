@@ -570,6 +570,36 @@ async def edit_charge(request: Request, charge_id: int):
     return _ledger_redirect(form, success="charge_updated")
 
 
+@router.post("/charges/{charge_id}/void")
+async def void_charge(request: Request, charge_id: int):
+    """Remove an unapplied charge from balances while retaining its audit history."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(TenantCharge)
+            .where(TenantCharge.id == charge_id)
+            .options(selectinload(TenantCharge.ledger_entries))
+        )
+        charge = result.scalar_one_or_none()
+        if not charge:
+            return _ledger_redirect(form, error="charge_not_found")
+        if charge.is_void:
+            return _ledger_redirect(form, success="charge_voided")
+        if not ledger_service.can_void_charge(charge):
+            return _ledger_redirect(form, error="charge_has_activity")
+
+        reason = str(form.get("void_reason", "")).strip()
+        charge.is_void = True
+        charge.void_reason = (reason or f"Removed from ledger by staff user {user['id']}")[:255]
+        charge.updated_at = datetime.utcnow()
+
+    return _ledger_redirect(form, success="charge_voided")
+
+
 @router.get("/ach/{payment_id}", response_class=HTMLResponse)
 async def payment_detail(request: Request, payment_id: int):
     """Single payment detail."""

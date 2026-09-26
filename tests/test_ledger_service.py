@@ -6,7 +6,14 @@ from types import SimpleNamespace
 from webapp.services import ledger_service
 
 
-def make_charge(*, due_date: date, charge_type: str = "rent", amount: str = "632.00"):
+def make_charge(
+    *,
+    due_date: date,
+    charge_type: str = "rent",
+    amount: str = "632.00",
+    is_void: bool = False,
+    ledger_entries=None,
+):
     return SimpleNamespace(
         id=1,
         tenant_id=10,
@@ -19,11 +26,12 @@ def make_charge(*, due_date: date, charge_type: str = "rent", amount: str = "632
         due_date=due_date,
         service_start=None,
         service_end=None,
-        is_void=False,
+        is_void=is_void,
+        void_reason="Entered in error" if is_void else None,
         is_recurring=charge_type == "rent",
         recurrence_group="rent:10" if charge_type == "rent" else None,
         created_at=None,
-        ledger_entries=[],
+        ledger_entries=ledger_entries or [],
     )
 
 
@@ -115,6 +123,34 @@ class MonthlyChargeSummaryTests(unittest.TestCase):
         self.assertEqual(len(summaries), 1)
         self.assertEqual(summaries[0]["amount"], Decimal("283.00"))
         self.assertEqual(summaries[0]["source"], "Lease rent schedule")
+
+
+class ChargeVoidTests(unittest.TestCase):
+    def test_unapplied_charge_can_be_voided(self):
+        charge = make_charge(due_date=date(2026, 9, 1))
+
+        self.assertTrue(ledger_service.can_void_charge(charge))
+
+    def test_charge_with_posted_payment_cannot_be_voided(self):
+        payment = SimpleNamespace(
+            amount=Decimal("100.00"),
+            status="posted",
+            entry_type="payment",
+            created_at=None,
+        )
+        charge = make_charge(due_date=date(2026, 9, 1), ledger_entries=[payment])
+
+        self.assertFalse(ledger_service.can_void_charge(charge))
+
+    def test_void_charge_is_removed_from_totals(self):
+        snapshot = ledger_service.charge_snapshot(
+            make_charge(due_date=date(2026, 9, 1), is_void=True),
+            as_of=date(2026, 9, 25),
+        )
+
+        self.assertEqual(snapshot["status"], "void")
+        self.assertEqual(snapshot["void_reason"], "Entered in error")
+        self.assertEqual(ledger_service.totals([snapshot])["outstanding"], Decimal("0.00"))
 
 
 if __name__ == "__main__":

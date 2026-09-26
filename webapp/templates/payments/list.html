@@ -73,7 +73,7 @@
         <div class="flex justify-end">
             {% if charge.status != 'void' %}
             <button type="button" class="bd-icon-button text-slate-400 hover:bg-blue-50 hover:text-blue-700" aria-label="Edit {{ charge.description }}"
-                onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})'>
+                onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})'>
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
             </button>
             {% endif %}
@@ -167,7 +167,11 @@
 {% endif %}
 {% if request.query_params.get('error') %}
 <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+    {% if request.query_params.get('error') == 'charge_has_activity' %}
+    This charge has a payment or credit attached and cannot be voided. Reverse the activity first.
+    {% else %}
     The ledger could not be updated. Check the amount and selected charge, then try again.
+    {% endif %}
 </div>
 {% endif %}
 
@@ -286,7 +290,7 @@
                 {% else %}
                 <div class="mt-4 rounded-xl border border-dashed border-blue-200 bg-white/60 px-4 py-5 text-center text-sm text-slate-500">No payments or credits have been applied to this charge yet.</div>
                 {% endif %}
-                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }})' class="bd-btn bd-btn-secondary">Edit charge</button>{% endif %}</div>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})' class="bd-btn bd-btn-secondary">Edit charge</button>{% endif %}</div>
             </div>
         </details>
         {% endfor %}
@@ -481,7 +485,16 @@
         <input type="hidden" name="tenant_id" id="edit-tenant"><input type="hidden" name="property_id" id="edit-property">
         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5"><div><h2 id="edit-title" class="text-xl font-bold text-gray-950">Edit charge</h2><p class="text-sm text-gray-500">Amounts cannot be reduced below money already applied.</p></div><button type="button" onclick="closeModal('edit-modal')" aria-label="Close edit charge dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button></div>
         <div class="space-y-4 p-6"><div><label for="edit-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="edit-description" name="description" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label for="edit-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="edit-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="utility">Utility</option><option value="water">Water bill</option><option value="late_fee">Late / daily fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div><div><label for="edit-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="edit-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div><div><label for="edit-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="edit-due" name="due_date" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div></div>
-        <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Save changes</button></div>
+        <div class="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <button id="void-charge-button" type="submit" formnovalidate class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0 1 15.916 21H8.084a2.25 2.25 0 0 1-2.244-2.327L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-10.978.397c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m6.478.165V4.477c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                    Void charge
+                </button>
+                <p id="void-charge-help" class="mt-1 hidden text-xs text-slate-500">Reverse attached payment activity before voiding this charge.</p>
+            </div>
+            <div class="flex justify-end gap-3"><button type="button" onclick="closeModal('edit-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Save changes</button></div>
+        </div>
     </form></div>
 </div>
 {% endblock %}
@@ -531,7 +544,7 @@ function openActivityForCharge(chargeId, balance) {
     chargeSelect.value = String(chargeId);
     document.getElementById('activity-amount').value = balance;
 }
-function openEdit(id, description, type, amount, dueDate, tenantId, propertyId) {
+function openEdit(id, description, type, amount, dueDate, tenantId, propertyId, applied, pending) {
     document.getElementById('edit-form').action = '/payments/charges/' + id + '/edit';
     document.getElementById('edit-description').value = description;
     document.getElementById('edit-type').value = type;
@@ -539,6 +552,14 @@ function openEdit(id, description, type, amount, dueDate, tenantId, propertyId) 
     document.getElementById('edit-due').value = dueDate;
     document.getElementById('edit-tenant').value = tenantId;
     document.getElementById('edit-property').value = propertyId;
+    const voidButton = document.getElementById('void-charge-button');
+    const hasActivity = Number(applied) > 0 || Number(pending) > 0;
+    voidButton.formAction = '/payments/charges/' + id + '/void';
+    voidButton.disabled = hasActivity;
+    voidButton.onclick = hasActivity ? null : function() {
+        return window.confirm('Void this charge? It will be removed from balances and retained in ledger history.');
+    };
+    document.getElementById('void-charge-help').classList.toggle('hidden', !hasActivity);
     openModal('edit-modal');
 }
 document.addEventListener('click', function(event) {

@@ -96,9 +96,20 @@ def charge_snapshot(charge: TenantCharge, *, as_of: date | None = None) -> dict:
         "is_partial": applied > 0 and outstanding > 0,
         "is_recurring": charge.is_recurring,
         "recurrence_group": getattr(charge, "recurrence_group", None),
+        "void_reason": getattr(charge, "void_reason", None),
         "created_at": getattr(charge, "created_at", None),
         "entries": sorted(charge.ledger_entries, key=lambda item: item.created_at or datetime.min, reverse=True),
     }
+
+
+def can_void_charge(charge: TenantCharge) -> bool:
+    """A charge can be voided only before money or pending payment is attached."""
+    snapshot = charge_snapshot(charge)
+    return (
+        not charge.is_void
+        and snapshot["applied"] <= 0
+        and snapshot["pending"] <= 0
+    )
 
 
 def _ordinal_day(day: int) -> str:
