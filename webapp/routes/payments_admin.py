@@ -735,6 +735,31 @@ async def void_charge(request: Request, charge_id: int):
     return _ledger_redirect(form, success="charge_voided")
 
 
+@router.post("/charges/{charge_id}/stop-late-fees")
+async def stop_charge_late_fees(request: Request, charge_id: int):
+    """Stop future automatic late fees for the charge's tenant rent schedule."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    form = await request.form()
+
+    async with get_session() as session:
+        result = await session.execute(select(TenantCharge).where(TenantCharge.id == charge_id))
+        charge = result.scalar_one_or_none()
+        if not charge:
+            return _ledger_redirect(form, error="charge_not_found")
+        if charge.charge_type != "rent":
+            return _ledger_redirect(form, error="late_fees_rent_only")
+
+        tenant_result = await session.execute(select(Tenant).where(Tenant.id == charge.tenant_id))
+        tenant = tenant_result.scalar_one_or_none()
+        if not tenant:
+            return _ledger_redirect(form, error="tenant_not_found")
+        ledger_service.stop_automatic_late_fees(tenant)
+
+    return _ledger_redirect(form, success="late_fees_stopped")
+
+
 @router.get("/ach/{payment_id}", response_class=HTMLResponse)
 async def payment_detail(request: Request, payment_id: int):
     """Single payment detail."""

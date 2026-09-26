@@ -29,6 +29,20 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Notification message templates
 MESSAGE_TEMPLATES = {
+    "rent_due": {
+        "subject": "Rent Payment Reminder",
+        "sms": "REMINDER: Your rent balance for {address} is ${amount}. Please submit payment through the tenant portal or contact Blue Deer if you have already paid.",
+        "email": """
+Dear {tenant_name},
+
+This is a friendly reminder that your current rent balance for {address} is ${amount}.
+
+Please submit payment through the tenant portal. If you have already paid or need to discuss the balance, please contact Blue Deer Property Management.
+
+Thank you,
+Blue Deer Property Management
+""",
+    },
     "overdue": {
         "subject": "Water Bill Overdue Notice",
         "sms": "NOTICE: Your water bill for {address} is OVERDUE. Amount due: ${amount}. Due date: {due_date}. Please pay immediately to avoid late fees.",

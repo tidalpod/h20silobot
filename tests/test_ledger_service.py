@@ -224,6 +224,25 @@ class ChargeVoidTests(unittest.TestCase):
         self.assertEqual(snapshot["void_reason"], "Entered in error")
         self.assertEqual(ledger_service.totals([snapshot])["outstanding"], Decimal("0.00"))
 
+    def test_snapshot_exposes_whether_charge_can_be_removed(self):
+        snapshot = ledger_service.charge_snapshot(
+            make_charge(due_date=date(2026, 9, 1)),
+            as_of=date(2026, 9, 25),
+        )
+
+        self.assertTrue(snapshot["can_void"])
+
+
+class LateFeeControlTests(unittest.TestCase):
+    def test_stop_automatic_late_fees_disables_both_fee_modes(self):
+        tenant = SimpleNamespace(late_fee_initial_enabled=True, late_fee_daily_enabled=True)
+
+        changed = ledger_service.stop_automatic_late_fees(tenant)
+
+        self.assertTrue(changed)
+        self.assertFalse(tenant.late_fee_initial_enabled)
+        self.assertFalse(tenant.late_fee_daily_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

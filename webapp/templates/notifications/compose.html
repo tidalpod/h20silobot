@@ -149,6 +149,9 @@
                 <h3 class="text-lg font-medium leading-6 text-gray-900">Quick Templates</h3>
             </div>
             <div class="px-4 py-5 sm:p-6 space-y-3">
+                <button type="button" onclick="useTemplate('rent_due')" class="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100">
+                    Rent Payment Reminder
+                </button>
                 <button type="button" onclick="useTemplate('overdue')" class="w-full text-left px-3 py-2 text-sm bg-red-50 text-red-700 rounded-md hover:bg-red-100">
                     Overdue Notice
                 </button>
@@ -207,6 +210,11 @@
     const addressStr = propAddress || '{address}';
 
     const templates = {
+        rent_due: {
+            subject: "Rent Payment Reminder",
+            sms: `REMINDER: Your rent balance for ${addressStr} is ${amountStr}. Please submit payment through the tenant portal or contact Blue Deer if you have already paid.`,
+            email: `Dear {name},\n\nThis is a friendly reminder that your current rent balance for ${addressStr} is ${amountStr}.\n\nPlease submit payment through the tenant portal. If you have already paid or need to discuss the balance, please contact Blue Deer Property Management.\n\nThank you,\nBlue Deer Property Management`
+        },
         overdue: {
             subject: "Water Bill Overdue Notice",
             sms: `NOTICE: Your water bill for ${addressStr} is OVERDUE. Amount due: ${amountStr}. Please pay immediately to avoid late fees.`,

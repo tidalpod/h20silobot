@@ -18,6 +18,56 @@
     {% endif %}
 {% endmacro %}
 
+{% macro sent_charge_context_and_actions(charge, tenant) %}
+{% if charge.status != 'void' %}
+<div class="mt-4 rounded-xl border border-blue-100 bg-white/75 px-4 py-3 text-sm text-slate-600">
+    <div class="flex items-start gap-2.5">
+        <svg class="mt-0.5 h-4 w-4 shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m6 12-3.75 9 19.5-9L2.25 3 6 12Zm0 0h7.5"/></svg>
+        <p>Created for <span class="font-semibold text-slate-800">{{ charge.tenant_name }}</span>{% if charge.created_at %} on {{ charge.created_at.strftime('%b %d, %Y') }}{% endif %}. Payment activity and balance changes remain attached to this charge.</p>
+    </div>
+</div>
+<div class="mt-4 border-t border-blue-100 pt-4">
+    <p class="mb-2.5 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-400">Charge actions</p>
+    <div class="flex flex-wrap gap-2">
+        {% if charge.status in ['open', 'partial', 'overdue'] %}
+        <button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5h15v15h-15z"/></svg>Record payment
+        </button>
+        <a href="/notifications/compose?tenant_id={{ charge.tenant_id }}&template=rent_due&amount={{ charge.outstanding }}" class="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-sm font-semibold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m6 12-3.75 9 19.5-9L2.25 3 6 12Zm0 0h7.5"/></svg>Send reminder
+        </a>
+        {% endif %}
+        <button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})' class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>Edit
+        </button>
+        {% if charge.can_void %}
+        <form action="/payments/charges/{{ charge.id }}/void" method="POST" onsubmit="return window.confirm('Delete this charge from balances? It will remain in the audit history as voided.');">
+            <input type="hidden" name="tenant_id" value="{{ charge.tenant_id }}">
+            <input type="hidden" name="property_id" value="{{ charge.property_id }}">
+            <input type="hidden" name="void_reason" value="Deleted from the charge action panel">
+            <button class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L18.16 19.673A2.25 2.25 0 0 1 15.916 21H8.084a2.25 2.25 0 0 1-2.244-2.327L4.772 5.79m14.456 0A48.108 48.108 0 0 0 15.75 5.4m-10.978.39a48.11 48.11 0 0 1 3.478-.39m7.5 0V4.484c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201V5.4m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>Delete
+            </button>
+        </form>
+        {% else %}
+        <button type="button" disabled title="Charges with payment activity cannot be deleted" class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2.5 text-sm font-semibold text-slate-400 opacity-70">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L18.16 19.673A2.25 2.25 0 0 1 15.916 21H8.084a2.25 2.25 0 0 1-2.244-2.327L4.772 5.79"/></svg>Delete
+        </button>
+        {% endif %}
+        {% if charge.charge_type == 'rent' and tenant and (tenant.late_fee_daily_enabled or tenant.late_fee_initial_enabled) %}
+        <form action="/payments/charges/{{ charge.id }}/stop-late-fees" method="POST" onsubmit="return window.confirm('Stop automatic late fees for this tenant? Existing fee charges will remain.');">
+            <input type="hidden" name="tenant_id" value="{{ charge.tenant_id }}">
+            <input type="hidden" name="property_id" value="{{ charge.property_id }}">
+            <button class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="m7.5 16.5 9-9"/></svg>Stop late fees
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
 {% macro render_charge(charge) %}
 <article class="ledger-charge-row group border-l-4 px-4 py-4 sm:px-5 {% if charge.charge_type == 'rent' %}border-l-blue-500{% elif charge.charge_type in ['water', 'utility'] %}border-l-cyan-500{% elif charge.charge_type == 'late_fee' %}border-l-amber-500{% elif charge.charge_type == 'security_deposit' %}border-l-violet-500{% elif charge.charge_type == 'damage' %}border-l-rose-500{% else %}border-l-slate-400{% endif %}">
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(17rem,1.8fr)_minmax(9rem,.72fr)_minmax(13rem,1fr)_minmax(9rem,.65fr)_auto] lg:items-center">
@@ -102,7 +152,7 @@
 </article>
 {% endmacro %}
 
-{% macro render_mobile_sent_charge(charge) %}
+{% macro render_mobile_sent_charge(charge, tenant) %}
 <details class="ledger-disclosure group">
     <summary class="relative cursor-pointer list-none px-4 py-4 transition hover:bg-slate-50/80">
         <div class="flex items-start justify-between gap-4 pr-7">
@@ -142,7 +192,7 @@
         {% else %}
         <div class="mt-4 rounded-xl border border-dashed border-blue-200 bg-white/60 px-3 py-4 text-center text-xs text-slate-500">No payments or credits have been applied yet.</div>
         {% endif %}
-        <div class="mt-4 grid gap-2 {% if charge.status in ['open', 'partial', 'overdue'] and charge.status != 'void' %}grid-cols-2{% endif %}">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary justify-center">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})' class="bd-btn bd-btn-secondary justify-center">Edit charge</button>{% endif %}</div>
+        {{ sent_charge_context_and_actions(charge, tenant) }}
     </div>
 </details>
 {% endmacro %}
@@ -337,7 +387,7 @@
                 <h3 class="text-base font-bold text-slate-950">{{ month_group.month.strftime('%B %Y') }}</h3>
                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">{{ month_group.charges|length }} charge{{ '' if month_group.charges|length == 1 else 's' }}</span>
             </div>
-            <div class="divide-y divide-slate-100">{% for charge in month_group.charges %}{{ render_mobile_sent_charge(charge) }}{% endfor %}</div>
+            <div class="divide-y divide-slate-100">{% for charge in month_group.charges %}{{ render_mobile_sent_charge(charge, selected_tenant) }}{% endfor %}</div>
         </section>
         {% endfor %}
     </div>
@@ -372,7 +422,7 @@
                 {% else %}
                 <div class="mt-4 rounded-xl border border-dashed border-blue-200 bg-white/60 px-4 py-5 text-center text-sm text-slate-500">No payments or credits have been applied to this charge yet.</div>
                 {% endif %}
-                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">{% if charge.status in ['open', 'partial', 'overdue'] %}<button type="button" onclick="openActivityForCharge({{ charge.id }}, {{ charge.outstanding }})" class="bd-btn bd-btn-primary">Record payment</button>{% endif %}{% if charge.status != 'void' %}<button type="button" onclick='openEdit({{ charge.id }}, {{ charge.description|tojson }}, {{ charge.charge_type|tojson }}, {{ charge.amount }}, {{ charge.due_date.isoformat()|tojson }}, {{ charge.tenant_id }}, {{ charge.property_id }}, {{ charge.applied }}, {{ charge.pending }})' class="bd-btn bd-btn-secondary">Edit charge</button>{% endif %}</div>
+                {{ sent_charge_context_and_actions(charge, selected_tenant) }}
             </div>
         </details>
         {% endfor %}
