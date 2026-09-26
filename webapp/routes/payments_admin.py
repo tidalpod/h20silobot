@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["payments-admin"])
 
+CHARGE_TYPE_LABELS = {
+    "rent": "Rent",
+    "security_deposit": "Security deposit",
+    "utility": "Utility charge",
+    "water": "Water bill",
+    "late_fee": "Late fee",
+    "damage": "Damage charge",
+    "other": "Other charge",
+}
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -426,9 +436,11 @@ async def create_charge(request: Request):
         return _ledger_redirect(form, error="invalid_charge")
 
     due_date = _parse_date(form.get("due_date"))
-    description = str(form.get("description", "")).strip()
     charge_type = str(form.get("charge_type", "other")).strip() or "other"
-    if not tenant_id or not due_date or amount <= 0 or not description:
+    if charge_type not in CHARGE_TYPE_LABELS:
+        charge_type = "other"
+    description = str(form.get("description", "")).strip() or CHARGE_TYPE_LABELS[charge_type]
+    if not tenant_id or not due_date or amount <= 0:
         return _ledger_redirect(form, error="invalid_charge")
 
     repeat_monthly = form.get("repeat_monthly") == "on"

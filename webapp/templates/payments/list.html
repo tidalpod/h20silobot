@@ -117,6 +117,14 @@
     .ledger-disclosure > summary::-webkit-details-marker { display: none; }
     .ledger-disclosure[open] > summary .disclosure-chevron { transform: rotate(180deg); }
     .ledger-payment-table tbody tr { transition: background-color .15s ease; }
+    .charge-category-option { cursor: pointer; }
+    .charge-category-option input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .charge-category-card { display: flex; min-height: 4.5rem; align-items: center; gap: .625rem; border: 1px solid #cbd5e1; border-radius: .875rem; background: #fff; padding: .75rem; color: #475569; transition: border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease; }
+    .charge-category-card:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; transform: translateY(-1px); }
+    .charge-category-option input:focus-visible + .charge-category-card { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .charge-category-option input:checked + .charge-category-card { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+    .charge-category-icon { display: inline-flex; width: 2rem; height: 2rem; flex: 0 0 auto; align-items: center; justify-content: center; border-radius: .625rem; background: #f1f5f9; transition: background-color .15s ease; }
+    .charge-category-option input:checked + .charge-category-card .charge-category-icon { background: #dbeafe; }
 </style>
 {% endblock %}
 
@@ -434,28 +442,56 @@
 {% endif %}
 
 <!-- Create charge modal -->
-<div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="charge-title">
-    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-        <form method="POST" action="/payments/charges">
+<div id="charge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-labelledby="charge-title">
+    <div class="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl" style="max-height: calc(100vh - 2rem);">
+        <form method="POST" action="/payments/charges" class="flex max-h-[calc(100vh-2rem)] flex-col">
             <input type="hidden" name="property_id" value="{{ filter_property_id or '' }}">
-            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-                <div><h2 id="charge-title" class="text-xl font-bold text-gray-950">Create charge</h2><p class="text-sm text-gray-500">Add a receivable to a tenant ledger.</p></div>
-                <button type="button" onclick="closeModal('charge-modal')" aria-label="Close create charge dialog" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100">✕</button>
+            <div class="relative flex items-center justify-between overflow-hidden border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/40 to-sky-100/70 px-5 py-5 sm:px-7 sm:py-6">
+                <div class="absolute -right-14 -top-24 h-48 w-48 rounded-full border border-blue-200/50 shadow-[0_0_0_2rem_rgba(37,99,235,.035),0_0_0_4rem_rgba(37,99,235,.02)]" aria-hidden="true"></div>
+                <div class="relative flex items-center gap-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+                    </span>
+                    <div><p class="text-[11px] font-semibold uppercase tracking-[.16em] text-blue-600">Tenant receivable</p><h2 id="charge-title" class="text-2xl font-bold tracking-tight text-slate-950">Create charge</h2><p class="mt-0.5 text-sm text-slate-500">Add a one-time or recurring charge to the ledger.</p></div>
+                </div>
+                <button type="button" onclick="closeModal('charge-modal')" aria-label="Close create charge dialog" class="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white hover:text-slate-900 hover:shadow-sm">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <div class="space-y-4 p-6">
-                <div><label for="create-tenant" class="mb-1 block text-sm font-medium text-gray-700">Tenant</label><select id="create-tenant" name="tenant_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+            <div class="space-y-6 overflow-y-auto px-5 py-6 sm:px-7">
+                <div><label for="create-tenant" class="mb-2 block text-sm font-semibold text-slate-800">Charge to <span class="text-red-500">*</span></label><select id="create-tenant" name="tenant_id" required class="bd-input text-sm">
                     <option value="">Choose tenant</option>{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if filter_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }} · {{ tenant.property_ref.address }}</option>{% endfor %}
                 </select></div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div><label for="create-type" class="mb-1 block text-sm font-medium text-gray-700">Type</label><select id="create-type" name="charge_type" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><option value="rent">Rent</option><option value="security_deposit">Security deposit</option><option value="utility">Utility</option><option value="water">Water bill</option><option value="late_fee">Late / daily fee</option><option value="damage">Damage</option><option value="other">Other</option></select></div>
-                    <div><label for="create-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount</label><input id="create-amount" name="amount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="0.00"></div>
+                <fieldset>
+                    <legend class="mb-2 block text-sm font-semibold text-slate-800">Category <span class="text-red-500">*</span></legend>
+                    <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="rent" checked onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('rent', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Rent</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="security_deposit" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('security_deposit', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Deposit</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="utility" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('utility', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Utility</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="water" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('water', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Water</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="late_fee" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('late_fee', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Late fee</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="damage" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('damage', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Damage</span></span></label>
+                        <label class="charge-category-option"><input type="radio" name="charge_type" value="other" onchange="updateChargeCategory(this)"><span class="charge-category-card"><span class="charge-category-icon">{{ category_icon('other', 'h-4 w-4') }}</span><span class="text-sm font-semibold">Other</span></span></label>
+                    </div>
+                </fieldset>
+                <div>
+                    <label for="create-amount" class="mb-2 block text-sm font-semibold text-slate-800">Amount <span class="text-red-500">*</span></label>
+                    <div class="relative"><span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-lg font-semibold text-slate-500">$</span><input id="create-amount" name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required class="bd-input pl-9 text-lg font-semibold" placeholder="0.00"></div>
                 </div>
-                <div><label for="create-description" class="mb-1 block text-sm font-medium text-gray-700">Description</label><input id="create-description" name="description" required maxlength="255" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" placeholder="Monthly rent"></div>
-                <div><label for="create-due" class="mb-1 block text-sm font-medium text-gray-700">Due date</label><input id="create-due" name="due_date" type="date" required value="{{ request.query_params.get('due_date', '') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"></div>
-                <label class="flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><input id="repeat-monthly" name="repeat_monthly" type="checkbox" onchange="document.getElementById('repeat-end').classList.toggle('hidden', !this.checked)"> Repeat this charge monthly</label>
-                <div id="repeat-end" class="hidden"><label for="repeat-end-date" class="mb-1 block text-sm font-medium text-gray-700">Repeat through</label><input id="repeat-end-date" name="end_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"><p class="mt-1 text-xs text-gray-400">Up to 36 monthly charges will be created.</p></div>
+                <div>
+                    <div class="mb-2 flex items-center justify-between gap-3"><label for="create-description" class="block text-sm font-semibold text-slate-800">Description <span class="font-normal text-slate-400">(optional)</span></label><span id="charge-description-count" class="text-xs font-medium text-slate-400">0 / 80</span></div>
+                    <textarea id="create-description" name="description" rows="2" maxlength="80" oninput="updateChargeDescriptionCount()" class="bd-input resize-none text-sm" placeholder="Add a note tenants will recognize"></textarea>
+                    <p class="mt-1.5 text-xs text-slate-400">If left blank, the category name will be used.</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div><label for="create-due" class="mb-2 block text-sm font-semibold text-slate-800">Due date <span class="text-red-500">*</span></label><input id="create-due" name="due_date" type="date" required value="{{ request.query_params.get('due_date', '') }}" class="bd-input text-sm"></div>
+                    <div class="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                        <label for="repeat-monthly" class="flex cursor-pointer items-center justify-between gap-4"><span><span class="block text-sm font-semibold text-blue-950">Repeat monthly</span><span class="mt-0.5 block text-xs text-blue-700/70">Create a charge each month</span></span><span class="relative inline-flex h-6 w-11 shrink-0 items-center"><input id="repeat-monthly" name="repeat_monthly" type="checkbox" class="peer sr-only" onchange="toggleRecurringCharge(this)"><span class="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span></span></label>
+                    </div>
+                </div>
+                <div id="repeat-end" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4"><label for="repeat-end-date" class="mb-2 block text-sm font-semibold text-slate-800">Repeat through</label><input id="repeat-end-date" name="end_date" type="date" data-no-default="true" class="bd-input text-sm"><p class="mt-1.5 text-xs text-slate-500">Blue Deer will create monthly charges through this date, up to 36 months.</p></div>
             </div>
-            <div class="flex justify-end gap-3 border-t border-gray-100 px-6 py-4"><button type="button" onclick="closeModal('charge-modal')" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button><button class="rounded-lg bg-blue-950 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-900">Create charge</button></div>
+            <div class="grid grid-cols-1 gap-3 border-t border-slate-200 bg-slate-50/80 px-5 py-4 sm:grid-cols-2 sm:px-7"><button type="button" onclick="closeModal('charge-modal')" class="bd-btn bd-btn-secondary rounded-xl border-blue-900 py-3 text-blue-950 hover:bg-blue-50">Cancel</button><button class="bd-btn bd-btn-primary rounded-xl py-3"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Create charge</button></div>
         </form>
     </div>
 </div>
@@ -508,6 +544,30 @@ function openModal(id) {
     if (first) setTimeout(() => first.focus(), 30);
 }
 function closeModal(id) { const el = document.getElementById(id); el.classList.add('hidden'); el.classList.remove('flex'); }
+const chargeDescriptionPlaceholders = {
+    rent: 'Monthly rent, prorated rent, or another rent note',
+    security_deposit: 'Security deposit or deposit adjustment',
+    utility: 'Electricity, gas, trash, or another utility',
+    water: 'Water usage or reimbursement period',
+    late_fee: 'Late or daily fee details',
+    damage: 'Repair or damage description',
+    other: 'Add a note tenants will recognize'
+};
+function updateChargeCategory(input) {
+    const description = document.getElementById('create-description');
+    description.placeholder = chargeDescriptionPlaceholders[input.value] || chargeDescriptionPlaceholders.other;
+}
+function updateChargeDescriptionCount() {
+    const description = document.getElementById('create-description');
+    document.getElementById('charge-description-count').textContent = description.value.length + ' / 80';
+}
+function toggleRecurringCharge(checkbox) {
+    const panel = document.getElementById('repeat-end');
+    const endDate = document.getElementById('repeat-end-date');
+    panel.classList.toggle('hidden', !checkbox.checked);
+    endDate.required = checkbox.checked;
+    if (checkbox.checked && !endDate.value) endDate.value = document.getElementById('create-due').value;
+}
 function closeActionsMenu() {
     const menu = document.getElementById('actions-menu');
     if (!menu) return;
@@ -612,7 +672,12 @@ document.getElementById('activity-charge')?.addEventListener('change', function(
 });
 // Provide useful defaults without trusting client values on the server.
 for (const input of document.querySelectorAll('input[type="date"]')) {
-    if (!input.value) input.value = new Date().toISOString().slice(0, 10);
+    if (!input.value && input.dataset.noDefault !== 'true') input.value = new Date().toISOString().slice(0, 10);
 }
+document.getElementById('create-due')?.addEventListener('change', function() {
+    const repeat = document.getElementById('repeat-monthly');
+    const endDate = document.getElementById('repeat-end-date');
+    if (repeat.checked && (!endDate.value || endDate.value < this.value)) endDate.value = this.value;
+});
 </script>
 {% endblock %}
