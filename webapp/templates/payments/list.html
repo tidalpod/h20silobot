@@ -670,9 +670,13 @@ document.getElementById('activity-charge')?.addEventListener('change', function(
     const option = this.options[this.selectedIndex];
     if (option && option.dataset.balance) document.getElementById('activity-amount').value = option.dataset.balance;
 });
+function localDateValue(date = new Date()) {
+    const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localTime.toISOString().slice(0, 10);
+}
 // Provide useful defaults without trusting client values on the server.
 for (const input of document.querySelectorAll('input[type="date"]')) {
-    if (!input.value && input.dataset.noDefault !== 'true') input.value = new Date().toISOString().slice(0, 10);
+    if (!input.value && input.dataset.noDefault !== 'true') input.value = localDateValue();
 }
 document.getElementById('create-due')?.addEventListener('change', function() {
     const repeat = document.getElementById('repeat-monthly');
