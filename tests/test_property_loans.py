@@ -194,6 +194,22 @@ def test_assets_combine_section8_voucher_and_tenant_portion():
     assert _effective_monthly_rent(prop) == Decimal("1200.00")
 
 
+def test_assets_use_gross_rent_as_cash_flow_when_there_is_no_mortgage():
+    prop = Property(
+        address="Debt Free Property",
+        bsa_account_number="debt-free",
+        monthly_rent=Decimal("1650.00"),
+        hoa_monthly=Decimal("125.00"),
+    )
+    prop.tenants = []
+    prop.loans = []
+
+    metrics = _compute_property_metrics(prop)
+
+    assert metrics["monthly_payment"] is None
+    assert metrics["cash_flow"] == Decimal("1650.00")
+
+
 def test_assets_sort_values_use_current_loan_and_effective_rent():
     prop = Property(
         address="11100 Maxwell Ave",

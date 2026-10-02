@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from decimal import Decimal
+from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Form, HTTPException, UploadFile, File
@@ -497,7 +498,7 @@ async def create_property(
 
 
 @router.get("/{property_id}", response_class=HTMLResponse)
-async def property_detail(request: Request, property_id: int):
+async def property_detail(request: Request, property_id: int, edit_loan_id: Optional[int] = None):
     """Show property detail page"""
     user = await get_current_user(request)
     if not user:
@@ -521,6 +522,12 @@ async def property_detail(request: Request, property_id: int):
 
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
+
+        edit_loan = prop.current_loan
+        if edit_loan_id is not None:
+            requested_loan = next((loan for loan in prop.loans if loan.id == edit_loan_id), None)
+            if requested_loan is not None:
+                edit_loan = requested_loan
 
         # Calculate current status
         current_status = BillStatus.UNKNOWN
@@ -549,6 +556,7 @@ async def property_detail(request: Request, property_id: int):
             "request": request,
             "user": user,
             "property": prop,
+            "edit_loan": edit_loan,
             "current_status": current_status,
             "latest_bill": latest_bill,
             "active_tenants": active_tenants,

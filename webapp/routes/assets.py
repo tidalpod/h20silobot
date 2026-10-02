@@ -135,7 +135,10 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
     hoa = _dec(hoa_value)
 
     equity = appraised - balance if appraised_value is not None and balance_value is not None else None
-    cash_flow = rent - piti - hoa if payment_value is not None else None
+    # Until tax and insurance expense tracking is added, a debt-free asset's
+    # cash-flow figure is its gross scheduled rent. Mortgaged assets continue
+    # to show rent less PITI and HOA.
+    cash_flow = rent - piti - hoa if payment_value is not None else rent_value
     cap_rate = None
     if payment_value is not None and appraised > 0:
         cap_rate = round(((rent - piti - hoa) * 12) / appraised * 100, 2)
