@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -289,6 +289,50 @@ def _validated_loan_payload(form: dict) -> dict:
     }
 
 
+ASSET_LOAN_FIELDS = (
+    "loan_number_last4",
+    "servicer",
+    "original_amount",
+    "current_balance",
+    "interest_rate",
+    "loan_type",
+    "term_months",
+    "start_date",
+    "maturity_date",
+    "monthly_payment",
+    "escrow_balance",
+    "status",
+    "notes",
+    "is_current",
+)
+
+
+def _validated_asset_loan_payload(form: dict) -> dict:
+    """Validate the active-loan fields exposed by the Assets pencil modal.
+
+    Insurance fields intentionally remain on the full Loan tab. Filtering the
+    normalized payload prevents a quick Assets edit from clearing those values.
+    """
+    loan_form = {
+        "loan_number_last4": form.get("loan_number_last4"),
+        "servicer": form.get("loan_servicer"),
+        "original_amount": form.get("loan_original_amount"),
+        "current_balance": form.get("loan_current_balance"),
+        "interest_rate": form.get("loan_interest_rate"),
+        "loan_type": form.get("loan_type"),
+        "term_years": form.get("loan_term_years"),
+        "start_date": form.get("loan_start_date"),
+        "maturity_date": form.get("loan_maturity_date"),
+        "monthly_payment": form.get("loan_monthly_payment"),
+        "escrow_balance": form.get("loan_escrow_balance"),
+        "status": form.get("loan_status"),
+        "notes": form.get("loan_notes"),
+        "is_current": "1",
+    }
+    payload = _validated_loan_payload(loan_form)
+    return {field: payload[field] for field in ASSET_LOAN_FIELDS}
+
+
 def _sync_property_loan_snapshot(prop: Property, loan: PropertyLoan):
     """Keep legacy Assets metrics aligned with the current related loan."""
     prop.loan_amount = loan.original_amount
@@ -309,45 +353,67 @@ def _sync_property_loan_snapshot(prop: Property, loan: PropertyLoan):
 async def save_financial_data(
     request: Request,
     property_id: int,
-    purchase_price: str = Form(None),
-    purchase_date: str = Form(None),
-    appraised_value: str = Form(None),
-    appraisal_date: str = Form(None),
-    loan_amount: str = Form(None),
-    loan_balance: str = Form(None),
-    interest_rate: str = Form(None),
-    loan_term_years: str = Form(None),
-    loan_start_date: str = Form(None),
-    monthly_pi: str = Form(None),
-    monthly_tax: str = Form(None),
-    monthly_insurance: str = Form(None),
-    monthly_piti: str = Form(None),
-    hoa_monthly: str = Form(None),
-    rehab_cost: str = Form(None),
 ):
-    """Save financial data for a single property."""
+    """Save property values and, when present, the current loan snapshot."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
+    form = dict(await request.form())
+    raw_loan_id = (form.get("loan_id") or "").strip()
+    loan_id = _parse_int(raw_loan_id)
+    if raw_loan_id and loan_id is None:
+        return RedirectResponse(url="/assets?edit_error=invalid_loan", status_code=303)
+
+    loan_payload = None
+    if loan_id is not None:
+        try:
+            loan_payload = _validated_asset_loan_payload(form)
+        except ValueError as exc:
+            return RedirectResponse(url=f"/assets?edit_error={exc}", status_code=303)
+
     async with get_session() as session:
         result = await session.execute(
-            select(Property).where(Property.id == property_id)
+            select(Property)
+            .where(Property.id == property_id)
+            .options(selectinload(Property.loans))
         )
         prop = result.scalar_one_or_none()
         if not prop:
             return RedirectResponse(url="/assets", status_code=303)
 
-        prop.purchase_price = _parse_decimal(purchase_price)
-        prop.purchase_date = _parse_date(purchase_date)
-        prop.appraised_value = _parse_decimal(appraised_value)
-        prop.appraisal_date = _parse_date(appraisal_date)
-        prop.monthly_tax = _parse_decimal(monthly_tax)
-        prop.hoa_monthly = _parse_decimal(hoa_monthly)
-        prop.rehab_cost = _parse_decimal(rehab_cost)
+        loan = None
+        if loan_id is not None and loan_payload is not None:
+            loan = next((item for item in prop.loans if item.id == loan_id and item.is_current), None)
+            if loan is None:
+                return RedirectResponse(url="/assets?edit_error=loan_not_found", status_code=303)
+
+            last4 = loan_payload["loan_number_last4"]
+            if last4 and any(
+                item.id != loan.id and item.loan_number_last4 == last4
+                for item in prop.loans
+            ):
+                return RedirectResponse(url="/assets?edit_error=duplicate_loan", status_code=303)
+
+        prop.purchase_price = _parse_decimal(form.get("purchase_price"))
+        prop.purchase_date = _parse_date(form.get("purchase_date"))
+        prop.appraised_value = _parse_decimal(form.get("appraised_value"))
+        prop.appraisal_date = _parse_date(form.get("appraisal_date"))
+        prop.monthly_tax = _parse_decimal(form.get("monthly_tax"))
+        prop.hoa_monthly = _parse_decimal(form.get("hoa_monthly"))
+        prop.rehab_cost = _parse_decimal(form.get("rehab_cost"))
+
+        if loan is not None and loan_payload is not None:
+            for existing in prop.loans:
+                existing.is_current = existing is loan
+            for field, value in loan_payload.items():
+                setattr(loan, field, value)
+            loan.updated_at = datetime.utcnow()
+            _sync_property_loan_snapshot(prop, loan)
+
         prop.updated_at = datetime.utcnow()
 
-    return RedirectResponse(url="/assets", status_code=303)
+    return RedirectResponse(url=f"/assets?asset_saved={property_id}", status_code=303)
 
 
 @router.post("/{property_id}/loans/save", response_class=HTMLResponse)

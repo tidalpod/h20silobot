@@ -63,6 +63,16 @@
         }
     </style>
 
+    {% if request.query_params.get('asset_saved') %}
+    <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+        Asset and loan details saved.
+    </div>
+    {% elif request.query_params.get('edit_error') %}
+    <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+        The changes could not be saved. Check the loan amounts, dates, rate, and loan-number suffix.
+    </div>
+    {% endif %}
+
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <!-- Portfolio Value -->
@@ -248,20 +258,24 @@
 {% for entity, rows in grouped.items() %}
 {% for row in rows %}
 {% set p = row.property %}
+{% set loan = row.loan %}
 <div id="modal-{{ p.id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto mx-4">
         <form action="/assets/{{ p.id }}/edit" method="post">
+            {% if loan %}<input type="hidden" name="loan_id" value="{{ loan.id }}">{% endif %}
             <div class="flex items-center justify-between px-6 py-4 border-b">
-                <h2 class="text-lg font-semibold text-gray-900">Edit Financial Data — {{ p.address }}</h2>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Asset details</p>
+                    <h2 class="mt-0.5 text-lg font-semibold text-gray-900">Edit {{ p.address }}</h2>
+                </div>
                 <button type="button" onclick="closeEditModal({{ p.id }})" class="text-gray-400 hover:text-gray-600 cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                 </button>
             </div>
-            <div class="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="mb-5 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                    Mortgage details are maintained on the property's
-                    <a href="/properties/{{ p.id }}?tab=loan" class="font-semibold underline">Loan tab</a>
-                    so refinancing and servicing history stay intact.
+            <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <h3 class="text-sm font-bold text-gray-900">Property values</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Purchase, valuation, tax, HOA, and improvement costs.</p>
                 </div>
                 {% set fields = [
                     ("purchase_price", "Purchase Price", "number", p.purchase_price, "$", "0.01"),
@@ -289,6 +303,76 @@
                     </div>
                 </div>
                 {% endfor %}
+
+                {% if loan %}
+                <div class="sm:col-span-2 mt-3 border-t border-gray-200 pt-5">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-900">Active loan</h3>
+                            <p class="mt-0.5 text-xs text-gray-500">Changes update this financing record and the Assets table immediately.</p>
+                        </div>
+                        <a href="/properties/{{ p.id }}?tab=loan" class="text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline">Insurance and full loan details</a>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-number-{{ p.id }}">Loan number (last 4)</label>
+                    <input id="loan-number-{{ p.id }}" name="loan_number_last4" value="{{ loan.loan_number_last4 or '' }}" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-servicer-{{ p.id }}">Servicer</label>
+                    <input id="loan-servicer-{{ p.id }}" name="loan_servicer" value="{{ loan.servicer or '' }}" maxlength="255" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                {% set loan_fields = [
+                    ("loan_original_amount", "Original Loan Amount", loan.original_amount, "0.01", "0", "$"),
+                    ("loan_current_balance", "Current Loan Balance", loan.current_balance, "0.01", "0", "$"),
+                    ("loan_interest_rate", "Interest Rate", loan.interest_rate, "0.001", "0", "%"),
+                    ("loan_term_years", "Term (years)", loan.term_years, "1", "1", ""),
+                    ("loan_monthly_payment", "Monthly PITI / Payment", loan.monthly_payment, "0.01", "0", "$"),
+                    ("loan_escrow_balance", "Escrow Balance", loan.escrow_balance, "0.01", "", "$"),
+                ] %}
+                {% for name, label, value, step, min_value, suffix in loan_fields %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ name }}-{{ p.id }}">{{ label }}</label>
+                    <div class="relative">
+                        {% if suffix == '$' %}<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>{% endif %}
+                        <input id="{{ name }}-{{ p.id }}" type="number" name="{{ name }}" value="{{ value if value is not none else '' }}" step="{{ step }}" {% if min_value %}min="{{ min_value }}"{% endif %} class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {% if suffix == '$' %}pl-7{% endif %} {% if suffix == '%' %}pr-8{% endif %}">
+                        {% if suffix == '%' %}<span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-type-{{ p.id }}">Loan Type</label>
+                    <input id="loan-type-{{ p.id }}" name="loan_type" value="{{ loan.loan_type or '' }}" maxlength="100" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-status-{{ p.id }}">Status</label>
+                    <select id="loan-status-{{ p.id }}" name="loan_status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="active" {% if loan.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="transferred" {% if loan.status == 'transferred' %}selected{% endif %}>Transferred</option>
+                        <option value="paid_off" {% if loan.status == 'paid_off' %}selected{% endif %}>Paid off</option>
+                        <option value="unknown" {% if loan.status == 'unknown' %}selected{% endif %}>Needs review</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-start-{{ p.id }}">Loan Start Date</label>
+                    <input id="loan-start-{{ p.id }}" type="date" name="loan_start_date" value="{{ loan.start_date.isoformat() if loan.start_date else '' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-maturity-{{ p.id }}">Maturity Date</label>
+                    <input id="loan-maturity-{{ p.id }}" type="date" name="loan_maturity_date" value="{{ loan.maturity_date.isoformat() if loan.maturity_date else '' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="loan-notes-{{ p.id }}">Loan Notes</label>
+                    <textarea id="loan-notes-{{ p.id }}" name="loan_notes" rows="2" maxlength="2000" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ loan.notes or '' }}</textarea>
+                </div>
+                {% else %}
+                <div class="sm:col-span-2 mt-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                    No active loan is attached. <a href="/properties/{{ p.id }}?tab=loan" class="font-semibold underline">Add one on the Loan tab</a> to track balance, PITI, servicing, and insurance.
+                </div>
+                {% endif %}
             </div>
             <div class="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
                 <button type="button" onclick="closeEditModal({{ p.id }})" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>

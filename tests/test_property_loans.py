@@ -14,6 +14,7 @@ from webapp.routes.assets import (
     _compute_property_metrics,
     _effective_monthly_rent,
     _sync_property_loan_snapshot,
+    _validated_asset_loan_payload,
     _validated_loan_payload,
 )
 
@@ -68,6 +69,35 @@ def test_financing_form_validation_normalizes_expected_values():
     assert payload["start_date"] == date(2026, 3, 1)
     assert payload["maturity_date"] == date(2056, 4, 1)
     assert payload["is_current"] is True
+
+
+def test_assets_quick_edit_validates_loan_fields_without_touching_insurance():
+    payload = _validated_asset_loan_payload({
+        "loan_number_last4": "4492",
+        "loan_servicer": "Shellpoint Mortgage Servicing",
+        "loan_original_amount": "96000.00",
+        "loan_current_balance": "94458.18",
+        "loan_interest_rate": "7.875",
+        "loan_type": "Conventional",
+        "loan_term_years": "30",
+        "loan_start_date": "2025-01-01",
+        "loan_maturity_date": "2055-02-01",
+        "loan_monthly_payment": "2250.88",
+        "loan_escrow_balance": "3214.78",
+        "loan_status": "active",
+        "loan_notes": "Verified in servicing portal.",
+    })
+
+    assert payload["current_balance"] == Decimal("94458.18")
+    assert payload["monthly_payment"] == Decimal("2250.88")
+    assert payload["term_months"] == 360
+    assert payload["is_current"] is True
+    assert "insurance_policy_number" not in payload
+
+
+def test_assets_quick_edit_rejects_negative_piti():
+    with pytest.raises(ValueError, match="invalid_monthly_payment"):
+        _validated_asset_loan_payload({"loan_monthly_payment": "-1"})
 
 
 @pytest.mark.parametrize(
