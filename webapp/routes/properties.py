@@ -514,6 +514,7 @@ async def property_detail(request: Request, property_id: int):
                 selectinload(Property.violations),
                 selectinload(Property.work_orders).selectinload(WorkOrder.vendor_ref),
                 selectinload(Property.work_orders).selectinload(WorkOrder.tenant_ref),
+                selectinload(Property.loans),
             )
         )
         prop = result.scalar_one_or_none()

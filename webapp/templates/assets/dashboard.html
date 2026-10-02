@@ -105,7 +105,7 @@
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cash Flow</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cap Rate</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">LTV</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Edit</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -126,25 +126,29 @@
                     {# Property rows #}
                     {% for row in rows %}
                     {% set p = row.property %}
+                    {% set loan = row.loan %}
                     <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                            <div>{{ p.address }}</div>
+                            <a href="/properties/{{ p.id }}?tab=loan" class="font-medium text-blue-700 hover:text-blue-900 hover:underline">{{ p.address }}</a>
                             <div class="text-xs text-gray-400">{{ p.city }}, {{ p.state }} {{ p.zip_code }}</div>
                         </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.purchase_price) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.rehab_cost) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.appraised_value) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.loan_balance) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(p.interest_rate) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(p.monthly_piti) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(loan.current_balance if loan else p.loan_balance) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(loan.interest_rate if loan else p.interest_rate) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(loan.monthly_payment if loan else p.monthly_piti) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(p.monthly_rent) }}</td>
                         <td class="px-4 py-2 text-sm text-right font-medium {% if row.cash_flow is not none and row.cash_flow >= 0 %}text-green-600{% elif row.cash_flow is not none %}text-red-600{% else %}text-gray-400{% endif %}">
                             {{ fmt2(row.cash_flow) }}
                         </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(row.cap_rate) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(row.ltv) }}</td>
-                        <td class="px-4 py-2 text-center">
+                        <td class="px-4 py-2 text-center whitespace-nowrap">
+                            <a href="/properties/{{ p.id }}?tab=loan" class="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" title="View loan details">
+                                Loan
+                            </a>
                             <button onclick="openEditModal({{ p.id }})" class="text-blue-600 hover:text-blue-800 p-1 cursor-pointer" title="Edit financial data">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
@@ -202,20 +206,17 @@
                 </button>
             </div>
             <div class="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="mb-5 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                    Mortgage details are maintained on the property's
+                    <a href="/properties/{{ p.id }}?tab=loan" class="font-semibold underline">Loan tab</a>
+                    so refinancing and servicing history stay intact.
+                </div>
                 {% set fields = [
                     ("purchase_price", "Purchase Price", "number", p.purchase_price, "$", "0.01"),
                     ("purchase_date", "Purchase Date", "date", p.purchase_date, "", ""),
                     ("appraised_value", "Appraised Value", "number", p.appraised_value, "$", "0.01"),
                     ("appraisal_date", "Appraisal Date", "date", p.appraisal_date, "", ""),
-                    ("loan_amount", "Original Loan Amount", "number", p.loan_amount, "$", "0.01"),
-                    ("loan_balance", "Current Loan Balance", "number", p.loan_balance, "$", "0.01"),
-                    ("interest_rate", "Interest Rate (%)", "number", p.interest_rate, "", "0.001"),
-                    ("loan_term_years", "Loan Term (years)", "number", p.loan_term_years, "", "1"),
-                    ("loan_start_date", "Loan Start Date", "date", p.loan_start_date, "", ""),
-                    ("monthly_pi", "Monthly P&I", "number", p.monthly_pi, "$", "0.01"),
                     ("monthly_tax", "Monthly Tax", "number", p.monthly_tax, "$", "0.01"),
-                    ("monthly_insurance", "Monthly Insurance", "number", p.monthly_insurance, "$", "0.01"),
-                    ("monthly_piti", "Monthly PITI", "number", p.monthly_piti, "$", "0.01"),
                     ("hoa_monthly", "HOA / Month", "number", p.hoa_monthly, "$", "0.01"),
                     ("rehab_cost", "Total Rehab Cost", "number", p.rehab_cost, "$", "0.01"),
                 ] %}

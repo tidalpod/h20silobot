@@ -326,6 +326,11 @@ async def init_db():
         # Seed default showing reminder settings
         await _seed_showing_reminder_settings(engine)
 
+        # Seed verified property financing details. This is idempotent and only
+        # attaches records when the normalized address has exactly one match.
+        from .loan_seed import seed_property_loans
+        await seed_property_loans(engine)
+
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")
         return True

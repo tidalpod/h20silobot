@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% macro loan_money(value) %}{% if value is not none %}${{ "{:,.2f}".format(value|float) }}{% else %}—{% endif %}{% endmacro %}
+
 {% block title %}{{ property.address }}{% endblock %}
 
 {% block head %}
@@ -227,6 +229,9 @@
                     {% if current_status.value == 'overdue' %}
                     <span class="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">!</span>
                     {% endif %}
+                </button>
+                <button onclick="showTab('loan')" id="tab-loan" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                    Loan{% if property.current_loan %}<span class="ml-1 text-xs text-gray-400">· {{ property.current_loan.status|replace('_', ' ')|title }}</span>{% endif %}
                 </button>
                 <button onclick="showTab('maintenance')" id="tab-maintenance" class="tab-btn border-b-2 border-transparent py-3 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
                     Maintenance{% if work_orders %} ({{ work_orders|length }}){% endif %}
@@ -1022,6 +1027,163 @@
             {% endif %}
         </div>
 
+        <!-- TAB: Loan -->
+        <div id="panel-loan" class="tab-panel hidden space-y-6">
+            {% set loan = property.current_loan %}
+            {% if request.query_params.get('loan_saved') %}
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                Loan details saved.
+            </div>
+            {% endif %}
+            {% if request.query_params.get('loan_error') %}
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+                The loan details could not be saved. Check the amounts, dates, loan-number suffix, and required selections.
+            </div>
+            {% endif %}
+
+            {% if loan %}
+            <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 bg-gradient-to-r from-slate-950 to-blue-950 px-5 py-5 text-white sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Current financing</p>
+                                {% if loan.status == 'active' %}
+                                <span class="rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-inset ring-emerald-300/25">Active</span>
+                                {% elif loan.status == 'transferred' %}
+                                <span class="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-semibold text-amber-100 ring-1 ring-inset ring-amber-300/25">Transferred</span>
+                                {% elif loan.status == 'paid_off' %}
+                                <span class="rounded-full bg-blue-400/15 px-2.5 py-1 text-xs font-semibold text-blue-100 ring-1 ring-inset ring-blue-300/25">Paid off</span>
+                                {% else %}
+                                <span class="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 ring-1 ring-inset ring-white/20">Needs review</span>
+                                {% endif %}
+                            </div>
+                            <h2 class="mt-2 text-xl font-bold">{{ loan.servicer or 'Current servicer required' }}</h2>
+                            <button type="button" class="sensitive-toggle mt-2 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-blue-50 hover:bg-white/15" data-visible="false" onclick="toggleSensitive(this)">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                                <span class="masked-value">{{ loan.masked_loan_number }}</span>
+                                <span class="full-value hidden">Loan ending {{ loan.loan_number_last4 if loan.loan_number_last4 else 'not available' }}</span>
+                            </button>
+                        </div>
+                        <button type="button" onclick="openLoanModal()" class="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white hover:bg-white/15">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m15.2 5.2 3.6 3.6M6 18l3.7-.7L19 8a2.55 2.55 0 0 0-3.6-3.6l-9.3 9.3L5.4 18H6Z"/></svg>
+                            Edit loan
+                        </button>
+                    </div>
+                </div>
+
+                {% if loan.status == 'transferred' %}
+                <div class="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 sm:px-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.8 17a2 2 0 0 0 1.74 3h14.92a2 2 0 0 0 1.74-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+                        <div><p class="font-semibold">Servicing transfer needs attention</p><p class="mt-0.5">{{ loan.notes or 'Confirm the current servicer and update the remaining loan details.' }}</p></div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Principal</p>
+                        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
+                            <div><dt class="text-xs text-slate-500">Original amount</dt><dd class="mt-1 text-base font-semibold text-slate-950">{{ loan_money(loan.original_amount) }}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Current balance</dt><dd class="mt-1 text-base font-semibold text-slate-950">{{ loan_money(loan.current_balance) }}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Interest rate</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{% if loan.interest_rate is not none %}{{ "{:.3f}".format(loan.interest_rate|float) }}%{% else %}—{% endif %}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Loan type</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ loan.loan_type or '—' }}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Term</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{% if loan.term_years is not none %}{{ "{:g}".format(loan.term_years) }} years{% else %}—{% endif %}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Loan period</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{% if loan.start_date %}{{ loan.start_date.strftime('%b %Y') }}{% else %}—{% endif %} – {% if loan.maturity_date %}{{ loan.maturity_date.strftime('%b %Y') }}{% else %}—{% endif %}</dd></div>
+                        </dl>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Payment & escrow</p>
+                        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
+                            <div><dt class="text-xs text-slate-500">Monthly payment</dt><dd class="mt-1 text-lg font-bold text-slate-950">{{ loan_money(loan.monthly_payment) }}</dd></div>
+                            <div><dt class="text-xs text-slate-500">Escrow balance</dt><dd class="mt-1 text-lg font-bold {% if loan.escrow_balance is not none and loan.escrow_balance < 0 %}text-red-700{% else %}text-slate-950{% endif %}">{{ loan_money(loan.escrow_balance) }}</dd></div>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 px-5 py-5 sm:px-6">
+                    <div class="flex items-center gap-2">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3 4.5 6v5.25c0 4.65 3.2 8.58 7.5 9.75 4.3-1.17 7.5-5.1 7.5-9.75V6L12 3Z"/><path stroke-linecap="round" d="m9.5 12 1.7 1.7 3.6-4"/></svg>
+                        </div>
+                        <div><h3 class="font-semibold text-slate-950">Insurance</h3><p class="text-xs text-slate-500">Policy attached to this loan</p></div>
+                    </div>
+                    <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div><dt class="text-xs font-medium text-slate-500">Carrier / payee</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ loan.insurance_carrier or loan.insurance_payee or 'Not provided' }}</dd>{% if loan.insurance_carrier and loan.insurance_payee %}<p class="mt-0.5 text-xs text-slate-500">Payee: {{ loan.insurance_payee }}</p>{% endif %}</div>
+                        <div><dt class="text-xs font-medium text-slate-500">Policy number</dt><dd class="mt-1"><button type="button" class="sensitive-toggle inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-900" data-visible="false" onclick="toggleSensitive(this)"><span class="masked-value">{{ loan.masked_policy_number }}</span><span class="full-value hidden">{{ loan.insurance_policy_number or 'Not available' }}</span><span class="text-xs font-medium text-slate-400">Show</span></button></dd></div>
+                        <div><dt class="text-xs font-medium text-slate-500">Expiration</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ loan.insurance_expiration_date.strftime('%b %d, %Y') if loan.insurance_expiration_date else '—' }}</dd></div>
+                        <div><dt class="text-xs font-medium text-slate-500">Premium</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ loan_money(loan.insurance_premium) }}{% if loan.insurance_premium and loan.insurance_premium_frequency %} / {{ 'mo' if loan.insurance_premium_frequency == 'monthly' else 'yr' }}{% endif %}</dd></div>
+                    </dl>
+                </div>
+
+                {% if loan.notes and loan.status != 'transferred' %}
+                <div class="border-t border-slate-200 bg-amber-50/70 px-5 py-4 sm:px-6"><p class="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Status note</p><p class="mt-1 text-sm text-amber-950">{{ loan.notes }}</p></div>
+                {% endif %}
+            </section>
+            {% else %}
+            <section class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 17.25V6.75A2.25 2.25 0 0 1 5.25 4.5ZM7 15h4"/></svg>
+                </div>
+                <h2 class="mt-4 text-lg font-semibold text-slate-950">No loan details recorded</h2>
+                <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">Add financing details to track the balance, payment, servicer, and insurance alongside this asset.</p>
+                <button type="button" onclick="openLoanModal()" class="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add loan details</button>
+            </section>
+            {% endif %}
+
+            {% if property.loans|length > 1 %}
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4"><h3 class="font-semibold text-slate-950">Financing history</h3><p class="mt-0.5 text-sm text-slate-500">Prior loans are retained when financing changes.</p></div>
+                <div class="divide-y divide-slate-100">
+                    {% for history_loan in property.loans if not history_loan.is_current %}
+                    <div class="flex items-center justify-between gap-4 px-5 py-4"><div><p class="text-sm font-semibold text-slate-900">{{ history_loan.servicer or 'Unknown servicer' }} · {{ history_loan.masked_loan_number }}</p><p class="mt-0.5 text-xs text-slate-500">{{ history_loan.status|replace('_', ' ')|title }}{% if history_loan.maturity_date %} · Matures {{ history_loan.maturity_date.strftime('%b %Y') }}{% endif %}</p></div><p class="text-sm font-semibold text-slate-900">{{ loan_money(history_loan.current_balance) }}</p></div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            <div id="loanModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="loanModalTitle">
+                <div class="mx-auto my-4 max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-10">
+                    <form action="/assets/{{ property.id }}/loans/save" method="post">
+                        <input type="hidden" name="loan_id" value="{{ loan.id if loan else '' }}">
+                        <input type="hidden" name="is_current" value="1">
+                        <div class="flex items-start justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+                            <div><p class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Asset financing</p><h2 id="loanModalTitle" class="mt-1 text-xl font-bold text-slate-950">{{ 'Edit loan details' if loan else 'Add loan details' }}</h2><p class="mt-1 text-sm text-slate-500">Only the last four digits of a loan number are stored.</p></div>
+                            <button type="button" onclick="closeLoanModal()" class="rounded-lg p-2 text-slate-500 hover:bg-slate-200" aria-label="Close"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="m6 6 12 12M18 6 6 18"/></svg></button>
+                        </div>
+                        <div class="max-h-[72vh] space-y-7 overflow-y-auto px-5 py-5 sm:px-6">
+                            <fieldset><legend class="text-sm font-bold text-slate-900">Loan</legend><div class="mt-3 grid gap-4 sm:grid-cols-2">
+                                <label class="text-sm font-medium text-slate-700">Loan number (last 4)<input name="loan_number_last4" value="{{ loan.loan_number_last4 if loan and loan.loan_number_last4 else '' }}" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" placeholder="5114" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Servicer<input name="servicer" value="{{ loan.servicer if loan and loan.servicer else '' }}" maxlength="255" placeholder="Current servicer" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Original amount<input type="number" name="original_amount" value="{{ loan.original_amount if loan and loan.original_amount is not none else '' }}" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Current principal balance<input type="number" name="current_balance" value="{{ loan.current_balance if loan and loan.current_balance is not none else '' }}" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Interest rate (%)<input type="number" name="interest_rate" value="{{ loan.interest_rate if loan and loan.interest_rate is not none else '' }}" min="0" max="100" step="0.001" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Loan type<input name="loan_type" value="{{ loan.loan_type if loan and loan.loan_type else '' }}" maxlength="100" placeholder="Commercial" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Term (years)<input type="number" name="term_years" value="{{ '{:g}'.format(loan.term_years) if loan and loan.term_years is not none else '' }}" min="1" max="100" step="1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Status<select name="status" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"><option value="active" {% if not loan or loan.status == 'active' %}selected{% endif %}>Active</option><option value="transferred" {% if loan and loan.status == 'transferred' %}selected{% endif %}>Transferred</option><option value="paid_off" {% if loan and loan.status == 'paid_off' %}selected{% endif %}>Paid off</option><option value="unknown" {% if loan and loan.status == 'unknown' %}selected{% endif %}>Needs review</option></select></label>
+                                <label class="text-sm font-medium text-slate-700">Start date<input type="date" name="start_date" value="{{ loan.start_date.isoformat() if loan and loan.start_date else '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Maturity date<input type="date" name="maturity_date" value="{{ loan.maturity_date.isoformat() if loan and loan.maturity_date else '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Monthly payment<input type="number" name="monthly_payment" value="{{ loan.monthly_payment if loan and loan.monthly_payment is not none else '' }}" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Escrow balance<input type="number" name="escrow_balance" value="{{ loan.escrow_balance if loan and loan.escrow_balance is not none else '' }}" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                            </div></fieldset>
+                            <fieldset class="border-t border-slate-200 pt-6"><legend class="text-sm font-bold text-slate-900">Insurance</legend><div class="mt-3 grid gap-4 sm:grid-cols-2">
+                                <label class="text-sm font-medium text-slate-700">Carrier<input name="insurance_carrier" value="{{ loan.insurance_carrier if loan and loan.insurance_carrier else '' }}" maxlength="255" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Payee<input name="insurance_payee" value="{{ loan.insurance_payee if loan and loan.insurance_payee else '' }}" maxlength="255" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Policy number<input name="insurance_policy_number" value="{{ loan.insurance_policy_number if loan and loan.insurance_policy_number else '' }}" maxlength="100" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Expiration date<input type="date" name="insurance_expiration_date" value="{{ loan.insurance_expiration_date.isoformat() if loan and loan.insurance_expiration_date else '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Premium<input type="number" name="insurance_premium" value="{{ loan.insurance_premium if loan and loan.insurance_premium is not none else '' }}" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                                <label class="text-sm font-medium text-slate-700">Premium frequency<select name="insurance_premium_frequency" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"><option value="">Not provided</option><option value="monthly" {% if loan and loan.insurance_premium_frequency == 'monthly' %}selected{% endif %}>Monthly</option><option value="annual" {% if loan and loan.insurance_premium_frequency == 'annual' %}selected{% endif %}>Annual</option></select></label>
+                            </div></fieldset>
+                            <label class="block border-t border-slate-200 pt-6 text-sm font-medium text-slate-700">Status / exception note<textarea name="notes" rows="3" maxlength="2000" placeholder="Servicing transfers, insurance exceptions, or follow-up needed" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ loan.notes if loan and loan.notes else '' }}</textarea></label>
+                        </div>
+                        <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6"><button type="button" onclick="closeLoanModal()" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save loan</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB: Maintenance -->
         <div id="panel-maintenance" class="tab-panel hidden space-y-6">
             <div class="bg-white shadow rounded-lg">
@@ -1276,6 +1438,49 @@ function showTab(tabName) {
     activeTab.classList.remove('border-transparent', 'text-gray-500');
     activeTab.classList.add('border-blue-500', 'text-blue-600');
 }
+
+function openLoanModal() {
+    const modal = document.getElementById('loanModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLoanModal() {
+    const modal = document.getElementById('loanModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function toggleSensitive(button) {
+    const masked = button.querySelector('.masked-value');
+    const full = button.querySelector('.full-value');
+    const label = button.querySelector('.text-xs.font-medium');
+    const isVisible = button.dataset.visible === 'true';
+    masked.classList.toggle('hidden', !isVisible);
+    full.classList.toggle('hidden', isVisible);
+    button.dataset.visible = isVisible ? 'false' : 'true';
+    if (label) label.textContent = isVisible ? 'Show' : 'Hide';
+}
+
+const propertyTab = new URLSearchParams(window.location.search).get('tab');
+if (['overview', 'tenants', 'compliance', 'utilities', 'loan', 'maintenance'].includes(propertyTab)) {
+    showTab(propertyTab);
+}
+if (new URLSearchParams(window.location.search).has('loan_error')) {
+    openLoanModal();
+}
+
+const loanModal = document.getElementById('loanModal');
+if (loanModal) {
+    loanModal.addEventListener('click', (event) => {
+        if (event.target === loanModal) closeLoanModal();
+    });
+}
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeLoanModal();
+});
 
 // Refresh bill with progress tracker
 async function refreshPropertyBill() {

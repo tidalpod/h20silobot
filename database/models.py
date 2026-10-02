@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
+import re
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Numeric, DateTime, Date,
     ForeignKey, Text, Enum, Boolean, Index, Float, UniqueConstraint
@@ -265,6 +266,12 @@ class Property(Base):
     violations = relationship("InspectionViolation", back_populates="property", order_by="desc(InspectionViolation.violation_date)")
     co_documents = relationship("COInspectionDocument", back_populates="property", order_by="desc(COInspectionDocument.uploaded_at)")
     co_vendors = relationship("COInspectionVendor", back_populates="property")
+    loans = relationship(
+        "PropertyLoan",
+        back_populates="property_ref",
+        cascade="all, delete-orphan",
+        order_by="desc(PropertyLoan.is_current), desc(PropertyLoan.updated_at)",
+    )
 
     def __repr__(self):
         return f"<Property {self.address} ({self.bsa_account_number})>"
@@ -273,6 +280,11 @@ class Property(Base):
     def latest_bill(self):
         """Get the most recent bill"""
         return self.bills[0] if self.bills else None
+
+    @property
+    def current_loan(self):
+        """Return the current financing record, if one is available."""
+        return next((loan for loan in self.loans if loan.is_current), None)
 
     @property
     def recert_eligible_date(self):
@@ -664,6 +676,72 @@ class PropertyTax(Base):
 
     def __repr__(self):
         return f"<PropertyTax {self.tax_year} - ${self.amount_due}>"
+
+
+class PropertyLoan(Base):
+    """A mortgage or other financing record attached to a property.
+
+    Loans are modeled separately from Property so refinances and servicing
+    transfers can be retained without overwriting prior financing history.
+    Only the final four digits of the loan number are stored.
+    """
+    __tablename__ = "property_loans"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    loan_number_last4 = Column(String(4), nullable=True)
+    servicer = Column(String(255), nullable=True)
+    original_amount = Column(Numeric(12, 2), nullable=True)
+    current_balance = Column(Numeric(12, 2), nullable=True)
+    interest_rate = Column(Numeric(6, 3), nullable=True)
+    loan_type = Column(String(100), nullable=True)
+    term_months = Column(Integer, nullable=True)
+    start_date = Column(Date, nullable=True)
+    maturity_date = Column(Date, nullable=True)
+    monthly_payment = Column(Numeric(12, 2), nullable=True)
+    escrow_balance = Column(Numeric(12, 2), nullable=True)
+
+    insurance_carrier = Column(String(255), nullable=True)
+    insurance_payee = Column(String(255), nullable=True)
+    insurance_policy_number = Column(String(100), nullable=True)
+    insurance_expiration_date = Column(Date, nullable=True)
+    insurance_premium = Column(Numeric(12, 2), nullable=True)
+    insurance_premium_frequency = Column(String(20), nullable=True)
+
+    status = Column(String(30), nullable=False, default="active")
+    notes = Column(Text, nullable=True)
+    is_current = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    property_ref = relationship("Property", back_populates="loans")
+
+    __table_args__ = (
+        UniqueConstraint("property_id", "loan_number_last4", name="uq_property_loan_last4"),
+        Index("ix_property_loans_property_current", "property_id", "is_current"),
+    )
+
+    @property
+    def masked_loan_number(self):
+        return f"•••• {self.loan_number_last4}" if self.loan_number_last4 else "Not available"
+
+    @property
+    def masked_policy_number(self):
+        if not self.insurance_policy_number:
+            return "Not available"
+        compact = re.sub(r"[^A-Za-z0-9]", "", self.insurance_policy_number)
+        suffix = compact[-4:]
+        return f"•••• {suffix}"
+
+    @property
+    def term_years(self):
+        if self.term_months is None:
+            return None
+        return self.term_months / 12
+
+    def __repr__(self):
+        return f"<PropertyLoan property_id={self.property_id} status={self.status}>"
 
 
 # =============================================================================
