@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -190,6 +191,16 @@ def _build_asset_rows(properties: list[Property]) -> list[dict]:
     return [_compute_asset_rollup(group) for group in rollups.values()]
 
 
+def _filter_asset_rows(rows: list[dict], selected_entity: Optional[str]) -> list[dict]:
+    """Return only the requested ownership portfolio, or the full portfolio."""
+    if selected_entity is None:
+        return rows
+    return [
+        row for row in rows
+        if (row["property"].entity or "Unassigned") == selected_entity
+    ]
+
+
 def _asset_sort_value(row: dict, key: str):
     """Return the normalized value used to sort an Assets table row."""
     loan = row["loan"]
@@ -212,7 +223,12 @@ def _asset_sort_value(row: dict, key: str):
 
 
 @router.get("/", response_class=HTMLResponse)
-async def assets_dashboard(request: Request, sort: str = "property", direction: str = "asc"):
+async def assets_dashboard(
+    request: Request,
+    sort: str = "property",
+    direction: str = "asc",
+    entity: Optional[str] = None,
+):
     """Portfolio-level investment dashboard."""
     user = await get_current_user(request)
     if not user:
@@ -232,9 +248,13 @@ async def assets_dashboard(request: Request, sort: str = "property", direction: 
         )
         all_properties = result.scalars().all()
 
+    asset_entities = sorted({prop.entity or "Unassigned" for prop in all_properties}, key=str.casefold)
+    selected_entity = entity if entity in asset_entities else None
+
     # Build one metrics row per physical asset. Configured duplex unit records
-    # are consolidated here before grouping, sorting, and portfolio totals.
-    rows = _build_asset_rows(all_properties)
+    # are consolidated here before grouping, sorting, filtering, and totals.
+    all_rows = _build_asset_rows(all_properties)
+    rows = _filter_asset_rows(all_rows, selected_entity)
 
     # Group by entity
     grouped: dict[str, list[dict]] = {}
@@ -255,7 +275,16 @@ async def assets_dashboard(request: Request, sort: str = "property", direction: 
     sort_urls = {}
     for key in ASSET_SORT_KEYS:
         next_direction = "desc" if sort == key and direction == "asc" else "asc"
-        sort_urls[key] = f"/assets/?sort={key}&direction={next_direction}"
+        params = {"sort": key, "direction": next_direction}
+        if selected_entity:
+            params["entity"] = selected_entity
+        sort_urls[key] = f"/assets/?{urlencode(params)}"
+
+    entity_urls = {
+        option: f"/assets/?{urlencode({'sort': sort, 'direction': direction, 'entity': option})}"
+        for option in asset_entities
+    }
+    all_entities_url = f"/assets/?{urlencode({'sort': sort, 'direction': direction})}"
 
     # Portfolio totals
     total_value = sum(_dec(r["appraised_value"]) for r in rows)
@@ -276,6 +305,10 @@ async def assets_dashboard(request: Request, sort: str = "property", direction: 
         "sort_key": sort,
         "sort_direction": direction,
         "sort_urls": sort_urls,
+        "asset_entities": asset_entities,
+        "selected_entity": selected_entity,
+        "entity_urls": entity_urls,
+        "all_entities_url": all_entities_url,
     })
 
 

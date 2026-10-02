@@ -14,6 +14,7 @@ from webapp.routes.assets import (
     _build_asset_rows,
     _compute_property_metrics,
     _effective_monthly_rent,
+    _filter_asset_rows,
     _sync_property_loan_snapshot,
     _validated_asset_loan_payload,
     _validated_loan_payload,
@@ -303,3 +304,27 @@ def test_assets_do_not_merge_other_republic_properties():
 
     assert len(rows) == 2
     assert sorted(row["unit_count"] for row in rows) == [1, 2]
+
+
+def test_assets_filter_rows_by_entity_without_changing_all_portfolios_view():
+    casa = Property(
+        id=301,
+        address="Casa Property",
+        bsa_account_number="casa-property",
+        entity="Casa Sicura LLC",
+    )
+    silo = Property(
+        id=302,
+        address="Silo Property",
+        bsa_account_number="silo-property",
+        entity="Silo Capital LLC",
+    )
+    for prop in (casa, silo):
+        prop.tenants = []
+        prop.loans = []
+    rows = _build_asset_rows([casa, silo])
+
+    assert _filter_asset_rows(rows, None) == rows
+    selected = _filter_asset_rows(rows, "Silo Capital LLC")
+    assert len(selected) == 1
+    assert selected[0]["property"] is silo
