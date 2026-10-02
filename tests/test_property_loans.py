@@ -8,9 +8,10 @@ from database.loan_seed import (
     find_unambiguous_property_id,
     normalize_property_address,
 )
-from database.models import Property, PropertyLoan
+from database.models import Property, PropertyLoan, Tenant
 from webapp.routes.assets import (
     _compute_property_metrics,
+    _effective_monthly_rent,
     _sync_property_loan_snapshot,
     _validated_loan_payload,
 )
@@ -126,3 +127,36 @@ def test_current_related_loan_drives_assets_metrics_and_legacy_snapshot():
     assert prop.loan_balance == Decimal("75000")
     assert prop.monthly_piti == Decimal("848.28")
     assert prop.monthly_insurance == Decimal("100.00")
+
+
+def test_assets_use_active_tenant_rent_before_listed_property_rent():
+    prop = Property(
+        address="11100 Maxwell Ave",
+        bsa_account_number="test-11100",
+        monthly_rent=Decimal("900.00"),
+    )
+    prop.tenants = [
+        Tenant(name="Former tenant", is_active=False, is_primary=True, current_rent=Decimal("800.00")),
+        Tenant(name="Current tenant", is_active=True, is_primary=True, current_rent=Decimal("1250.00")),
+    ]
+
+    metrics = _compute_property_metrics(prop)
+
+    assert _effective_monthly_rent(prop) == Decimal("1250.00")
+    assert metrics["monthly_rent"] == Decimal("1250.00")
+
+
+def test_assets_combine_section8_voucher_and_tenant_portion():
+    prop = Property(address="11294 Essex Ave", bsa_account_number="test-11294")
+    prop.tenants = [
+        Tenant(
+            name="Current tenant",
+            is_active=True,
+            is_primary=True,
+            is_section8=True,
+            voucher_amount=Decimal("925.00"),
+            tenant_portion=Decimal("275.00"),
+        )
+    ]
+
+    assert _effective_monthly_rent(prop) == Decimal("1200.00")

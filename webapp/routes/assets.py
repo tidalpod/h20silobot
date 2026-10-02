@@ -27,6 +27,22 @@ def _dec(v) -> float:
     return float(v)
 
 
+def _effective_monthly_rent(p: Property):
+    """Return the rent already maintained for the property's active household."""
+    active_tenants = [tenant for tenant in p.tenants if tenant.is_active]
+    primary_tenant = next((tenant for tenant in active_tenants if tenant.is_primary), None)
+    tenant = primary_tenant or (active_tenants[0] if active_tenants else None)
+
+    if tenant:
+        if tenant.is_section8 and (tenant.voucher_amount is not None or tenant.tenant_portion is not None):
+            return Decimal(tenant.voucher_amount or 0) + Decimal(tenant.tenant_portion or 0)
+        if tenant.current_rent is not None:
+            return Decimal(tenant.current_rent)
+
+    # Keep the advertised property rent as a fallback for vacant/listed units.
+    return p.monthly_rent
+
+
 def _compute_property_metrics(p: Property) -> dict:
     """Compute equity, cash flow, cap rate, LTV for a property."""
     loan = p.current_loan
@@ -34,7 +50,8 @@ def _compute_property_metrics(p: Property) -> dict:
     balance_value = loan.current_balance if loan else p.loan_balance
     payment_value = loan.monthly_payment if loan else p.monthly_piti
     balance = _dec(balance_value)
-    rent = _dec(p.monthly_rent)
+    rent_value = _effective_monthly_rent(p)
+    rent = _dec(rent_value)
     piti = _dec(payment_value)
     hoa = _dec(p.hoa_monthly)
 
@@ -49,6 +66,7 @@ def _compute_property_metrics(p: Property) -> dict:
     return {
         "property": p,
         "loan": loan,
+        "monthly_rent": rent_value,
         "equity": equity,
         "cash_flow": cash_flow,
         "cap_rate": cap_rate,
@@ -66,7 +84,7 @@ async def assets_dashboard(request: Request):
     async with get_session() as session:
         result = await session.execute(
             select(Property)
-            .options(selectinload(Property.loans))
+            .options(selectinload(Property.loans), selectinload(Property.tenants))
             .where(Property.is_active == True)
             .order_by(Property.entity, Property.address)
         )

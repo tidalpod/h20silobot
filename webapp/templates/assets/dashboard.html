@@ -139,7 +139,7 @@
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(loan.current_balance if loan else p.loan_balance) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(loan.interest_rate if loan else p.interest_rate) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(loan.monthly_payment if loan else p.monthly_piti) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(p.monthly_rent) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(row.monthly_rent) }}</td>
                         <td class="px-4 py-2 text-sm text-right font-medium {% if row.cash_flow is not none and row.cash_flow >= 0 %}text-green-600{% elif row.cash_flow is not none %}text-red-600{% else %}text-gray-400{% endif %}">
                             {{ fmt2(row.cash_flow) }}
                         </td>
@@ -165,7 +165,7 @@
                         {% set ns.eq = ns.eq + (row.equity|float if row.equity else 0) %}
                         {% set ns.debt = ns.debt + (row.property.loan_balance|float if row.property.loan_balance else 0) %}
                         {% set ns.cf = ns.cf + (row.cash_flow|float if row.cash_flow else 0) %}
-                        {% set ns.rent = ns.rent + (row.property.monthly_rent|float if row.property.monthly_rent else 0) %}
+                        {% set ns.rent = ns.rent + (row.monthly_rent|float if row.monthly_rent is not none else 0) %}
                         {% set ns.piti = ns.piti + (row.property.monthly_piti|float if row.property.monthly_piti else 0) %}
                         {% set ns.rehab = ns.rehab + (row.property.rehab_cost|float if row.property.rehab_cost else 0) %}
                     {% endfor %}
