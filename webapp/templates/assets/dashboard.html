@@ -162,6 +162,8 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for entity, rows in grouped.items() %}
+                    {% set entity_units = namespace(count=0) %}
+                    {% for row in rows %}{% set entity_units.count = entity_units.count + row.unit_count %}{% endfor %}
                     {# Entity header #}
                     <tr class="bg-gray-100 cursor-pointer hover:bg-gray-200" onclick="toggleEntity('{{ entity|replace(' ', '_')|replace('.', '') }}')">
                         <td colspan="14" class="px-4 py-2">
@@ -170,7 +172,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                                 </svg>
                                 {{ entity }}
-                                <span class="text-gray-400 font-normal">({{ rows|length }} {{ 'property' if rows|length == 1 else 'properties' }})</span>
+                                <span class="text-gray-400 font-normal">
+                                    ({{ rows|length }} {{ 'asset' if rows|length == 1 else 'assets' }}{% if entity_units.count != rows|length %} · {{ entity_units.count }} units{% endif %})
+                                </span>
                             </div>
                         </td>
                     </tr>
@@ -181,14 +185,17 @@
                     {% set loan = row.loan %}
                     <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                            <a href="/properties/{{ p.id }}?tab=loan" class="font-medium text-blue-700 hover:text-blue-900 hover:underline">{{ p.address }}</a>
+                            <a href="/properties/{{ p.id }}?tab=loan" class="font-medium text-blue-700 hover:text-blue-900 hover:underline">{{ row.display_address }}</a>
                             <div class="text-xs text-gray-400">{{ p.city }}, {{ p.state }} {{ p.zip_code }}</div>
+                            {% if row.unit_count > 1 %}
+                            <div class="mt-0.5 text-[11px] font-medium text-blue-600">{{ row.unit_count }} units consolidated</div>
+                            {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.purchase_price) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.rehab_cost) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.appraised_value) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.purchase_price) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.rehab_cost) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.appraised_value) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(loan.current_balance if loan else p.loan_balance) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.loan_balance) }}</td>
                         <td class="max-w-40 px-4 py-2 text-sm text-left leading-tight">
                             {% if loan and loan.servicer %}
                             <span class="font-medium text-gray-700">{{ loan.servicer }}</span>
@@ -198,9 +205,16 @@
                             <span class="text-gray-400">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(loan.interest_rate if loan else p.interest_rate) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(loan.monthly_payment if loan else p.monthly_piti) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(row.monthly_rent) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(row.interest_rate) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(row.monthly_payment) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">
+                            <div>{{ fmt2(row.monthly_rent) }}</div>
+                            {% if row.unit_count > 1 %}
+                            <div class="mt-0.5 text-[11px] text-gray-400">
+                                {% for unit, unit_rent in row.rent_components %}{{ unit.address|replace(row.display_address, '')|trim or ('Unit ' ~ loop.index) }} {{ fmt2(unit_rent) }}{% if not loop.last %} + {% endif %}{% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-2 text-sm text-right font-medium {% if row.cash_flow is not none and row.cash_flow >= 0 %}text-green-600{% elif row.cash_flow is not none %}text-red-600{% else %}text-gray-400{% endif %}">
                             {{ fmt2(row.cash_flow) }}
                         </td>
@@ -222,13 +236,13 @@
                     {# Subtotals row #}
                     {% set ns = namespace(val=0, eq=0, debt=0, cf=0, rent=0, piti=0, rehab=0) %}
                     {% for row in rows %}
-                        {% set ns.val = ns.val + (row.property.appraised_value|float if row.property.appraised_value else 0) %}
+                        {% set ns.val = ns.val + (row.appraised_value|float if row.appraised_value else 0) %}
                         {% set ns.eq = ns.eq + (row.equity|float if row.equity else 0) %}
-                        {% set ns.debt = ns.debt + (row.property.loan_balance|float if row.property.loan_balance else 0) %}
+                        {% set ns.debt = ns.debt + (row.loan_balance|float if row.loan_balance else 0) %}
                         {% set ns.cf = ns.cf + (row.cash_flow|float if row.cash_flow else 0) %}
                         {% set ns.rent = ns.rent + (row.monthly_rent|float if row.monthly_rent is not none else 0) %}
-                        {% set ns.piti = ns.piti + (row.property.monthly_piti|float if row.property.monthly_piti else 0) %}
-                        {% set ns.rehab = ns.rehab + (row.property.rehab_cost|float if row.property.rehab_cost else 0) %}
+                        {% set ns.piti = ns.piti + (row.monthly_payment|float if row.monthly_payment else 0) %}
+                        {% set ns.rehab = ns.rehab + (row.rehab_cost|float if row.rehab_cost else 0) %}
                     {% endfor %}
                     <tr class="entity-row-{{ entity|replace(' ', '_')|replace('.', '') }} bg-gray-50 font-medium text-sm">
                         <td class="px-4 py-2 text-gray-600 italic">Subtotal</td>
@@ -266,7 +280,8 @@
             <div class="flex items-center justify-between px-6 py-4 border-b">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Asset details</p>
-                    <h2 class="mt-0.5 text-lg font-semibold text-gray-900">Edit {{ p.address }}</h2>
+                    <h2 class="mt-0.5 text-lg font-semibold text-gray-900">Edit {{ row.display_address }}</h2>
+                    {% if row.unit_count > 1 %}<p class="mt-0.5 text-xs text-gray-500">Shared asset and loan data is stored on {{ p.address }}; rent is totaled from all {{ row.unit_count }} units.</p>{% endif %}
                 </div>
                 <button type="button" onclick="closeEditModal({{ p.id }})" class="text-gray-400 hover:text-gray-600 cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
@@ -278,13 +293,13 @@
                     <p class="mt-0.5 text-xs text-gray-500">Purchase, valuation, tax, HOA, and improvement costs.</p>
                 </div>
                 {% set fields = [
-                    ("purchase_price", "Purchase Price", "number", p.purchase_price, "$", "0.01"),
-                    ("purchase_date", "Purchase Date", "date", p.purchase_date, "", ""),
-                    ("appraised_value", "Appraised Value", "number", p.appraised_value, "$", "0.01"),
-                    ("appraisal_date", "Appraisal Date", "date", p.appraisal_date, "", ""),
-                    ("monthly_tax", "Monthly Tax", "number", p.monthly_tax, "$", "0.01"),
-                    ("hoa_monthly", "HOA / Month", "number", p.hoa_monthly, "$", "0.01"),
-                    ("rehab_cost", "Total Rehab Cost", "number", p.rehab_cost, "$", "0.01"),
+                    ("purchase_price", "Purchase Price", "number", row.purchase_price, "$", "0.01"),
+                    ("purchase_date", "Purchase Date", "date", row.purchase_date, "", ""),
+                    ("appraised_value", "Appraised Value", "number", row.appraised_value, "$", "0.01"),
+                    ("appraisal_date", "Appraisal Date", "date", row.appraisal_date, "", ""),
+                    ("monthly_tax", "Monthly Tax", "number", row.monthly_tax, "$", "0.01"),
+                    ("hoa_monthly", "HOA / Month", "number", row.hoa_monthly, "$", "0.01"),
+                    ("rehab_cost", "Total Rehab Cost", "number", row.rehab_cost, "$", "0.01"),
                 ] %}
                 {% for name, label, type, value, prefix, step in fields %}
                 <div>

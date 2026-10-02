@@ -35,6 +35,15 @@ ASSET_SORT_KEYS = (
     "ltv",
 )
 
+# These addresses are represented as one Property record per apartment in the
+# operating system, but are one physical asset for valuation and financing.
+# Keep the rollup explicit so similarly named single-family homes are never
+# merged by a broad address heuristic.
+MULTIUNIT_ASSET_ADDRESSES = {
+    "11035 republic ave": "11035 Republic Ave",
+    "3616 wasmund ave": "3616 Wasmund Ave",
+}
+
 
 def _dec(v) -> float:
     """Convert Decimal/None to float for arithmetic."""
@@ -59,29 +68,103 @@ def _effective_monthly_rent(p: Property):
     return p.monthly_rent
 
 
-def _compute_property_metrics(p: Property) -> dict:
-    """Compute equity, cash flow, cap rate, LTV for a property."""
-    loan = p.current_loan
-    appraised = _dec(p.appraised_value)
-    balance_value = loan.current_balance if loan else p.loan_balance
-    payment_value = loan.monthly_payment if loan else p.monthly_piti
+def _normalized_asset_address(address: str) -> str:
+    """Normalize an address just enough to identify configured multi-unit assets."""
+    return " ".join(
+        (address or "")
+        .casefold()
+        .replace(".", " ")
+        .replace(",", " ")
+        .split()
+    )
+
+
+def _asset_rollup_key(p: Property) -> str:
+    """Return a stable building key for configured duplexes, else the property id."""
+    normalized = _normalized_asset_address(p.address)
+    for base in MULTIUNIT_ASSET_ADDRESSES:
+        if normalized == base or normalized.startswith(f"{base} apt ") or normalized.startswith(f"{base} unit "):
+            return f"building:{base}"
+    return f"property:{p.id}"
+
+
+def _rollup_property_order(p: Property):
+    """Prefer Unit/Apt 1 as the canonical record for shared asset data."""
+    normalized = _normalized_asset_address(p.address)
+    is_unit_one = normalized.endswith(" apt 1") or normalized.endswith(" unit 1")
+    return (0 if is_unit_one else 1, normalized, p.id or 0)
+
+
+def _first_property_value(properties: list[Property], field: str):
+    """Return the canonical non-empty shared value without adding duplicates."""
+    for prop in properties:
+        value = getattr(prop, field)
+        if value is not None:
+            return value
+    return None
+
+
+def _compute_asset_rollup(properties: list[Property]) -> dict:
+    """Compute one Assets-table row for one physical building."""
+    ordered = sorted(properties, key=_rollup_property_order)
+    primary = ordered[0]
+    loan = primary.current_loan or next((prop.current_loan for prop in ordered if prop.current_loan), None)
+
+    rents = [(prop, _effective_monthly_rent(prop)) for prop in ordered]
+    populated_rents = [Decimal(rent) for _, rent in rents if rent is not None]
+    rent_value = sum(populated_rents, Decimal("0")) if populated_rents else None
+
+    purchase_price = _first_property_value(ordered, "purchase_price")
+    purchase_date = _first_property_value(ordered, "purchase_date")
+    rehab_cost = _first_property_value(ordered, "rehab_cost")
+    appraised_value = _first_property_value(ordered, "appraised_value")
+    appraisal_date = _first_property_value(ordered, "appraisal_date")
+    monthly_tax = _first_property_value(ordered, "monthly_tax")
+    legacy_balance = _first_property_value(ordered, "loan_balance")
+    legacy_payment = _first_property_value(ordered, "monthly_piti")
+    legacy_rate = _first_property_value(ordered, "interest_rate")
+    hoa_value = _first_property_value(ordered, "hoa_monthly")
+
+    balance_value = loan.current_balance if loan else legacy_balance
+    payment_value = loan.monthly_payment if loan else legacy_payment
+    rate_value = loan.interest_rate if loan else legacy_rate
+    appraised = _dec(appraised_value)
     balance = _dec(balance_value)
-    rent_value = _effective_monthly_rent(p)
     rent = _dec(rent_value)
     piti = _dec(payment_value)
-    hoa = _dec(p.hoa_monthly)
+    hoa = _dec(hoa_value)
 
-    equity = appraised - balance if p.appraised_value is not None and balance_value is not None else None
+    equity = appraised - balance if appraised_value is not None and balance_value is not None else None
     cash_flow = rent - piti - hoa if payment_value is not None else None
     cap_rate = None
     if payment_value is not None and appraised > 0:
-        annual_cf = (rent - piti - hoa) * 12
-        cap_rate = round(annual_cf / appraised * 100, 2)
-    ltv = round(balance / appraised * 100, 2) if p.appraised_value and appraised > 0 and balance_value is not None else None
+        cap_rate = round(((rent - piti - hoa) * 12) / appraised * 100, 2)
+    ltv = round(balance / appraised * 100, 2) if appraised_value is not None and appraised > 0 and balance_value is not None else None
+
+    normalized_primary = _normalized_asset_address(primary.address)
+    display_address = primary.address
+    for base, label in MULTIUNIT_ASSET_ADDRESSES.items():
+        if normalized_primary == base or normalized_primary.startswith(f"{base} apt ") or normalized_primary.startswith(f"{base} unit "):
+            display_address = label
+            break
 
     return {
-        "property": p,
+        "property": primary,
+        "properties": ordered,
         "loan": loan,
+        "display_address": display_address,
+        "unit_count": len(ordered),
+        "rent_components": rents,
+        "purchase_price": purchase_price,
+        "purchase_date": purchase_date,
+        "rehab_cost": rehab_cost,
+        "appraised_value": appraised_value,
+        "appraisal_date": appraisal_date,
+        "monthly_tax": monthly_tax,
+        "hoa_monthly": hoa_value,
+        "loan_balance": balance_value,
+        "interest_rate": rate_value,
+        "monthly_payment": payment_value,
         "monthly_rent": rent_value,
         "equity": equity,
         "cash_flow": cash_flow,
@@ -90,20 +173,33 @@ def _compute_property_metrics(p: Property) -> dict:
     }
 
 
+def _compute_property_metrics(p: Property) -> dict:
+    """Compute equity, cash flow, cap rate, LTV for a property."""
+    return _compute_asset_rollup([p])
+
+
+def _build_asset_rows(properties: list[Property]) -> list[dict]:
+    """Collapse configured multi-unit records into physical-asset rows."""
+    rollups: dict[tuple[str, str], list[Property]] = {}
+    for prop in properties:
+        entity = prop.entity or "Unassigned"
+        rollups.setdefault((entity, _asset_rollup_key(prop)), []).append(prop)
+    return [_compute_asset_rollup(group) for group in rollups.values()]
+
+
 def _asset_sort_value(row: dict, key: str):
     """Return the normalized value used to sort an Assets table row."""
-    prop = row["property"]
     loan = row["loan"]
     values = {
-        "property": prop.address.casefold(),
-        "purchase": prop.purchase_price,
-        "rehab": prop.rehab_cost,
-        "appraised": prop.appraised_value,
+        "property": row["display_address"].casefold(),
+        "purchase": row["purchase_price"],
+        "rehab": row["rehab_cost"],
+        "appraised": row["appraised_value"],
         "equity": row["equity"],
-        "loan_balance": loan.current_balance if loan else prop.loan_balance,
+        "loan_balance": row["loan_balance"],
         "servicer": loan.servicer.casefold() if loan and loan.servicer else None,
-        "rate": loan.interest_rate if loan else prop.interest_rate,
-        "piti": loan.monthly_payment if loan else prop.monthly_piti,
+        "rate": row["interest_rate"],
+        "piti": row["monthly_payment"],
         "rent": row["monthly_rent"],
         "cash_flow": row["cash_flow"],
         "cap_rate": row["cap_rate"],
@@ -133,8 +229,9 @@ async def assets_dashboard(request: Request, sort: str = "property", direction: 
         )
         all_properties = result.scalars().all()
 
-    # Build per-property metrics
-    rows = [_compute_property_metrics(p) for p in all_properties]
+    # Build one metrics row per physical asset. Configured duplex unit records
+    # are consolidated here before grouping, sorting, and portfolio totals.
+    rows = _build_asset_rows(all_properties)
 
     # Group by entity
     grouped: dict[str, list[dict]] = {}
@@ -158,11 +255,11 @@ async def assets_dashboard(request: Request, sort: str = "property", direction: 
         sort_urls[key] = f"/assets/?sort={key}&direction={next_direction}"
 
     # Portfolio totals
-    total_value = sum(_dec(r["property"].appraised_value) for r in rows)
+    total_value = sum(_dec(r["appraised_value"]) for r in rows)
     total_equity = sum(_dec(r["equity"]) for r in rows)
-    total_debt = sum(_dec(r["property"].loan_balance) for r in rows)
+    total_debt = sum(_dec(r["loan_balance"]) for r in rows)
     total_cash_flow = sum(_dec(r["cash_flow"]) for r in rows)
-    total_rehab = sum(_dec(r["property"].rehab_cost) for r in rows)
+    total_rehab = sum(_dec(r["rehab_cost"]) for r in rows)
 
     return templates.TemplateResponse("assets/dashboard.html", {
         "request": request,

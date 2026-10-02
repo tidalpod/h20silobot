@@ -11,6 +11,7 @@ from database.loan_seed import (
 from database.models import Property, PropertyLoan, Tenant
 from webapp.routes.assets import (
     _asset_sort_value,
+    _build_asset_rows,
     _compute_property_metrics,
     _effective_monthly_rent,
     _sync_property_loan_snapshot,
@@ -214,3 +215,75 @@ def test_assets_sort_values_use_current_loan_and_effective_rent():
     assert _asset_sort_value(row, "servicer") == "select portfolio servicing"
     assert _asset_sort_value(row, "loan_balance") == Decimal("102159.12")
     assert _asset_sort_value(row, "rent") == Decimal("1400.00")
+
+
+@pytest.mark.parametrize(
+    "base_address,display_address",
+    [
+        ("11035 Republic Ave", "11035 Republic Ave"),
+        ("3616 Wasmund Ave", "3616 Wasmund Ave"),
+    ],
+)
+def test_assets_consolidate_configured_duplex_units(base_address, display_address):
+    unit_one = Property(
+        id=101,
+        address=f"{base_address}, Apt. 1",
+        city="Warren",
+        state="MI",
+        zip_code="48089",
+        bsa_account_number=f"{base_address}-1",
+        entity="Casa Sicura LLC",
+        purchase_price=Decimal("100000.00"),
+        appraised_value=Decimal("150000.00"),
+    )
+    unit_one.tenants = [
+        Tenant(name="Unit one", is_active=True, is_primary=True, current_rent=Decimal("950.00"))
+    ]
+    unit_one.loans = [
+        PropertyLoan(
+            servicer="Test Servicer",
+            current_balance=Decimal("80000.00"),
+            interest_rate=Decimal("7.500"),
+            monthly_payment=Decimal("900.00"),
+            is_current=True,
+        )
+    ]
+    unit_two = Property(
+        id=102,
+        address=f"{base_address}, Apt. 2",
+        city="Warren",
+        state="MI",
+        zip_code="48089",
+        bsa_account_number=f"{base_address}-2",
+        entity="Casa Sicura LLC",
+    )
+    unit_two.tenants = [
+        Tenant(name="Unit two", is_active=True, is_primary=True, current_rent=Decimal("1000.00"))
+    ]
+    unit_two.loans = []
+
+    rows = _build_asset_rows([unit_two, unit_one])
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["property"] is unit_one
+    assert row["display_address"] == display_address
+    assert row["unit_count"] == 2
+    assert row["monthly_rent"] == Decimal("1950.00")
+    assert row["loan_balance"] == Decimal("80000.00")
+    assert row["monthly_payment"] == Decimal("900.00")
+    assert row["cash_flow"] == pytest.approx(1050.00)
+
+
+def test_assets_do_not_merge_other_republic_properties():
+    duplex_one = Property(id=201, address="11035 Republic Ave Apt. 1", bsa_account_number="duplex-1")
+    duplex_two = Property(id=202, address="11035 Republic Ave Apt. 2", bsa_account_number="duplex-2")
+    other_republic = Property(id=203, address="6750 Republic Ave.", bsa_account_number="other-republic")
+    for prop in (duplex_one, duplex_two, other_republic):
+        prop.tenants = []
+        prop.loans = []
+
+    rows = _build_asset_rows([duplex_one, duplex_two, other_republic])
+
+    assert len(rows) == 2
+    assert sorted(row["unit_count"] for row in rows) == [1, 2]
