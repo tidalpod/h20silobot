@@ -10,6 +10,7 @@ from database.loan_seed import (
 )
 from database.models import Property, PropertyLoan, Tenant
 from webapp.routes.assets import (
+    _asset_sort_value,
     _compute_property_metrics,
     _effective_monthly_rent,
     _sync_property_loan_snapshot,
@@ -160,3 +161,26 @@ def test_assets_combine_section8_voucher_and_tenant_portion():
     ]
 
     assert _effective_monthly_rent(prop) == Decimal("1200.00")
+
+
+def test_assets_sort_values_use_current_loan_and_effective_rent():
+    prop = Property(
+        address="11100 Maxwell Ave",
+        bsa_account_number="sort-11100",
+        monthly_rent=Decimal("1400.00"),
+        loan_balance=Decimal("999999.00"),
+    )
+    loan = PropertyLoan(
+        servicer="Select Portfolio Servicing",
+        current_balance=Decimal("102159.12"),
+        monthly_payment=Decimal("1106.91"),
+        interest_rate=Decimal("7.750"),
+        is_current=True,
+    )
+    prop.loans = [loan]
+    row = _compute_property_metrics(prop)
+
+    assert _asset_sort_value(row, "property") == "11100 maxwell ave"
+    assert _asset_sort_value(row, "servicer") == "select portfolio servicing"
+    assert _asset_sort_value(row, "loan_balance") == Decimal("102159.12")
+    assert _asset_sort_value(row, "rent") == Decimal("1400.00")

@@ -19,6 +19,22 @@ router = APIRouter(tags=["assets"])
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+ASSET_SORT_KEYS = (
+    "property",
+    "purchase",
+    "rehab",
+    "appraised",
+    "equity",
+    "loan_balance",
+    "servicer",
+    "rate",
+    "piti",
+    "rent",
+    "cash_flow",
+    "cap_rate",
+    "ltv",
+)
+
 
 def _dec(v) -> float:
     """Convert Decimal/None to float for arithmetic."""
@@ -74,12 +90,39 @@ def _compute_property_metrics(p: Property) -> dict:
     }
 
 
+def _asset_sort_value(row: dict, key: str):
+    """Return the normalized value used to sort an Assets table row."""
+    prop = row["property"]
+    loan = row["loan"]
+    values = {
+        "property": prop.address.casefold(),
+        "purchase": prop.purchase_price,
+        "rehab": prop.rehab_cost,
+        "appraised": prop.appraised_value,
+        "equity": row["equity"],
+        "loan_balance": loan.current_balance if loan else prop.loan_balance,
+        "servicer": loan.servicer.casefold() if loan and loan.servicer else None,
+        "rate": loan.interest_rate if loan else prop.interest_rate,
+        "piti": loan.monthly_payment if loan else prop.monthly_piti,
+        "rent": row["monthly_rent"],
+        "cash_flow": row["cash_flow"],
+        "cap_rate": row["cap_rate"],
+        "ltv": row["ltv"],
+    }
+    return values[key]
+
+
 @router.get("/", response_class=HTMLResponse)
-async def assets_dashboard(request: Request):
+async def assets_dashboard(request: Request, sort: str = "property", direction: str = "asc"):
     """Portfolio-level investment dashboard."""
     user = await get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
+    if sort not in ASSET_SORT_KEYS:
+        sort = "property"
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
 
     async with get_session() as session:
         result = await session.execute(
@@ -99,6 +142,21 @@ async def assets_dashboard(request: Request):
         entity = row["property"].entity or "Unassigned"
         grouped.setdefault(entity, []).append(row)
 
+    # Keep ownership groups intact while sorting properties within each group.
+    for entity, entity_rows in grouped.items():
+        populated = [row for row in entity_rows if _asset_sort_value(row, sort) is not None]
+        empty = [row for row in entity_rows if _asset_sort_value(row, sort) is None]
+        grouped[entity] = sorted(
+            populated,
+            key=lambda row: _asset_sort_value(row, sort),
+            reverse=direction == "desc",
+        ) + empty
+
+    sort_urls = {}
+    for key in ASSET_SORT_KEYS:
+        next_direction = "desc" if sort == key and direction == "asc" else "asc"
+        sort_urls[key] = f"/assets/?sort={key}&direction={next_direction}"
+
     # Portfolio totals
     total_value = sum(_dec(r["property"].appraised_value) for r in rows)
     total_equity = sum(_dec(r["equity"]) for r in rows)
@@ -115,6 +173,9 @@ async def assets_dashboard(request: Request):
         "total_debt": total_debt,
         "total_cash_flow": total_cash_flow,
         "total_rehab": total_rehab,
+        "sort_key": sort,
+        "sort_direction": direction,
+        "sort_urls": sort_urls,
     })
 
 

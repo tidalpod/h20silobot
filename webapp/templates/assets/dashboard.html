@@ -5,6 +5,34 @@
 {% macro fmt2(val) %}{% if val is not none %}${{ "{:,.2f}".format(val|float) }}{% else %}—{% endif %}{% endmacro %}
 {% macro fmtpct(val) %}{% if val is not none %}{{ "{:.2f}".format(val|float) }}%{% else %}—{% endif %}{% endmacro %}
 
+{% macro sort_header(label, key, align='right') -%}
+<th scope="col"
+    aria-sort="{% if sort_key == key %}{{ 'ascending' if sort_direction == 'asc' else 'descending' }}{% else %}none{% endif %}"
+    class="px-4 py-3 text-{{ align }} text-xs font-medium text-gray-500 uppercase tracking-wider">
+    <a href="{{ sort_urls[key] }}"
+       class="group inline-flex w-full items-center gap-1.5 rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 {% if align == 'right' %}justify-end{% else %}justify-start{% endif %}"
+       title="Sort by {{ label }}">
+        <span>{{ label }}</span>
+        <svg aria-hidden="true"
+             class="h-3.5 w-3.5 flex-none {% if sort_key == key %}text-blue-600{% else %}text-gray-300 group-hover:text-blue-400{% endif %}"
+             fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            {% if sort_key == key and sort_direction == 'asc' %}
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19.5v-15m0 0-6 6m6-6 6 6" />
+            {% else %}
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0 6-6m-6 6-6-6" />
+            {% endif %}
+        </svg>
+        <span class="sr-only">
+            {% if sort_key == key %}
+            Sorted {{ 'ascending' if sort_direction == 'asc' else 'descending' }}; activate to reverse order
+            {% else %}
+            Activate to sort ascending
+            {% endif %}
+        </span>
+    </a>
+</th>
+{%- endmacro %}
+
 {% block header %}
 <header>
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -93,18 +121,19 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rehab</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Appraised</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Equity</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Bal</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">PITI</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rent</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cash Flow</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cap Rate</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">LTV</th>
+                        {{ sort_header('Property', 'property', 'left') }}
+                        {{ sort_header('Purchase', 'purchase') }}
+                        {{ sort_header('Rehab', 'rehab') }}
+                        {{ sort_header('Appraised', 'appraised') }}
+                        {{ sort_header('Equity', 'equity') }}
+                        {{ sort_header('Loan Bal', 'loan_balance') }}
+                        {{ sort_header('Servicer', 'servicer', 'left') }}
+                        {{ sort_header('Rate', 'rate') }}
+                        {{ sort_header('PITI', 'piti') }}
+                        {{ sort_header('Rent', 'rent') }}
+                        {{ sort_header('Cash Flow', 'cash_flow') }}
+                        {{ sort_header('Cap Rate', 'cap_rate') }}
+                        {{ sort_header('LTV', 'ltv') }}
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -112,7 +141,7 @@
                     {% for entity, rows in grouped.items() %}
                     {# Entity header #}
                     <tr class="bg-gray-100 cursor-pointer hover:bg-gray-200" onclick="toggleEntity('{{ entity|replace(' ', '_')|replace('.', '') }}')">
-                        <td colspan="13" class="px-4 py-2">
+                        <td colspan="14" class="px-4 py-2">
                             <div class="flex items-center gap-2 font-semibold text-sm text-gray-800">
                                 <svg id="chevron-{{ entity|replace(' ', '_')|replace('.', '') }}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
@@ -137,6 +166,15 @@
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(p.appraised_value) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(loan.current_balance if loan else p.loan_balance) }}</td>
+                        <td class="px-4 py-2 text-sm text-left whitespace-nowrap">
+                            {% if loan and loan.servicer %}
+                            <span class="font-medium text-gray-700">{{ loan.servicer }}</span>
+                            {% elif loan and loan.status == 'transferred' %}
+                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">Needs update</span>
+                            {% else %}
+                            <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmtpct(loan.interest_rate if loan else p.interest_rate) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(loan.monthly_payment if loan else p.monthly_piti) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt2(row.monthly_rent) }}</td>
@@ -176,6 +214,7 @@
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.val) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.eq) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt(ns.debt) }}</td>
+                        <td class="px-4 py-2"></td>
                         <td class="px-4 py-2"></td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt2(ns.piti) }}</td>
                         <td class="px-4 py-2 text-right text-gray-800">{{ fmt2(ns.rent) }}</td>
