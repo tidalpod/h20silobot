@@ -380,6 +380,9 @@ function restoreRefreshBtn(cell, propertyId, delay) {
 function updateRowFromResult(row, data) {
     if (data.amount_due !== undefined) {
         row.cells[2].innerHTML = `<span class="font-medium text-gray-900">$${data.amount_due.toFixed(2)}</span>`;
+        row.cells[3].innerHTML = data.amount_due > 0
+            ? '<span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">Unpaid</span>'
+            : '<span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Paid</span>';
     }
     if (data.scraped_at) {
         row.cells[4].innerHTML = `<span class="text-green-600 font-medium">${data.scraped_at}</span>`;

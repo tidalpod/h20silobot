@@ -46,6 +46,9 @@ class BillData:
     parcel_number: Optional[str] = None
     record_key: Optional[str] = None  # BSA internal ID for direct URL access
     raw_data: Optional[str] = None
+    # A zero balance is valid when BSA explicitly returned it. Keep that
+    # distinct from the scraper's Decimal("0") fallback on a parse failure.
+    amount_parsed: bool = False
 
 
 @dataclass
@@ -521,6 +524,7 @@ class BSAScraper:
 
         # Extract total balance (first dollar amount after "Balance" header)
         amount_due = Decimal("0")
+        amount_parsed = False
         charges = {}
         in_charges = False
         for i, line in enumerate(lines):
@@ -529,9 +533,10 @@ class BSAScraper:
                 continue
             if in_charges:
                 dollar_match = re.match(r'^\$?([\d,]+\.?\d*)', line)
-                if dollar_match and not charges:
+                if dollar_match and not amount_parsed:
                     # First dollar amount after Balance is the total
                     amount_due = Decimal(dollar_match.group(1).replace(',', ''))
+                    amount_parsed = True
                     continue
                 # Parse individual charge items
                 if line.isupper() and len(line) > 2 and not line.startswith('$'):
@@ -545,7 +550,7 @@ class BSAScraper:
                     break
 
         # Fallback: scan for amount on the line AFTER a label
-        if amount_due == Decimal("0"):
+        if not amount_parsed:
             for i, line in enumerate(lines):
                 low = line.lower().strip()
                 # Check for "Amount to Pay" with dollar on same line
@@ -553,6 +558,7 @@ class BSAScraper:
                     match = re.search(r'\$([\d,]+\.?\d*)', line)
                     if match:
                         amount_due = Decimal(match.group(1).replace(',', ''))
+                        amount_parsed = True
                         break
                 # Check for label lines — dollar amount may be on same or next line
                 if low in ("balance", "amount due", "total amount due", "total due"):
@@ -560,22 +566,25 @@ class BSAScraper:
                     match = re.search(r'\$([\d,]+\.?\d*)', line)
                     if match:
                         amount_due = Decimal(match.group(1).replace(',', ''))
+                        amount_parsed = True
                         break
                     # Check next line
                     if i + 1 < len(lines):
                         match = re.search(r'\$?([\d,]+\.\d{2})', lines[i + 1])
                         if match:
                             amount_due = Decimal(match.group(1).replace(',', ''))
+                            amount_parsed = True
                             break
                 # "Current Bill - $663.04 due" pattern
                 if "current bill" in low:
                     match = re.search(r'\$([\d,]+\.?\d*)', line)
                     if match:
                         amount_due = Decimal(match.group(1).replace(',', ''))
+                        amount_parsed = True
                         break
 
             # Last resort: regex on raw HTML for inline patterns
-            if amount_due == Decimal("0"):
+            if not amount_parsed:
                 # Try matching dollar amounts near known labels in the raw HTML
                 balance_match = re.search(
                     r'(?:Total\s+Amount\s+Due|Amount\s*Due|Balance|Total\s*Due)[^$\d]{0,30}\$?([\d,]+\.\d{2})',
@@ -583,6 +592,7 @@ class BSAScraper:
                 )
                 if balance_match:
                     amount_due = Decimal(balance_match.group(1).replace(',', ''))
+                    amount_parsed = True
                 else:
                     logger.warning(
                         f"Failed to parse amount from detail page. "
@@ -614,6 +624,7 @@ class BSAScraper:
             owner_name=owner_name if owner_name else None,
             parcel_number=parcel_number if parcel_number else None,
             raw_data=str(charges) if charges else text[:3000],
+            amount_parsed=amount_parsed,
         )
 
     def __init__(self, municipality_uid: str = None):
@@ -948,18 +959,21 @@ class BSAScraper:
 
             # Extract amount due - look for "Amount to Pay:" then get the next $ amount
             amount_due = Decimal("0")
+            amount_parsed = False
             for i, line in enumerate(lines):
                 if "Amount to Pay" in line:
                     # Check if amount is on same line
                     match = re.search(r'\$([\d,]+\.?\d*)', line)
                     if match:
                         amount_due = Decimal(match.group(1).replace(',', ''))
+                        amount_parsed = True
                     # Or check next line
                     elif i + 1 < len(lines):
                         next_line = lines[i + 1]
                         match = re.search(r'\$([\d,]+\.?\d*)', next_line)
                         if match:
                             amount_due = Decimal(match.group(1).replace(',', ''))
+                            amount_parsed = True
                     break
 
             # Extract individual charges
@@ -1026,7 +1040,8 @@ class BSAScraper:
                 late_fees=None,
                 water_usage=None,
                 owner_name=owner_name if owner_name else None,
-                raw_data=text[:5000]
+                raw_data=text[:5000],
+                amount_parsed=amount_parsed,
             )
 
         except Exception as e:
@@ -1042,6 +1057,7 @@ class BSAScraper:
 
             # Initialize data
             amount_due = Decimal("0")
+            amount_parsed = False
             due_date = None
             statement_date = None
             previous_balance = None
@@ -1060,6 +1076,7 @@ class BSAScraper:
                 if match:
                     try:
                         amount_due = Decimal(match.group(1).replace(',', ''))
+                        amount_parsed = True
                         break
                     except:
                         pass
@@ -1119,7 +1136,8 @@ class BSAScraper:
                 late_fees=late_fees,
                 water_usage=water_usage,
                 owner_name=owner_name,
-                raw_data=content[:5000]
+                raw_data=content[:5000],
+                amount_parsed=amount_parsed,
             )
 
         except Exception as e:

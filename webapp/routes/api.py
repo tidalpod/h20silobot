@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 _refresh_status = {"running": False, "total": 0, "completed": 0, "last_property": "", "results": []}
 
 
+def _apply_scraped_bill_amount(bill: WaterBill, bill_data) -> bool:
+    """Apply financial fields only when BSA exposed a parseable balance.
+
+    A parsed $0.00 is a real paid balance. An unparsed page also carries a
+    Decimal("0") fallback, so callers must use the parser confidence flag
+    instead of treating every zero as a failure.
+    """
+    if not getattr(bill_data, "amount_parsed", False):
+        return False
+    bill.amount_due = bill_data.amount_due
+    bill.previous_balance = bill_data.previous_balance
+    bill.current_charges = bill_data.current_charges
+    bill.late_fees = bill_data.late_fees
+    bill.payments_received = bill_data.payments_received
+    return True
+
+
 @router.get("/properties")
 async def api_list_properties(request: Request):
     """Get all properties as JSON"""
@@ -181,22 +198,16 @@ async def api_refresh_property(property_id: int):
 
                 if existing_bill:
                     bill = existing_bill
-                    # Only overwrite financial fields if scraper returned a real amount
-                    # (scraper defaults to $0 on parse failure — don't clobber good data)
-                    if bill_data.amount_due and float(bill_data.amount_due) > 0:
-                        bill.amount_due = bill_data.amount_due
-                        bill.previous_balance = bill_data.previous_balance
-                        bill.current_charges = bill_data.current_charges
-                        bill.late_fees = bill_data.late_fees
-                        bill.payments_received = bill_data.payments_received
+                    _apply_scraped_bill_amount(bill, bill_data)
                     bill.due_date = bill_data.due_date or bill.due_date
                     bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
                     bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                     bill.scraped_at = datetime.utcnow()
                 else:
-                    # No existing bill — only create new record if we got a real amount
-                    if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
-                        logger.warning(f"Scraper returned $0 for {prop.address} with no existing bill — skipping")
+                    # Do not create a record when the page did not expose a balance.
+                    # A confidently parsed $0.00 is valid and records a paid account.
+                    if not getattr(bill_data, "amount_parsed", False):
+                        logger.warning(f"Scraper could not parse a balance for {prop.address} — skipping")
                         scraped_at = datetime.utcnow()
                         return {
                             "status": "warning",
@@ -503,19 +514,14 @@ async def refresh_single_property(property_id: int):
 
                     if existing_bill:
                         bill = existing_bill
-                        if bill_data.amount_due and float(bill_data.amount_due) > 0:
-                            bill.amount_due = bill_data.amount_due
-                            bill.previous_balance = bill_data.previous_balance
-                            bill.current_charges = bill_data.current_charges
-                            bill.late_fees = bill_data.late_fees
-                            bill.payments_received = bill_data.payments_received
+                        _apply_scraped_bill_amount(bill, bill_data)
                         bill.due_date = bill_data.due_date or bill.due_date
                         bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
                         bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                         bill.scraped_at = datetime.utcnow()
                     else:
-                        if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
-                            logger.warning(f"Scraper returned $0 for {prop.address} (Playwright single) — skipping")
+                        if not getattr(bill_data, "amount_parsed", False):
+                            logger.warning(f"Scraper could not parse a balance for {prop.address} (Playwright single) — skipping")
                             return
                         bill = WaterBill(
                             property_id=prop.id,
@@ -629,20 +635,14 @@ async def refresh_all_properties():
 
                             if existing_bill:
                                 bill = existing_bill
-                                # Only overwrite financial fields if scraper returned a real amount
-                                if bill_data.amount_due and float(bill_data.amount_due) > 0:
-                                    bill.amount_due = bill_data.amount_due
-                                    bill.previous_balance = bill_data.previous_balance
-                                    bill.current_charges = bill_data.current_charges
-                                    bill.late_fees = bill_data.late_fees
-                                    bill.payments_received = bill_data.payments_received
+                                _apply_scraped_bill_amount(bill, bill_data)
                                 bill.due_date = bill_data.due_date or bill.due_date
                                 bill.water_usage_gallons = bill_data.water_usage or bill.water_usage_gallons
                                 bill.raw_data = str(bill_data.raw_data) if bill_data.raw_data else bill.raw_data
                                 bill.scraped_at = datetime.utcnow()
                             else:
-                                if not bill_data.amount_due or float(bill_data.amount_due) <= 0:
-                                    logger.warning(f"Scraper returned $0 for {prop.address} (HTTP bulk) — skipping")
+                                if not getattr(bill_data, "amount_parsed", False):
+                                    logger.warning(f"Scraper could not parse a balance for {prop.address} (HTTP bulk) — skipping")
                                     continue
                                 bill = WaterBill(
                                     property_id=prop.id,
