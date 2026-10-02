@@ -49,6 +49,19 @@
 
 {% block content %}
 <div class="mx-auto w-full max-w-[1920px] px-3 py-6 sm:px-4 lg:px-6">
+    <style>
+        @media (min-width: 1024px) {
+            #assets-table th,
+            #assets-table td {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+
+            #assets-table td {
+                font-size: 0.8125rem;
+            }
+        }
+    </style>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -118,7 +131,7 @@
     {% else %}
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full min-w-full table-auto divide-y divide-gray-200">
+            <table id="assets-table" class="w-full min-w-full table-auto divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         {{ sort_header('Property', 'property', 'left') }}
