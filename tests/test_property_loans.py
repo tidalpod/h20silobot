@@ -185,6 +185,29 @@ def test_assets_infer_value_and_equity_from_twenty_percent_down():
     assert metrics["ltv"] == 70.0
 
 
+def test_assets_use_original_balance_when_current_principal_is_missing():
+    prop = Property(
+        address="Origination Balance Property",
+        bsa_account_number="origination-balance",
+    )
+    prop.tenants = []
+    prop.loans = [
+        PropertyLoan(
+            original_amount=Decimal("80000.00"),
+            current_balance=None,
+            is_current=True,
+        )
+    ]
+
+    metrics = _compute_property_metrics(prop)
+
+    assert metrics["appraised_value"] == Decimal("100000.00")
+    assert metrics["debt_value"] == Decimal("80000.00")
+    assert metrics["debt_source"] == "original_balance_fallback"
+    assert metrics["equity"] == 20000
+    assert metrics["ltv"] == 80.0
+
+
 def test_recorded_appraisal_wins_over_implied_value():
     value, source = _effective_asset_value(
         Decimal("135000.00"),

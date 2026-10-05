@@ -224,7 +224,12 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.loan_balance) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">
+                            <div>{{ fmt(row.debt_value) }}</div>
+                            {% if row.debt_source == 'original_balance_fallback' %}
+                            <div class="mt-0.5 text-[10px] text-amber-600">Original balance fallback</div>
+                            {% endif %}
+                        </td>
                         <td class="max-w-40 px-4 py-2 text-sm text-left leading-tight">
                             {% if loan and loan.servicer %}
                             <span class="font-medium text-gray-700">{{ loan.servicer }}</span>
@@ -267,7 +272,7 @@
                     {% for row in rows %}
                         {% set ns.val = ns.val + (row.appraised_value|float if row.appraised_value else 0) %}
                         {% set ns.eq = ns.eq + (row.equity|float if row.equity else 0) %}
-                        {% set ns.debt = ns.debt + (row.loan_balance|float if row.loan_balance else 0) %}
+                        {% set ns.debt = ns.debt + (row.debt_value|float if row.debt_value else 0) %}
                         {% set ns.cf = ns.cf + (row.cash_flow|float if row.cash_flow else 0) %}
                         {% set ns.rent = ns.rent + (row.monthly_rent|float if row.monthly_rent is not none else 0) %}
                         {% set ns.piti = ns.piti + (row.monthly_payment|float if row.monthly_payment else 0) %}

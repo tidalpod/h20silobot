@@ -177,7 +177,15 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
     appraised = _dec(appraised_value)
     equity_balance_value = balance_value
     if equity_balance_value is None:
-        equity_balance_value = original_loan_amount if loan else Decimal("0")
+        if original_loan_amount is not None:
+            equity_balance_value = original_loan_amount
+        elif loan is None and legacy_balance is None:
+            equity_balance_value = Decimal("0")
+    debt_source = None
+    if balance_value is not None:
+        debt_source = "current_balance"
+    elif original_loan_amount is not None:
+        debt_source = "original_balance_fallback"
     balance = _dec(equity_balance_value)
     rent = _dec(rent_value)
     piti = _dec(payment_value)
@@ -218,6 +226,8 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
         "monthly_tax": monthly_tax,
         "hoa_monthly": hoa_value,
         "loan_balance": balance_value,
+        "debt_value": equity_balance_value,
+        "debt_source": debt_source,
         "interest_rate": rate_value,
         "monthly_payment": payment_value,
         "monthly_rent": rent_value,
@@ -261,7 +271,7 @@ def _asset_sort_value(row: dict, key: str):
         "rehab": row["rehab_cost"],
         "appraised": row["appraised_value"],
         "equity": row["equity"],
-        "loan_balance": row["loan_balance"],
+        "loan_balance": row["debt_value"],
         "servicer": loan.servicer.casefold() if loan and loan.servicer else None,
         "rate": row["interest_rate"],
         "piti": row["monthly_payment"],
@@ -340,7 +350,7 @@ async def assets_dashboard(
     # Portfolio totals
     total_value = sum(_dec(r["appraised_value"]) for r in rows)
     total_equity = sum(_dec(r["equity"]) for r in rows)
-    total_debt = sum(_dec(r["loan_balance"]) for r in rows)
+    total_debt = sum(_dec(r["debt_value"]) for r in rows)
     total_cash_flow = sum(_dec(r["cash_flow"]) for r in rows)
     total_rehab = sum(_dec(r["rehab_cost"]) for r in rows)
 
