@@ -263,13 +263,14 @@ def _build_asset_rows(properties: list[Property]) -> list[dict]:
     return [_compute_asset_rollup(group) for group in rollups.values()]
 
 
-def _filter_asset_rows(rows: list[dict], selected_entity: Optional[str]) -> list[dict]:
-    """Return only the requested ownership portfolio, or the full portfolio."""
-    if selected_entity is None:
+def _filter_asset_rows(rows: list[dict], selected_entities: list[str]) -> list[dict]:
+    """Return requested ownership portfolios, or the full portfolio."""
+    if not selected_entities:
         return rows
+    selected = set(selected_entities)
     return [
         row for row in rows
-        if (row["property"].entity or "Unassigned") == selected_entity
+        if (row["property"].entity or "Unassigned") in selected
     ]
 
 
@@ -299,7 +300,6 @@ async def assets_dashboard(
     request: Request,
     sort: str = "property",
     direction: str = "asc",
-    entity: Optional[str] = None,
 ):
     """Portfolio-level investment dashboard."""
     user = await get_current_user(request)
@@ -321,12 +321,13 @@ async def assets_dashboard(
         all_properties = result.scalars().all()
 
     asset_entities = sorted({prop.entity or "Unassigned" for prop in all_properties}, key=str.casefold)
-    selected_entity = entity if entity in asset_entities else None
+    requested_entities = set(request.query_params.getlist("entity"))
+    selected_entities = [option for option in asset_entities if option in requested_entities]
 
     # Build one metrics row per physical asset. Configured duplex unit records
     # are consolidated here before grouping, sorting, filtering, and totals.
     all_rows = _build_asset_rows(all_properties)
-    rows = _filter_asset_rows(all_rows, selected_entity)
+    rows = _filter_asset_rows(all_rows, selected_entities)
 
     # Group by entity
     grouped: dict[str, list[dict]] = {}
@@ -347,15 +348,20 @@ async def assets_dashboard(
     sort_urls = {}
     for key in ASSET_SORT_KEYS:
         next_direction = "desc" if sort == key and direction == "asc" else "asc"
-        params = {"sort": key, "direction": next_direction}
-        if selected_entity:
-            params["entity"] = selected_entity
+        params = [("sort", key), ("direction", next_direction)]
+        params.extend(("entity", option) for option in selected_entities)
         sort_urls[key] = f"/assets/?{urlencode(params)}"
 
-    entity_urls = {
-        option: f"/assets/?{urlencode({'sort': sort, 'direction': direction, 'entity': option})}"
-        for option in asset_entities
-    }
+    entity_urls = {}
+    for option in asset_entities:
+        toggled_entities = (
+            [selected for selected in selected_entities if selected != option]
+            if option in selected_entities
+            else [*selected_entities, option]
+        )
+        params = [("sort", sort), ("direction", direction)]
+        params.extend(("entity", selected) for selected in toggled_entities)
+        entity_urls[option] = f"/assets/?{urlencode(params)}"
     all_entities_url = f"/assets/?{urlencode({'sort': sort, 'direction': direction})}"
 
     # Portfolio totals
@@ -378,7 +384,7 @@ async def assets_dashboard(
         "sort_direction": direction,
         "sort_urls": sort_urls,
         "asset_entities": asset_entities,
-        "selected_entity": selected_entity,
+        "selected_entities": selected_entities,
         "entity_urls": entity_urls,
         "all_entities_url": all_entities_url,
     })

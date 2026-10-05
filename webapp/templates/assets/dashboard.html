@@ -39,7 +39,7 @@
         <div>
             <h1 class="bd-page-title">Assets</h1>
             <p class="bd-page-subtitle">
-                {% if selected_entity %}Viewing {{ selected_entity }}.{% else %}Equity, debt, cash flow, and portfolio performance in one view.{% endif %}
+                {% if selected_entities %}Viewing {{ selected_entities | join(' + ') }}.{% else %}Equity, debt, cash flow, and portfolio performance in one view.{% endif %}
             </p>
         </div>
     </div>
@@ -67,15 +67,16 @@
         <div class="flex min-w-max items-center gap-2">
             <span class="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-400">Portfolio</span>
             <a href="{{ all_entities_url }}"
-               {% if not selected_entity %}aria-current="page"{% endif %}
-               class="inline-flex shrink-0 items-center rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all {% if not selected_entity %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+               {% if not selected_entities %}aria-current="page"{% endif %}
+               class="inline-flex shrink-0 items-center rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all {% if not selected_entities %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900{% endif %}">
                 All
             </a>
             <div aria-hidden="true" class="h-5 w-px shrink-0 bg-gray-200"></div>
             {% for option in asset_entities %}
             <a href="{{ entity_urls[option] }}"
-               {% if selected_entity == option %}aria-current="page"{% endif %}
-               class="inline-flex shrink-0 items-center rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all {% if selected_entity == option %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+               role="checkbox"
+               aria-checked="{{ 'true' if option in selected_entities else 'false' }}"
+               class="inline-flex shrink-0 items-center rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all {% if option in selected_entities %}bg-blue-600 text-white shadow-sm{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900{% endif %}">
                 {{ option }}
             </a>
             {% endfor %}

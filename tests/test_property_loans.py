@@ -438,7 +438,23 @@ def test_assets_filter_rows_by_entity_without_changing_all_portfolios_view():
         prop.loans = []
     rows = _build_asset_rows([casa, silo])
 
-    assert _filter_asset_rows(rows, None) == rows
-    selected = _filter_asset_rows(rows, "Silo Capital LLC")
+    assert _filter_asset_rows(rows, []) == rows
+    selected = _filter_asset_rows(rows, ["Silo Capital LLC"])
     assert len(selected) == 1
     assert selected[0]["property"] is silo
+
+
+def test_assets_filter_rows_by_multiple_entities():
+    properties = [
+        Property(id=311, address="Casa Property", bsa_account_number="casa", entity="Casa Sicura LLC"),
+        Property(id=312, address="Silo Property", bsa_account_number="silo", entity="Silo Capital LLC"),
+        Property(id=313, address="Partner Property", bsa_account_number="partner", entity="Silo Partners LLC"),
+    ]
+    for prop in properties:
+        prop.tenants = []
+        prop.loans = []
+
+    rows = _build_asset_rows(properties)
+    selected = _filter_asset_rows(rows, ["Casa Sicura LLC", "Silo Partners LLC"])
+
+    assert {row["property"].entity for row in selected} == {"Casa Sicura LLC", "Silo Partners LLC"}
