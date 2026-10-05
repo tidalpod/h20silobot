@@ -214,22 +214,37 @@ def test_recorded_appraisal_wins_over_implied_value():
         Decimal("95000.00"),
         Decimal("15000.00"),
         Decimal("80000.00"),
+        Decimal("70000.00"),
     )
 
     assert value == Decimal("135000.00")
     assert source == "appraisal"
 
 
-def test_purchase_price_wins_over_twenty_percent_down_estimate():
+def test_twenty_percent_down_estimate_wins_over_purchase_fallback_for_financed_asset():
     value, source = _effective_asset_value(
         None,
         Decimal("95000.00"),
         None,
         Decimal("80000.00"),
+        Decimal("70000.00"),
     )
 
-    assert value == Decimal("95000.00")
-    assert source == "purchase_price"
+    assert value == Decimal("100000.00")
+    assert source == "implied_80_ltv"
+
+
+def test_current_balance_reconstructs_twenty_percent_down_value_when_original_is_missing():
+    value, source = _effective_asset_value(
+        None,
+        Decimal("95000.00"),
+        None,
+        None,
+        Decimal("80000.00"),
+    )
+
+    assert value == Decimal("100000.00")
+    assert source == "implied_current_balance_80_ltv"
 
 
 def test_rehab_cost_is_added_to_purchase_price_fallback():
@@ -237,7 +252,8 @@ def test_rehab_cost_is_added_to_purchase_price_fallback():
         None,
         Decimal("95000.00"),
         Decimal("15000.00"),
-        Decimal("80000.00"),
+        None,
+        None,
     )
 
     assert value == Decimal("110000.00")

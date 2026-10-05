@@ -111,22 +111,28 @@ def _effective_asset_value(
     purchase_price,
     rehab_cost,
     original_loan_amount,
+    current_loan_balance,
 ) -> tuple[Optional[Decimal], Optional[str]]:
     """Return the best available asset value and how it was established.
 
-    A recorded appraisal remains authoritative. Otherwise use the property's
-    invested basis: purchase price plus any recorded rehab cost. Only infer a
-    value from an 80% origination LTV (20% down) when no purchase price exists.
+    A recorded appraisal remains authoritative. Otherwise, financed assets use
+    their original loan amount to reconstruct an 80% origination LTV (20%
+    down). If the original amount is unavailable, the current balance is a
+    conservative proxy. Purchase and rehab basis is reserved for assets without
+    usable loan data.
     """
     if appraised_value is not None:
         return Decimal(appraised_value), "appraisal"
+    if original_loan_amount is not None and Decimal(original_loan_amount) > 0:
+        implied_value = (Decimal(original_loan_amount) / ASSUMED_ORIGINATION_LTV).quantize(Decimal("0.01"))
+        return implied_value, "implied_80_ltv"
+    if current_loan_balance is not None and Decimal(current_loan_balance) > 0:
+        implied_value = (Decimal(current_loan_balance) / ASSUMED_ORIGINATION_LTV).quantize(Decimal("0.01"))
+        return implied_value, "implied_current_balance_80_ltv"
     if purchase_price is not None:
         if rehab_cost is not None:
             return Decimal(purchase_price) + Decimal(rehab_cost), "purchase_plus_rehab"
         return Decimal(purchase_price), "purchase_price"
-    if original_loan_amount is not None:
-        implied_value = (Decimal(original_loan_amount) / ASSUMED_ORIGINATION_LTV).quantize(Decimal("0.01"))
-        return implied_value, "implied_80_ltv"
     return None, None
 
 
@@ -177,6 +183,7 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
         purchase_price,
         rehab_cost,
         original_loan_amount,
+        balance_value,
     )
     appraised = _dec(appraised_value)
     equity_balance_value = balance_value
