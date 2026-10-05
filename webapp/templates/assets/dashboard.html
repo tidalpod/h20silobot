@@ -35,19 +35,19 @@
 
 {% block header %}
 <header>
-    <div class="mx-auto w-full max-w-[1920px] px-3 py-6 sm:px-4 lg:px-6">
-        <div class="bd-page-header flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Portfolio intelligence</p>
-                <h1 class="bd-page-title mt-1">Assets</h1>
-                <p class="bd-page-subtitle">
-                    {% if selected_entity %}Viewing {{ selected_entity }}.{% else %}Equity, debt, cash flow, and portfolio performance in one view.{% endif %}
-                </p>
-            </div>
+    <div class="mx-auto w-full max-w-[1920px] px-3 pb-4 pt-6 sm:px-4 lg:px-6">
+        <div class="bd-page-header">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Portfolio intelligence</p>
+            <h1 class="bd-page-title mt-1">Assets</h1>
+            <p class="bd-page-subtitle">
+                {% if selected_entity %}Viewing {{ selected_entity }}.{% else %}Equity, debt, cash flow, and portfolio performance in one view.{% endif %}
+            </p>
+
             {% if asset_entities %}
-            <div class="min-w-0 lg:max-w-[70%]">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Portfolio</p>
-                <nav aria-label="Portfolio selector" class="flex max-w-full gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+            <div class="mt-6 flex min-w-0 justify-center">
+                <div class="min-w-0 max-w-full">
+                    <p class="mb-2 text-center text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Portfolio view</p>
+                    <nav aria-label="Portfolio selector" class="mx-auto flex w-fit max-w-full gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
                     <a href="{{ all_entities_url }}"
                        {% if not selected_entity %}aria-current="page"{% endif %}
                        class="shrink-0 rounded-lg px-3.5 py-2 text-sm font-semibold transition {% if not selected_entity %}bg-blue-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100 hover:text-slate-900{% endif %}">
@@ -60,7 +60,8 @@
                         {{ option }}
                     </a>
                     {% endfor %}
-                </nav>
+                    </nav>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -69,7 +70,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="mx-auto w-full max-w-[1920px] px-3 py-6 sm:px-4 lg:px-6">
+<div class="mx-auto w-full max-w-[1920px] px-3 pb-6 pt-4 sm:px-4 lg:px-6">
     <style>
         @media (min-width: 1024px) {
             #assets-table th,
