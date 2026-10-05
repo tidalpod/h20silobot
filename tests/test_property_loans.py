@@ -14,6 +14,7 @@ from webapp.routes.assets import (
     _build_asset_rows,
     _compute_property_metrics,
     _effective_monthly_rent,
+    _effective_asset_value,
     _filter_asset_rows,
     _sync_property_loan_snapshot,
     _validated_asset_loan_payload,
@@ -160,6 +161,55 @@ def test_current_related_loan_drives_assets_metrics_and_legacy_snapshot():
     assert prop.loan_balance == Decimal("75000")
     assert prop.monthly_piti == Decimal("848.28")
     assert prop.monthly_insurance == Decimal("100.00")
+
+
+def test_assets_infer_value_and_equity_from_twenty_percent_down():
+    prop = Property(
+        address="Implied Value Property",
+        bsa_account_number="implied-value",
+    )
+    prop.tenants = []
+    prop.loans = [
+        PropertyLoan(
+            original_amount=Decimal("80000.00"),
+            current_balance=Decimal("70000.00"),
+            is_current=True,
+        )
+    ]
+
+    metrics = _compute_property_metrics(prop)
+
+    assert metrics["appraised_value"] == Decimal("100000.00")
+    assert metrics["valuation_source"] == "implied_80_ltv"
+    assert metrics["equity"] == 30000
+    assert metrics["ltv"] == 70.0
+
+
+def test_recorded_appraisal_wins_over_implied_value():
+    value, source = _effective_asset_value(
+        Decimal("135000.00"),
+        Decimal("80000.00"),
+        Decimal("95000.00"),
+    )
+
+    assert value == Decimal("135000.00")
+    assert source == "appraisal"
+
+
+def test_debt_free_asset_uses_purchase_price_as_value_and_equity():
+    prop = Property(
+        address="Debt Free Value Property",
+        bsa_account_number="debt-free-value",
+        purchase_price=Decimal("90000.00"),
+    )
+    prop.tenants = []
+    prop.loans = []
+
+    metrics = _compute_property_metrics(prop)
+
+    assert metrics["appraised_value"] == Decimal("90000.00")
+    assert metrics["valuation_source"] == "purchase_price"
+    assert metrics["equity"] == 90000
 
 
 def test_assets_use_active_tenant_rent_before_listed_property_rent():

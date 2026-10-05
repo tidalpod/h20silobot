@@ -107,6 +107,7 @@
                 <div>
                     <p class="text-sm text-gray-500">Portfolio Value</p>
                     <p class="text-xl font-bold text-gray-900">{{ fmt(total_value) }}</p>
+                    <p class="mt-0.5 text-[11px] text-gray-400">Entered appraisals or 20%-down implied values</p>
                 </div>
             </div>
         </div>
@@ -214,7 +215,14 @@
                         </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.purchase_price) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.rehab_cost) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.appraised_value) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-gray-700">
+                            <div>{{ fmt(row.appraised_value) }}</div>
+                            {% if row.valuation_source == 'implied_80_ltv' %}
+                            <div class="mt-0.5 text-[10px] font-medium text-blue-600">Implied · 20% down</div>
+                            {% elif row.valuation_source == 'purchase_price' %}
+                            <div class="mt-0.5 text-[10px] text-gray-400">Purchase-price fallback</div>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.equity) }}</td>
                         <td class="px-4 py-2 text-sm text-right text-gray-700">{{ fmt(row.loan_balance) }}</td>
                         <td class="max-w-40 px-4 py-2 text-sm text-left leading-tight">
@@ -316,7 +324,7 @@
                 {% set fields = [
                     ("purchase_price", "Purchase Price", "number", row.purchase_price, "$", "0.01"),
                     ("purchase_date", "Purchase Date", "date", row.purchase_date, "", ""),
-                    ("appraised_value", "Appraised Value", "number", row.appraised_value, "$", "0.01"),
+                    ("appraised_value", "Appraised Value", "number", row.stored_appraised_value, "$", "0.01"),
                     ("appraisal_date", "Appraisal Date", "date", row.appraisal_date, "", ""),
                     ("monthly_tax", "Monthly Tax", "number", row.monthly_tax, "$", "0.01"),
                     ("hoa_monthly", "HOA / Month", "number", row.hoa_monthly, "$", "0.01"),

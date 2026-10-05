@@ -44,6 +44,7 @@ MULTIUNIT_ASSET_ADDRESSES = {
     "11035 republic ave": "11035 Republic Ave",
     "3616 wasmund ave": "3616 Wasmund Ave",
 }
+ASSUMED_ORIGINATION_LTV = Decimal("0.80")
 
 
 def _dec(v) -> float:
@@ -105,6 +106,27 @@ def _first_property_value(properties: list[Property], field: str):
     return None
 
 
+def _effective_asset_value(
+    appraised_value,
+    original_loan_amount,
+    purchase_price,
+) -> tuple[Optional[Decimal], Optional[str]]:
+    """Return the best available asset value and how it was established.
+
+    A recorded appraisal remains authoritative. When it is missing, infer the
+    acquisition value from an 80% origination LTV (20% down). A purchase price
+    is the final fallback for properties without usable financing data.
+    """
+    if appraised_value is not None:
+        return Decimal(appraised_value), "appraisal"
+    if original_loan_amount is not None:
+        implied_value = (Decimal(original_loan_amount) / ASSUMED_ORIGINATION_LTV).quantize(Decimal("0.01"))
+        return implied_value, "implied_80_ltv"
+    if purchase_price is not None:
+        return Decimal(purchase_price), "purchase_price"
+    return None, None
+
+
 def _compute_asset_rollup(properties: list[Property]) -> dict:
     """Compute one Assets-table row for one physical building."""
     ordered = sorted(properties, key=_rollup_property_order)
@@ -118,24 +140,50 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
     purchase_price = _first_property_value(ordered, "purchase_price")
     purchase_date = _first_property_value(ordered, "purchase_date")
     rehab_cost = _first_property_value(ordered, "rehab_cost")
-    appraised_value = _first_property_value(ordered, "appraised_value")
+    stored_appraised_value = _first_property_value(ordered, "appraised_value")
     appraisal_date = _first_property_value(ordered, "appraisal_date")
     monthly_tax = _first_property_value(ordered, "monthly_tax")
     legacy_balance = _first_property_value(ordered, "loan_balance")
     legacy_payment = _first_property_value(ordered, "monthly_piti")
     legacy_rate = _first_property_value(ordered, "interest_rate")
+    legacy_original_amount = _first_property_value(ordered, "loan_amount")
     hoa_value = _first_property_value(ordered, "hoa_monthly")
 
-    balance_value = loan.current_balance if loan else legacy_balance
-    payment_value = loan.monthly_payment if loan else legacy_payment
-    rate_value = loan.interest_rate if loan else legacy_rate
+    original_loan_amount = (
+        loan.original_amount
+        if loan and loan.original_amount is not None
+        else legacy_original_amount
+    )
+    balance_value = (
+        loan.current_balance
+        if loan and loan.current_balance is not None
+        else legacy_balance
+    )
+    payment_value = (
+        loan.monthly_payment
+        if loan and loan.monthly_payment is not None
+        else legacy_payment
+    )
+    rate_value = (
+        loan.interest_rate
+        if loan and loan.interest_rate is not None
+        else legacy_rate
+    )
+    appraised_value, valuation_source = _effective_asset_value(
+        stored_appraised_value,
+        original_loan_amount,
+        purchase_price,
+    )
     appraised = _dec(appraised_value)
-    balance = _dec(balance_value)
+    equity_balance_value = balance_value
+    if equity_balance_value is None:
+        equity_balance_value = original_loan_amount if loan else Decimal("0")
+    balance = _dec(equity_balance_value)
     rent = _dec(rent_value)
     piti = _dec(payment_value)
     hoa = _dec(hoa_value)
 
-    equity = appraised - balance if appraised_value is not None and balance_value is not None else None
+    equity = appraised - balance if appraised_value is not None and equity_balance_value is not None else None
     # Until tax and insurance expense tracking is added, a debt-free asset's
     # cash-flow figure is its gross scheduled rent. Mortgaged assets continue
     # to show rent less PITI and HOA.
@@ -143,7 +191,7 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
     cap_rate = None
     if payment_value is not None and appraised > 0:
         cap_rate = round(((rent - piti - hoa) * 12) / appraised * 100, 2)
-    ltv = round(balance / appraised * 100, 2) if appraised_value is not None and appraised > 0 and balance_value is not None else None
+    ltv = round(balance / appraised * 100, 2) if appraised_value is not None and appraised > 0 and equity_balance_value is not None else None
 
     normalized_primary = _normalized_asset_address(primary.address)
     display_address = primary.address
@@ -163,6 +211,9 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
         "purchase_date": purchase_date,
         "rehab_cost": rehab_cost,
         "appraised_value": appraised_value,
+        "stored_appraised_value": stored_appraised_value,
+        "valuation_source": valuation_source,
+        "original_loan_amount": original_loan_amount,
         "appraisal_date": appraisal_date,
         "monthly_tax": monthly_tax,
         "hoa_monthly": hoa_value,
