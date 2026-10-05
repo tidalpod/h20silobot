@@ -107,7 +107,7 @@
                 <div>
                     <p class="text-sm text-gray-500">Portfolio Value</p>
                     <p class="text-xl font-bold text-gray-900">{{ fmt(total_value) }}</p>
-                    <p class="mt-0.5 text-[11px] text-gray-400">Entered appraisals or 20%-down implied values</p>
+                    <p class="mt-0.5 text-[11px] text-gray-400">Appraisals, purchase/rehab basis, or 20%-down estimate</p>
                 </div>
             </div>
         </div>
@@ -219,6 +219,8 @@
                             <div>{{ fmt(row.appraised_value) }}</div>
                             {% if row.valuation_source == 'implied_80_ltv' %}
                             <div class="mt-0.5 text-[10px] font-medium text-blue-600">Implied · 20% down</div>
+                            {% elif row.valuation_source == 'purchase_plus_rehab' %}
+                            <div class="mt-0.5 text-[10px] text-gray-400">Purchase + rehab basis</div>
                             {% elif row.valuation_source == 'purchase_price' %}
                             <div class="mt-0.5 text-[10px] text-gray-400">Purchase-price fallback</div>
                             {% endif %}

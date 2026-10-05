@@ -108,22 +108,25 @@ def _first_property_value(properties: list[Property], field: str):
 
 def _effective_asset_value(
     appraised_value,
-    original_loan_amount,
     purchase_price,
+    rehab_cost,
+    original_loan_amount,
 ) -> tuple[Optional[Decimal], Optional[str]]:
     """Return the best available asset value and how it was established.
 
-    A recorded appraisal remains authoritative. When it is missing, infer the
-    acquisition value from an 80% origination LTV (20% down). A purchase price
-    is the final fallback for properties without usable financing data.
+    A recorded appraisal remains authoritative. Otherwise use the property's
+    invested basis: purchase price plus any recorded rehab cost. Only infer a
+    value from an 80% origination LTV (20% down) when no purchase price exists.
     """
     if appraised_value is not None:
         return Decimal(appraised_value), "appraisal"
+    if purchase_price is not None:
+        if rehab_cost is not None:
+            return Decimal(purchase_price) + Decimal(rehab_cost), "purchase_plus_rehab"
+        return Decimal(purchase_price), "purchase_price"
     if original_loan_amount is not None:
         implied_value = (Decimal(original_loan_amount) / ASSUMED_ORIGINATION_LTV).quantize(Decimal("0.01"))
         return implied_value, "implied_80_ltv"
-    if purchase_price is not None:
-        return Decimal(purchase_price), "purchase_price"
     return None, None
 
 
@@ -171,8 +174,9 @@ def _compute_asset_rollup(properties: list[Property]) -> dict:
     )
     appraised_value, valuation_source = _effective_asset_value(
         stored_appraised_value,
-        original_loan_amount,
         purchase_price,
+        rehab_cost,
+        original_loan_amount,
     )
     appraised = _dec(appraised_value)
     equity_balance_value = balance_value

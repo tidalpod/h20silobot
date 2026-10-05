@@ -211,12 +211,37 @@ def test_assets_use_original_balance_when_current_principal_is_missing():
 def test_recorded_appraisal_wins_over_implied_value():
     value, source = _effective_asset_value(
         Decimal("135000.00"),
-        Decimal("80000.00"),
         Decimal("95000.00"),
+        Decimal("15000.00"),
+        Decimal("80000.00"),
     )
 
     assert value == Decimal("135000.00")
     assert source == "appraisal"
+
+
+def test_purchase_price_wins_over_twenty_percent_down_estimate():
+    value, source = _effective_asset_value(
+        None,
+        Decimal("95000.00"),
+        None,
+        Decimal("80000.00"),
+    )
+
+    assert value == Decimal("95000.00")
+    assert source == "purchase_price"
+
+
+def test_rehab_cost_is_added_to_purchase_price_fallback():
+    value, source = _effective_asset_value(
+        None,
+        Decimal("95000.00"),
+        Decimal("15000.00"),
+        Decimal("80000.00"),
+    )
+
+    assert value == Decimal("110000.00")
+    assert source == "purchase_plus_rehab"
 
 
 def test_debt_free_asset_uses_purchase_price_as_value_and_equity():
