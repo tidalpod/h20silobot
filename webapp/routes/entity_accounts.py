@@ -523,7 +523,16 @@ async def upload_entity_document(
     if not contents:
         return RedirectResponse(url="/payments/bank-accounts", status_code=303)
 
-    ext = Path(file.filename).suffix if file.filename else ".pdf"
+    from webapp.services.upload_security import safe_upload_extension
+    allowed_types = {
+        "application/pdf", "image/jpeg", "image/png",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    try:
+        ext = safe_upload_extension(file.content_type, contents, allowed_types)
+    except ValueError:
+        return RedirectResponse(url="/payments/bank-accounts?error=invalid_document", status_code=303)
     key = f"entity-docs/{entity_id}/{doc_type}_{int(dt.utcnow().timestamp())}{ext}"
     file_url = storage.upload(key, contents, content_type=file.content_type or "application/pdf")
 

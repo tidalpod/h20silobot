@@ -119,6 +119,9 @@
 
     <main class="max-w-2xl mx-auto px-4 py-8">
         <form method="POST" action="/apply" id="application-form" novalidate>
+            <div class="hidden" aria-hidden="true">
+                <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+            </div>
             <input type="hidden" name="property_id" id="selected-property-id" value="">
 
             <!-- ============ STEP 1: Select Property + Start ============ -->

@@ -12,20 +12,13 @@ from sqlalchemy.orm import selectinload
 from database.connection import get_session
 from database.models import ESignSigner, ESignEnvelope, ESignStatus, LeaseDocument
 from webapp.services import esign_service
+from webapp.request_security import client_ip
 
 router = APIRouter(tags=["esign-public"])
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-
-def _client_ip(request: Request) -> str:
-    """Extract client IP, respecting X-Forwarded-For."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else ""
 
 
 @router.get("/sign/{token}", response_class=HTMLResponse)
@@ -90,7 +83,7 @@ async def signing_page(request: Request, token: str):
 
         # Record view
         await esign_service.record_view(
-            signer_id, _client_ip(request),
+            signer_id, client_ip(request),
             request.headers.get("user-agent", "")
         )
 
@@ -128,7 +121,7 @@ async def submit_signing(request: Request, token: str):
         signer_id=signer_id,
         signature_data_base64=signature_data,
         signature_type=signature_type,
-        ip=_client_ip(request),
+        ip=client_ip(request),
         user_agent=request.headers.get("user-agent", ""),
     )
 
@@ -163,7 +156,7 @@ async def decline_signing(request: Request, token: str):
     result = await esign_service.decline_signature(
         signer_id=signer_id,
         reason=reason,
-        ip=_client_ip(request),
+        ip=client_ip(request),
         user_agent=request.headers.get("user-agent", ""),
     )
 

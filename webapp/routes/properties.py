@@ -972,7 +972,11 @@ async def upload_photo(
             return JSONResponse({"error": "Property not found"}, status_code=404)
 
         # Generate unique filename
-        ext = Path(photo.filename).suffix.lower() or ".jpg"
+        from webapp.services.upload_security import safe_upload_extension
+        try:
+            ext = safe_upload_extension(photo.content_type, contents, allowed_types)
+        except ValueError:
+            return JSONResponse({"error": "File contents do not match the selected image type."}, status_code=400)
         filename = f"{property_id}_{uuid.uuid4().hex[:8]}{ext}"
         key = f"properties/{filename}"
         url = storage.upload(key, contents, photo.content_type)
@@ -1275,8 +1279,14 @@ async def upload_violation(
             if len(pdf_contents) > 20 * 1024 * 1024:
                 pdf_contents = None
             else:
-                ext = Path(violation_file.filename).suffix.lower() or ".pdf"
-                pdf_filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
+                from webapp.services.upload_security import safe_upload_extension
+                try:
+                    ext = safe_upload_extension(violation_file.content_type, pdf_contents, {"application/pdf"})
+                except ValueError:
+                    pdf_contents = None
+                    ext = None
+                if ext:
+                    pdf_filename = f"{property_id}_violation_{uuid.uuid4().hex[:8]}{ext}"
 
     # Handle optional image upload
     image_contents = None
@@ -1288,8 +1298,14 @@ async def upload_violation(
             if len(image_contents) > 10 * 1024 * 1024:
                 image_contents = None
             else:
-                img_ext = Path(violation_image.filename).suffix.lower() or ".jpg"
-                image_filename = f"{property_id}_vimg_{uuid.uuid4().hex[:8]}{img_ext}"
+                from webapp.services.upload_security import safe_upload_extension
+                try:
+                    img_ext = safe_upload_extension(violation_image.content_type, image_contents, allowed_image_types)
+                except ValueError:
+                    image_contents = None
+                    img_ext = None
+                if img_ext:
+                    image_filename = f"{property_id}_vimg_{uuid.uuid4().hex[:8]}{img_ext}"
 
     # Require at least one file
     if not pdf_contents and not image_contents:

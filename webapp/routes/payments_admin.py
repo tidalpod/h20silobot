@@ -1,6 +1,7 @@
 """Admin Payment routes — view all payments, detail, Plaid webhook, Stripe webhook"""
 
 import logging
+import json
 import uuid
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -25,6 +26,7 @@ from webapp.auth.dependencies import get_current_user
 from webapp.services import payment_service
 from webapp.services import stripe_service
 from webapp.services import ledger_service
+from webapp.services import plaid_service
 
 logger = logging.getLogger(__name__)
 
@@ -1010,9 +1012,13 @@ async def payment_detail(request: Request, payment_id: int):
 @router.post("/webhooks/plaid")
 @router.post("/webhook")
 async def plaid_webhook(request: Request):
-    """Plaid webhook endpoint (public, no auth)."""
+    """Plaid webhook endpoint authenticated with Plaid's signed JWT."""
+    payload = await request.body()
+    signature = request.headers.get("Plaid-Verification", "")
+    if not await plaid_service.verify_webhook_signature(payload, signature):
+        return JSONResponse({"error": "Invalid signature"}, status_code=401)
     try:
-        data = await request.json()
+        data = json.loads(payload)
     except Exception:
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 

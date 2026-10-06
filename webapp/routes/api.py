@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List
 
 import aiohttp
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -16,8 +16,12 @@ from database.models import (
     Property, WaterBill, BillStatus, Tenant, WorkOrder, SMSMessage, MessageDirection,
     BillAlertSettings, BillAlertLog, Notification, NotificationChannel, NotificationStatus,
 )
+from webapp.auth.dependencies import require_auth
 
-router = APIRouter(tags=["api"])
+# Every endpoint in this router exposes portfolio data or can trigger a paid
+# scraping operation.  Keep the guard at router level so newly-added API
+# handlers cannot accidentally ship without authentication.
+router = APIRouter(tags=["api"], dependencies=[Depends(require_auth)])
 logger = logging.getLogger(__name__)
 
 # Track refresh-all progress
@@ -258,16 +262,18 @@ async def api_refresh_property(property_id: int):
                     "property_id": prop.id,
                     "amount_due": actual_amount,
                     "scraped_at": scraped_at.strftime("%b %d, %H:%M"),
-                    "_debug_scraped": scraped_amount,
-                    "_debug_raw": str(bill_data.raw_data)[:500] if bill_data.raw_data else None,
                 }
             else:
                 logger.warning(f"No bill data found for {prop.address}")
                 return {"status": "not_found", "message": "No bill data found on BSA Online", "property_id": prop.id}
 
-        except Exception as e:
-            logger.error(f"Error refreshing {prop.address}: {e}")
-            return {"status": "error", "message": str(e), "property_id": prop.id}
+        except Exception:
+            logger.exception("Bill refresh failed for property_id=%s", prop.id)
+            return {
+                "status": "error",
+                "message": "Bill refresh failed. Please try again or contact support.",
+                "property_id": prop.id,
+            }
 
 
 @router.post("/refresh-bills")
@@ -411,7 +417,7 @@ async def _check_bill_alert(property_id: int, bill, session):
                     session.add(notification)
                     if sms_result.success:
                         sent_any = True
-                    logger.info(f"Bill alert SMS to {tenant.name} ({tenant.phone}): {'sent' if sms_result.success else 'failed'}")
+                    logger.info("Bill alert SMS tenant_id=%s status=%s", tenant.id, "sent" if sms_result.success else "failed")
                 except Exception as e:
                     logger.error(f"Bill alert SMS error for tenant {tenant.id}: {e}")
 
@@ -439,7 +445,7 @@ async def _check_bill_alert(property_id: int, bill, session):
                     session.add(notification)
                     if email_result.success:
                         sent_any = True
-                    logger.info(f"Bill alert email to {tenant.name} ({tenant.email}): {'sent' if email_result.success else 'failed'}")
+                    logger.info("Bill alert email tenant_id=%s status=%s", tenant.id, "sent" if email_result.success else "failed")
                 except Exception as e:
                     logger.error(f"Bill alert email error for tenant {tenant.id}: {e}")
 
@@ -689,13 +695,13 @@ async def refresh_all_properties():
                             })
                             logger.warning(f"No bill data found for {prop.address}")
 
-                    except Exception as e:
+                    except Exception:
                         _refresh_status["results"].append({
                             "property_id": prop.id,
                             "status": "error",
-                            "message": str(e),
+                            "message": "Refresh failed",
                         })
-                        logger.error(f"Error refreshing {prop.address}: {e}")
+                        logger.exception("Error refreshing property_id=%s", prop.id)
                         continue
                     finally:
                         _refresh_status["completed"] += 1

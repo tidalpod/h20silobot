@@ -6,6 +6,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -59,6 +60,10 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Starting Blue Deer Web App...")
 
+    config_errors = web_config.validate()
+    if config_errors:
+        raise RuntimeError("Unsafe application configuration: " + "; ".join(config_errors))
+
     # Debug: log email config status
     logger.info(f"[CONFIG] SENDGRID_API_KEY set: {bool(web_config.sendgrid_api_key)}")
     logger.info(f"[CONFIG] EMAIL_FROM set: {bool(web_config.email_from)} ({web_config.email_from[:20] if web_config.email_from else 'empty'})")
@@ -67,9 +72,8 @@ async def lifespan(app: FastAPI):
     # Initialize database
     db_success = await init_db()
     if not db_success:
-        logger.warning("Database connection failed - some features may be unavailable")
-    else:
-        logger.info("Database connected successfully")
+        raise RuntimeError("Database initialization or security migration failed")
+    logger.info("Database connected successfully")
 
     # Run showing reminder migration
     try:
@@ -255,8 +259,31 @@ async def security_and_cache_headers(request: Request, call_next):
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+class ProtectedUploadStaticFiles(StaticFiles):
+    """Keep legacy sensitive local-upload paths behind session/token auth."""
+
+    protected_prefixes = (
+        "leases/", "invoices/", "entity-docs/", "entity_docs/", "packets/", "projects/",
+    )
+
+    async def get_response(self, path, scope):
+        if path.startswith(self.protected_prefixes):
+            session = scope.get("session", {})
+            has_session = any(session.get(name) for name in ("user", "tenant", "vendor"))
+            params = parse_qs(scope.get("query_string", b"").decode(errors="ignore"))
+            signing_token = (params.get("signing_token") or [""])[0]
+            if signing_token:
+                from webapp.services.esign_service import verify_signing_token
+                has_signing_access = bool(verify_signing_token(signing_token))
+            else:
+                has_signing_access = False
+            if not has_session and not has_signing_access:
+                return JSONResponse({"detail": "Not found"}, status_code=404)
+        return await super().get_response(path, scope)
+
+
 # Mount uploads directory (Railway volume or local)
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+app.mount("/uploads", ProtectedUploadStaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # Templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -302,11 +329,13 @@ from .routes.applications import router as applications_router
 from .routes.leads import router as leads_router
 from .routes.esign_public import router as esign_public_router
 from .routes.packets import router as packets_router
+from .routes.protected_files import router as protected_files_router
 # Recertification is now built into property/tenant - dates tracked there
 # from .routes.recertifications import router as recertifications_router
 
 # PWA routes must be registered before portal/vendor prefix routes
 app.include_router(pwa_router)
+app.include_router(protected_files_router)
 app.include_router(esign_public_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)

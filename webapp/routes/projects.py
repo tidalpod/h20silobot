@@ -563,11 +563,16 @@ async def add_project_draw(request: Request, project_id: int):
     if receipt_file and hasattr(receipt_file, "read") and receipt_file.filename:
         allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
         if receipt_file.content_type in allowed:
-            ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
-            filename = f"draw_{project_id}_{uuid.uuid4().hex[:8]}{ext}"
-            key = f"projects/draws/{filename}"
             content = await receipt_file.read()
-            receipt_url = storage.upload(key, content, receipt_file.content_type)
+            from webapp.services.upload_security import safe_upload_extension
+            try:
+                ext = safe_upload_extension(receipt_file.content_type, content, allowed)
+            except ValueError:
+                ext = None
+            if ext:
+                filename = f"draw_{project_id}_{uuid.uuid4().hex[:8]}{ext}"
+                key = f"projects/draws/{filename}"
+                receipt_url = storage.upload(key, content, receipt_file.content_type)
 
     async with get_session() as session:
         draw = ProjectDraw(

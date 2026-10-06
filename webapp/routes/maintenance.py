@@ -837,11 +837,16 @@ async def mark_work_order_paid(request: Request, wo_id: int):
     if receipt_file and hasattr(receipt_file, "read") and receipt_file.filename:
         allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]
         if receipt_file.content_type in allowed:
-            ext = Path(receipt_file.filename).suffix.lower() or ".jpg"
-            filename = f"receipt_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
-            key = f"work_orders/{filename}"
             content = await receipt_file.read()
-            receipt_url = storage.upload(key, content, receipt_file.content_type)
+            from webapp.services.upload_security import safe_upload_extension
+            try:
+                ext = safe_upload_extension(receipt_file.content_type, content, allowed)
+            except ValueError:
+                ext = None
+            if ext:
+                filename = f"receipt_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
+                key = f"work_orders/{filename}"
+                receipt_url = storage.upload(key, content, receipt_file.content_type)
 
     async with get_session() as session:
         result = await session.execute(
@@ -951,7 +956,11 @@ async def upload_work_order_photo(
         if not wo:
             return JSONResponse({"error": "Work order not found"}, status_code=404)
 
-        ext = Path(photo.filename).suffix.lower() or ".jpg"
+        from webapp.services.upload_security import safe_upload_extension
+        try:
+            ext = safe_upload_extension(photo.content_type, contents, allowed_types)
+        except ValueError:
+            return JSONResponse({"error": "File contents do not match the selected image type."}, status_code=400)
         filename = f"wo_{wo_id}_{uuid.uuid4().hex[:8]}{ext}"
         key = f"work_orders/{filename}"
         url = storage.upload(key, contents, photo.content_type)

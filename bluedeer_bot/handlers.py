@@ -542,21 +542,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def setup_handlers(application):
     """Set up all bot handlers"""
+    from telegram_access import admin_only
+
     # Command handlers
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("chatid", chatid_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("inspections", inspections_command))
-    application.add_handler(CommandHandler("recerts", recerts_command))
-    application.add_handler(CommandHandler("bills", bills_command))
-    application.add_handler(CommandHandler("maintenance", maintenance_command))
-    application.add_handler(CommandHandler("leases", leases_command))
-    application.add_handler(CommandHandler("notify", notify_command))
-    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("start", admin_only(start_command)))
+    application.add_handler(CommandHandler("chatid", admin_only(chatid_command)))
+    application.add_handler(CommandHandler("status", admin_only(status_command)))
+    application.add_handler(CommandHandler("inspections", admin_only(inspections_command)))
+    application.add_handler(CommandHandler("recerts", admin_only(recerts_command)))
+    application.add_handler(CommandHandler("bills", admin_only(bills_command)))
+    application.add_handler(CommandHandler("maintenance", admin_only(maintenance_command)))
+    application.add_handler(CommandHandler("leases", admin_only(leases_command)))
+    application.add_handler(CommandHandler("notify", admin_only(notify_command)))
+    application.add_handler(CommandHandler("help", admin_only(help_command)))
 
     # Menu callbacks
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
-    application.add_handler(CallbackQueryHandler(back_to_menu_callback, pattern="^back_to_menu$"))
+    application.add_handler(CallbackQueryHandler(admin_only(menu_callback), pattern="^menu_"))
+    application.add_handler(CallbackQueryHandler(admin_only(back_to_menu_callback), pattern="^back_to_menu$"))
 
     # Password vault
     from bluedeer_bot import vault

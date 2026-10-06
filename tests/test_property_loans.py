@@ -3,8 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from database.loan_seed import (
-    PROPERTY_LOAN_SEEDS,
+from database.loan_import import (
     find_unambiguous_property_id,
     normalize_property_address,
 )
@@ -37,7 +36,7 @@ def valid_form(**overrides):
         "escrow_balance": "-25.50",
         "insurance_carrier": "",
         "insurance_payee": "",
-        "insurance_policy_number": "GAC0443402",
+        "insurance_policy_number": "TEST-POLICY-0001",
         "insurance_expiration_date": "2027-04-30",
         "insurance_premium": "99.23",
         "insurance_premium_frequency": "monthly",
@@ -52,7 +51,7 @@ def valid_form(**overrides):
 def test_property_loan_masks_identifiers_and_formats_term():
     loan = PropertyLoan(
         loan_number_last4="5114",
-        insurance_policy_number="381-5024929094-01",
+        insurance_policy_number="TEST-0000009401",
         term_months=360,
     )
 
@@ -120,20 +119,19 @@ def test_financing_form_rejects_invalid_values(overrides, error):
 
 def test_address_matching_is_exact_normalized_and_unambiguous():
     properties = [
-        (11, "22532 Sharrow Ave."),
-        (12, "22532 Sharrow Ave., Apt 2"),
+        (11, "100 Example Ave."),
+        (12, "100 Example Ave., Apt 2"),
     ]
 
-    assert normalize_property_address("22532 Sharrow Ave.") == "22532 sharrow ave"
-    assert find_unambiguous_property_id(properties, "22532 Sharrow Ave") == 11
-    assert find_unambiguous_property_id(properties + [(13, "22532 Sharrow Ave")], "22532 Sharrow Ave") is None
-    assert len(PROPERTY_LOAN_SEEDS) == 10
+    assert normalize_property_address("100 Example Ave.") == "100 example ave"
+    assert find_unambiguous_property_id(properties, "100 Example Ave") == 11
+    assert find_unambiguous_property_id(properties + [(13, "100 Example Ave")], "100 Example Ave") is None
 
 
 def test_current_related_loan_drives_assets_metrics_and_legacy_snapshot():
     prop = Property(
-        address="11076 Lozier Ave",
-        bsa_account_number="test-11076",
+        address="101 Example Ave",
+        bsa_account_number="test-account",
         appraised_value=Decimal("100000"),
         monthly_rent=Decimal("1500"),
         hoa_monthly=Decimal("0"),

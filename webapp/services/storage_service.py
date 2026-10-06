@@ -1,20 +1,26 @@
 """Cloudflare R2 / local filesystem storage abstraction.
 
-When R2 credentials are configured, files are uploaded to R2 and full public
-URLs are returned.  When not configured (or on upload failure), files are
-written to the local filesystem under UPLOAD_PATH and a /uploads/... path is
-returned — fully backwards-compatible with the existing StaticFiles mount.
+When R2 credentials are configured, files are uploaded to a private bucket and
+served through application routes. When not configured (or on upload failure),
+files are written under UPLOAD_PATH. Sensitive prefixes always use an
+authenticated delivery route; non-sensitive media remains cacheable.
 """
 
 import logging
 import os
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional
+from urllib.parse import unquote, urlparse
 
 from webapp.config import web_config
 
 logger = logging.getLogger(__name__)
+
+PROTECTED_PREFIXES = (
+    "leases/", "invoices/", "entity-docs/", "entity_docs/",
+    "packets/", "projects/", "work_orders/", "violations/", "co_inspections/",
+)
 
 # Local upload base — same logic used everywhere else in the codebase
 UPLOAD_BASE = os.environ.get("UPLOAD_PATH") or (
@@ -69,9 +75,8 @@ class StorageService:
                     Body=data,
                     ContentType=content_type,
                 )
-                url = f"{self._public_url}/{key}"
-                logger.info(f"[STORAGE] Uploaded to R2: {url}")
-                return url
+                logger.info("[STORAGE] Uploaded object to R2")
+                return self._delivery_url(key)
             except Exception as e:
                 logger.error(f"[STORAGE] R2 upload failed, falling back to local: {e}")
 
@@ -93,9 +98,8 @@ class StorageService:
                     Key=key,
                     ExtraArgs={"ContentType": content_type},
                 )
-                url = f"{self._public_url}/{key}"
-                logger.info(f"[STORAGE] Uploaded to R2 from path: {url}")
-                return url
+                logger.info("[STORAGE] Uploaded object to R2 from path")
+                return self._delivery_url(key)
             except Exception as e:
                 logger.error(f"[STORAGE] R2 upload_from_path failed, falling back to local: {e}")
 
@@ -105,7 +109,7 @@ class StorageService:
             dest.parent.mkdir(parents=True, exist_ok=True)
             import shutil
             shutil.copy2(str(path), str(dest))
-        return f"/uploads/{key}"
+        return self._delivery_url(key)
 
     def delete(self, key_or_url: str) -> None:
         """Delete a file by key or URL (handles both R2 and local URLs)."""
@@ -159,9 +163,10 @@ class StorageService:
 
     def url(self, key: str) -> str:
         """Construct the URL for a key without uploading."""
-        if self._s3:
-            return f"{self._public_url}/{key}"
-        return f"/uploads/{key}"
+        return self._delivery_url(key)
+
+    def is_protected_key(self, key_or_url: str) -> bool:
+        return self._extract_key(key_or_url).startswith(PROTECTED_PREFIXES)
 
     def resolve_local_path(self, key_or_url: str) -> Optional[Path]:
         """Resolve to a local file path if the file is local. Returns None for R2-only files."""
@@ -194,20 +199,26 @@ class StorageService:
 
         # Strip R2 public URL prefix
         if self._public_url and key_or_url.startswith(self._public_url):
-            return key_or_url[len(self._public_url):].lstrip("/")
+            raw_key = key_or_url[len(self._public_url):].lstrip("/")
 
         # Strip /uploads/ prefix
-        if key_or_url.startswith("/uploads/"):
-            return key_or_url[len("/uploads/"):]
+        elif key_or_url.startswith("/uploads/"):
+            raw_key = key_or_url[len("/uploads/"):]
+        elif key_or_url.startswith("/protected-files/"):
+            raw_key = key_or_url[len("/protected-files/"):]
+        elif key_or_url.startswith("/media-files/"):
+            raw_key = key_or_url[len("/media-files/"):]
+        elif not key_or_url.startswith("http"):
+            raw_key = key_or_url
+        else:
+            # Unknown remote URL — try to extract path after the domain.
+            raw_key = unquote(urlparse(key_or_url).path).lstrip("/")
 
-        # Already a bare key
-        if not key_or_url.startswith("http"):
-            return key_or_url
-
-        # Unknown remote URL — try to extract path after the domain
-        from urllib.parse import urlparse
-        parsed = urlparse(key_or_url)
-        return parsed.path.lstrip("/")
+        path = PurePosixPath(unquote(raw_key))
+        if path.is_absolute() or ".." in path.parts:
+            logger.warning("Rejected unsafe storage key")
+            return ""
+        return str(path)
 
     def _write_local(self, key: str, data: bytes) -> str:
         """Write to local filesystem and return /uploads/ URL."""
@@ -215,6 +226,14 @@ class StorageService:
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "wb") as f:
             f.write(data)
+        return self._delivery_url(key)
+
+    def _delivery_url(self, key: str) -> str:
+        """Never expose sensitive object-store URLs directly."""
+        if key.startswith(PROTECTED_PREFIXES):
+            return f"/protected-files/{key}"
+        if self._s3:
+            return f"/media-files/{key}"
         return f"/uploads/{key}"
 
 

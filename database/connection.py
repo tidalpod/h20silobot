@@ -230,22 +230,24 @@ Tenant acknowledges that payment of the monthly water bill is a material conditi
 
 
 async def _seed_telegram_admins(engine):
-    """Ensure default Telegram admin users exist for Blue Deer alerts"""
-    admin_users = [
-        # (telegram_id, first_name)
-        (2092822589, "Admin"),
-    ]
+    """Seed only explicitly configured Telegram administrators."""
+    from telegram_access import configured_admin_ids
+
+    admin_users = configured_admin_ids()
+    if not admin_users:
+        return
 
     async with engine.begin() as conn:
-        for telegram_id, first_name in admin_users:
+        for telegram_id in admin_users:
             result = await conn.execute(text(
-                f"SELECT id FROM telegram_users WHERE telegram_id = {telegram_id}"
-            ))
+                "SELECT id FROM telegram_users WHERE telegram_id = :telegram_id"
+            ), {"telegram_id": telegram_id})
             if not result.fetchone():
                 await conn.execute(text(
-                    f"INSERT INTO telegram_users (telegram_id, first_name, is_admin, notifications_enabled) "
-                    f"VALUES ({telegram_id}, '{first_name}', true, true)"
-                ))
+                    "INSERT INTO telegram_users "
+                    "(telegram_id, first_name, is_admin, notifications_enabled) "
+                    "VALUES (:telegram_id, 'Configured admin', true, true)"
+                ), {"telegram_id": telegram_id})
                 print(f"[DB] Added Telegram admin user {telegram_id}")
 
 
@@ -317,6 +319,14 @@ async def init_db():
         # Run migrations for new columns
         await run_migrations(engine)
 
+        # Encrypt any legacy plaintext credentials and financial tokens before
+        # request handlers or bots can read them.
+        from .migrations.encrypt_sensitive_data import run_migration as encrypt_sensitive_data
+        await encrypt_sensitive_data(engine)
+
+        from .migrations.proxy_storage_urls import run_migration as proxy_storage_urls
+        await proxy_storage_urls(engine)
+
         # Seed default Telegram admin user for Blue Deer alerts
         await _seed_telegram_admins(engine)
 
@@ -325,11 +335,6 @@ async def init_db():
 
         # Seed default showing reminder settings
         await _seed_showing_reminder_settings(engine)
-
-        # Seed verified property financing details. This is idempotent and only
-        # attaches records when the normalized address has exactly one match.
-        from .loan_seed import seed_property_loans
-        await seed_property_loans(engine)
 
         print("[DB] SUCCESS - Database connected and tables created!")
         logger.info("Database connected successfully")

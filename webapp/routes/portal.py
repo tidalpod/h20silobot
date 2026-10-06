@@ -338,7 +338,11 @@ async def portal_photo_upload(request: Request, wo_id: int, photo: UploadFile = 
         if not wo:
             return JSONResponse({"error": "Work order not found"}, status_code=404)
 
-        ext = Path(photo.filename).suffix.lower() or ".jpg"
+        from webapp.services.upload_security import safe_upload_extension
+        try:
+            ext = safe_upload_extension(photo.content_type, contents, allowed_types)
+        except ValueError:
+            return JSONResponse({"error": "File contents do not match the selected image type."}, status_code=400)
         filename = f"wo_{wo_id}_tenant_{uuid.uuid4().hex[:8]}{ext}"
         key = f"work_orders/{filename}"
         url = storage.upload(key, contents, photo.content_type)

@@ -1,16 +1,19 @@
 """Authentication routes"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import hmac
 from pathlib import Path
-from time import monotonic
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 
 from database.connection import get_session
-from database.models import WebUser
+from database.models import LoginAttempt, WebUser
+from webapp.config import web_config
+from webapp.request_security import client_ip
 from .utils import hash_password, verify_password
 from .dependencies import login_user, logout_user, get_current_user
 
@@ -23,7 +26,6 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 LOGIN_WINDOW_SECONDS = 15 * 60
 MAX_LOGIN_ATTEMPTS_PER_ACCOUNT = 10
 MAX_LOGIN_ATTEMPTS_PER_IP = 30
-_login_attempts = {}
 
 
 def _safe_next_url(value: str) -> str:
@@ -37,39 +39,42 @@ def _masked_phone(phone: str) -> str:
 
 
 def _login_keys(request: Request, email: str) -> tuple[str, str]:
-    forwarded_for = request.headers.get("x-forwarded-for", "")
-    client_ip = forwarded_for.split(",")[0].strip() if forwarded_for else (request.client.host if request.client else "unknown")
-    return f"ip:{client_ip}", f"account:{email.strip().lower()}"
+    return f"ip:{client_ip(request)}", f"account:{email.strip().lower()}"
 
 
-def _recent_attempts(key: str) -> list[float]:
-    cutoff = monotonic() - LOGIN_WINDOW_SECONDS
-    attempts = [timestamp for timestamp in _login_attempts.get(key, []) if timestamp >= cutoff]
-    if attempts:
-        _login_attempts[key] = attempts
-    else:
-        _login_attempts.pop(key, None)
-    return attempts
+def _key_hash(key: str) -> str:
+    return hmac.new(web_config.secret_key.encode(), key.encode(), hashlib.sha256).hexdigest()
 
 
-def _login_is_limited(request: Request, email: str) -> bool:
-    ip_key, account_key = _login_keys(request, email)
-    return (
-        len(_recent_attempts(ip_key)) >= MAX_LOGIN_ATTEMPTS_PER_IP
-        or len(_recent_attempts(account_key)) >= MAX_LOGIN_ATTEMPTS_PER_ACCOUNT
-    )
+async def _login_is_limited(request: Request, email: str) -> bool:
+    cutoff = datetime.utcnow() - timedelta(seconds=LOGIN_WINDOW_SECONDS)
+    ip_key, account_key = (_key_hash(key) for key in _login_keys(request, email))
+    async with get_session() as session:
+        await session.execute(delete(LoginAttempt).where(LoginAttempt.attempted_at < cutoff))
+        counts = []
+        for key in (ip_key, account_key):
+            counts.append(await session.scalar(
+                select(func.count(LoginAttempt.id)).where(
+                    LoginAttempt.key_hash == key,
+                    LoginAttempt.attempted_at >= cutoff,
+                )
+            ) or 0)
+        await session.commit()
+    return counts[0] >= MAX_LOGIN_ATTEMPTS_PER_IP or counts[1] >= MAX_LOGIN_ATTEMPTS_PER_ACCOUNT
 
 
-def _record_login_failure(request: Request, email: str) -> None:
-    timestamp = monotonic()
-    for key in _login_keys(request, email):
-        attempts = _recent_attempts(key)
-        attempts.append(timestamp)
-        _login_attempts[key] = attempts
+async def _record_login_failure(request: Request, email: str) -> None:
+    async with get_session() as session:
+        session.add_all(LoginAttempt(key_hash=_key_hash(key)) for key in _login_keys(request, email))
+        await session.commit()
 
 
-def _clear_account_attempts(email: str) -> None:
-    _login_attempts.pop(f"account:{email.strip().lower()}", None)
+async def _clear_account_attempts(email: str) -> None:
+    async with get_session() as session:
+        await session.execute(delete(LoginAttempt).where(
+            LoginAttempt.key_hash == _key_hash(f"account:{email.strip().lower()}")
+        ))
+        await session.commit()
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -93,7 +98,7 @@ async def login(
     next: str = Form("/")
 ):
     """Handle login form submission"""
-    if _login_is_limited(request, email):
+    if await _login_is_limited(request, email):
         return templates.TemplateResponse(
             "auth/login.html",
             {"request": request, "next": _safe_next_url(next), "error": "Too many sign-in attempts. Please wait 15 minutes and try again.", "email": email},
@@ -107,7 +112,7 @@ async def login(
         user = result.scalar_one_or_none()
 
         if not user or not verify_password(password, user.password_hash):
-            _record_login_failure(request, email)
+            await _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
                 {"request": request, "next": _safe_next_url(next), "error": "Invalid email or password", "email": email},
@@ -115,7 +120,7 @@ async def login(
             )
 
         if not user.is_active:
-            _record_login_failure(request, email)
+            await _record_login_failure(request, email)
             return templates.TemplateResponse(
                 "auth/login.html",
                 {"request": request, "next": _safe_next_url(next), "error": "Account is disabled", "email": email},
@@ -128,7 +133,7 @@ async def login(
 
         # Store in session
         login_user(request, user)
-        _clear_account_attempts(email)
+        await _clear_account_attempts(email)
 
     return RedirectResponse(url=_safe_next_url(next), status_code=303)
 

@@ -38,7 +38,8 @@ def main():
     errors = web_config.validate()
     if errors:
         for error in errors:
-            logger.warning(f"Config warning: {error}")
+            logger.error(f"Unsafe configuration: {error}")
+        raise SystemExit("Refusing to start with unsafe configuration")
 
     logger.info(f"Starting H2O Silo Web App on {web_config.host}:{web_config.port}")
     logger.info(f"Debug mode: {web_config.debug}")

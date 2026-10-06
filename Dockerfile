@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy requirements first for caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir playwright-stealth>=2.0.0
+    pip install --no-cache-dir "playwright-stealth==2.0.3"
 
 # Copy application code
 COPY . .

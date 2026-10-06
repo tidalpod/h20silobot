@@ -46,6 +46,12 @@ async def main():
         logger.error("BLUEDEER_BOT_TOKEN is required")
         sys.exit(1)
 
+    from database.encrypted import validate_encryption_key
+    encryption_error = validate_encryption_key()
+    if encryption_error:
+        logger.error(encryption_error)
+        sys.exit(1)
+
     logger.info(f"BLUEDEER_BOT_TOKEN set: {bool(token)}")
     logger.info(f"BLUEDEER_ADMIN_TELEGRAM_ID: {admin_id or 'Not set'}")
     logger.info(f"BLUEDEER_GROUP_CHAT_ID: {group_id or 'Not set'}")

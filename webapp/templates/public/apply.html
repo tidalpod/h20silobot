@@ -65,6 +65,9 @@
 
     <main class="max-w-2xl mx-auto px-4 py-8">
         <form method="POST" action="/apply/{{ property.id }}" id="application-form" novalidate>
+            <div class="hidden" aria-hidden="true">
+                <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+            </div>
 
             <!-- ============ STEP 1: Start My Application ============ -->
             <div class="step active" data-step="1">

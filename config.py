@@ -53,6 +53,10 @@ class Config:
             errors.append("TELEGRAM_BOT_TOKEN is required")
         if not self.database_url:
             errors.append("DATABASE_URL is required")
+        from database.encrypted import validate_encryption_key
+        encryption_error = validate_encryption_key()
+        if encryption_error:
+            errors.append(encryption_error)
         return errors
 
 

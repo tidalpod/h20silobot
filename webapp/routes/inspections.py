@@ -617,8 +617,14 @@ async def upload_co_document(
             if len(pdf_contents) > 20 * 1024 * 1024:
                 pdf_contents = None
             else:
-                ext = Path(doc_file.filename).suffix.lower() or ".pdf"
-                pdf_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{ext}"
+                from webapp.services.upload_security import safe_upload_extension
+                try:
+                    ext = safe_upload_extension(doc_file.content_type, pdf_contents, {"application/pdf"})
+                except ValueError:
+                    pdf_contents = None
+                    ext = None
+                if ext:
+                    pdf_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{ext}"
 
     # Handle image
     image_contents = None
@@ -630,8 +636,14 @@ async def upload_co_document(
             if len(image_contents) > 10 * 1024 * 1024:
                 image_contents = None
             else:
-                img_ext = Path(doc_image.filename).suffix.lower() or ".jpg"
-                image_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{img_ext}"
+                from webapp.services.upload_security import safe_upload_extension
+                try:
+                    img_ext = safe_upload_extension(doc_image.content_type, image_contents, allowed_image_types)
+                except ValueError:
+                    image_contents = None
+                    img_ext = None
+                if img_ext:
+                    image_filename = f"{property_id}_{inspection_type}_{uuid.uuid4().hex[:8]}{img_ext}"
 
     if not pdf_contents and not image_contents:
         return RedirectResponse(url=f"/inspections/co/property/{property_id}", status_code=303)

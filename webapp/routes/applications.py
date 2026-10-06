@@ -19,6 +19,7 @@ from database.models import Property, TenantApplication, ApplicationStatus
 from webapp.auth.dependencies import get_current_user
 from webapp.config import web_config
 from webapp.services import stripe_service
+from webapp.services.abuse_protection import check_and_record
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,13 @@ def _collect_dynamic_entries(form, prefix_fields: dict, max_count=20):
 @router.post("/apply/{property_id}")
 async def apply_submit(request: Request, property_id: int):
     """Process a rental application submission."""
+    form = await request.form()
+    # Honeypot plus a shared per-origin throttle prevent automated submission floods.
+    if form.get("website", "").strip():
+        raise HTTPException(status_code=400, detail="Invalid submission")
+    if await check_and_record(request, "rental_application", limit=5, window_seconds=60 * 60):
+        raise HTTPException(status_code=429, detail="Too many applications. Please try again later.")
+
     async with get_session() as session:
         # Verify property exists and is active
         result = await session.execute(
@@ -174,8 +182,6 @@ async def apply_submit(request: Request, property_id: int):
         prop = result.scalar_one_or_none()
         if not prop:
             raise HTTPException(status_code=404, detail="Property not found")
-
-        form = await request.form()
 
         # --- Core column fields ---
         income = _parse_money(form.get("income", ""))
@@ -533,17 +539,21 @@ async def _send_application_telegram(application, prop):
 @router.post("/api/screening/webhook")
 async def screening_webhook(request: Request):
     """Handle TenantReportX webhook callbacks."""
-    # Verify webhook secret
-    if web_config.tenantreportx_webhook_secret:
-        signature = request.headers.get("X-Webhook-Signature", "")
-        body = await request.body()
-        expected = hmac.new(
-            web_config.tenantreportx_webhook_secret.encode(),
-            body,
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(signature, expected):
-            return JSONResponse({"error": "Invalid signature"}, status_code=401)
+    # Fail closed: accepting unsigned screening results is worse than delaying
+    # processing while configuration is repaired.
+    if not web_config.tenantreportx_webhook_secret:
+        logger.error("TenantReportX webhook rejected: signing secret is not configured")
+        return JSONResponse({"error": "Webhook unavailable"}, status_code=503)
+
+    signature = request.headers.get("X-Webhook-Signature", "")
+    body = await request.body()
+    expected = hmac.new(
+        web_config.tenantreportx_webhook_secret.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return JSONResponse({"error": "Invalid signature"}, status_code=401)
 
     payload = await request.json()
 

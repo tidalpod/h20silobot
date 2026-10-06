@@ -266,10 +266,10 @@ async def show_summary(query, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-    except Exception as e:
-        logger.error(f"Error in show_summary: {e}")
+    except Exception:
+        logger.exception("Error in show_summary")
         await query.edit_message_text(
-            f"❌ Error: {str(e)}",
+            "❌ Something went wrong. Please try again.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
@@ -344,10 +344,10 @@ async def show_properties(query, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    except Exception as e:
-        logger.error(f"Error in show_properties: {e}")
+    except Exception:
+        logger.exception("Error in show_properties")
         await query.edit_message_text(
-            f"❌ Error: {str(e)}",
+            "❌ Something went wrong. Please try again.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
@@ -434,10 +434,10 @@ async def show_property_detail(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-    except Exception as e:
-        logger.error(f"Error in show_property_detail: {e}")
+    except Exception:
+        logger.exception("Error in show_property_detail")
         await query.edit_message_text(
-            f"❌ Error: {str(e)}",
+            "❌ Something went wrong. Please try again.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
@@ -519,10 +519,10 @@ async def show_overdue(query, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    except Exception as e:
-        logger.error(f"Error in show_overdue: {e}")
+    except Exception:
+        logger.exception("Error in show_overdue")
         await query.edit_message_text(
-            f"❌ Error: {str(e)}",
+            "❌ Something went wrong. Please try again.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
@@ -551,10 +551,10 @@ async def do_refresh(query, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=keyboard
             )
-        except Exception as e:
-            logger.error(f"Refresh failed: {e}")
+        except Exception:
+            logger.exception("Refresh failed")
             await query.edit_message_text(
-                f"❌ *Refresh Failed*\n\n{str(e)}",
+                "❌ *Refresh Failed*\n\nPlease try again later.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
@@ -622,10 +622,10 @@ async def show_remove_menu(query, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    except Exception as e:
-        logger.error(f"Error in show_remove_menu: {e}")
+    except Exception:
+        logger.exception("Error in show_remove_menu")
         await query.edit_message_text(
-            f"❌ Error: {str(e)}",
+            "❌ Something went wrong. Please try again.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("« Back to Menu", callback_data="back_to_menu")
             ]])
@@ -669,8 +669,9 @@ Bot: ✅ Running
                 text += f"Last Scrape: {last_scrape.started_at.strftime('%b %d, %Y %H:%M')}\n"
                 text += f"Scrape Status: {status}\n"
 
-        except Exception as e:
-            text += f"\n_Error getting stats: {e}_"
+        except Exception:
+            logger.exception("Error getting bot status stats")
+            text += "\n_Stats are temporarily unavailable._"
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Refresh Data", callback_data="menu_refresh")],
@@ -818,10 +819,10 @@ async def handle_property_input(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup=keyboard
         )
 
-    except Exception as e:
-        logger.error(f"Error adding property: {e}")
+    except Exception:
+        logger.exception("Error adding property")
         await update.message.reply_text(
-            f"❌ *Error Adding Property*\n\n{str(e)}",
+            "❌ *Error Adding Property*\n\nPlease try again later.",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔄 Try Again", callback_data="menu_add"),
@@ -928,9 +929,9 @@ async def properties_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    except Exception as e:
-        logger.error(f"Error in properties_command: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except Exception:
+        logger.exception("Error in properties_command")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
 
 
 async def summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1029,9 +1030,9 @@ async def summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard
         )
 
-    except Exception as e:
-        logger.error(f"Error in summary_command: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except Exception:
+        logger.exception("Error in summary_command")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
 
 
 async def overdue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1103,9 +1104,9 @@ async def overdue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    except Exception as e:
-        logger.error(f"Error in overdue_command: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except Exception:
+        logger.exception("Error in overdue_command")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
 
 
 async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1126,9 +1127,9 @@ async def refresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=keyboard
             )
-        except Exception as e:
-            logger.error(f"Refresh failed: {e}")
-            await update.message.reply_text(f"❌ *Refresh Failed*\n\n{str(e)}", parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            logger.exception("Refresh failed")
+            await update.message.reply_text("❌ *Refresh Failed*\n\nPlease try again later.", parse_mode=ParseMode.MARKDOWN)
     else:
         await update.message.reply_text("⚠️ Database not available. Cannot refresh.")
 
@@ -1230,9 +1231,9 @@ async def add_property_account(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode=ParseMode.MARKDOWN
         )
 
-    except Exception as e:
-        logger.error(f"Error adding property: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except Exception:
+        logger.exception("Error adding property")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
 
     return ConversationHandler.END
 
@@ -1292,9 +1293,9 @@ async def remove_property_start(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode=ParseMode.MARKDOWN
         )
 
-    except Exception as e:
-        logger.error(f"Error in remove_property_start: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except Exception:
+        logger.exception("Error in remove_property_start")
+        await update.message.reply_text("❌ Something went wrong. Please try again.")
 
 
 async def remove_property_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1343,9 +1344,9 @@ async def remove_property_callback(update: Update, context: ContextTypes.DEFAULT
                 parse_mode=ParseMode.MARKDOWN
             )
 
-        except Exception as e:
-            logger.error(f"Error in remove_property_callback: {e}")
-            await query.edit_message_text(f"❌ Error: {str(e)}")
+        except Exception:
+            logger.exception("Error in remove_property_callback")
+            await query.edit_message_text("❌ Something went wrong. Please try again.")
 
 
 async def remove_property_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1387,9 +1388,9 @@ async def remove_property_confirm(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode=ParseMode.MARKDOWN
             )
 
-        except Exception as e:
-            logger.error(f"Error in remove_property_confirm: {e}")
-            await query.edit_message_text(f"❌ Error: {str(e)}")
+        except Exception:
+            logger.exception("Error in remove_property_confirm")
+            await query.edit_message_text("❌ Something went wrong. Please try again.")
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1429,48 +1430,50 @@ Bot: ✅ Running
                 text += f"Last Scrape: {last_scrape.started_at.strftime('%b %d, %Y %H:%M')}\n"
                 text += f"Scrape Status: {status}\n"
 
-        except Exception as e:
-            text += f"\n_Error getting stats: {e}_"
+        except Exception:
+            logger.exception("Error getting bot status stats")
+            text += "\n_Stats are temporarily unavailable._"
 
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
 def setup_handlers(application):
     """Set up all bot handlers"""
+    from telegram_access import admin_only
 
     # Command handlers
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("properties", properties_command))
-    application.add_handler(CommandHandler("summary", summary_command))
-    application.add_handler(CommandHandler("overdue", overdue_command))
-    application.add_handler(CommandHandler("refresh", refresh_command))
-    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("start", admin_only(start_command)))
+    application.add_handler(CommandHandler("help", admin_only(help_command)))
+    application.add_handler(CommandHandler("properties", admin_only(properties_command)))
+    application.add_handler(CommandHandler("summary", admin_only(summary_command)))
+    application.add_handler(CommandHandler("overdue", admin_only(overdue_command)))
+    application.add_handler(CommandHandler("refresh", admin_only(refresh_command)))
+    application.add_handler(CommandHandler("status", admin_only(status_command)))
 
     # Add property conversation
     add_conv = ConversationHandler(
-        entry_points=[CommandHandler("add", add_property_start)],
+        entry_points=[CommandHandler("add", admin_only(add_property_start))],
         states={
-            ADDING_PROPERTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_property_account)],
+            ADDING_PROPERTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_only(add_property_account))],
         },
-        fallbacks=[CommandHandler("cancel", cancel_command)],
+        fallbacks=[CommandHandler("cancel", admin_only(cancel_command))],
     )
     application.add_handler(add_conv)
 
     # Interactive menu callbacks
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
-    application.add_handler(CallbackQueryHandler(back_to_menu_callback, pattern="^back_to_menu$"))
-    application.add_handler(CallbackQueryHandler(show_property_detail, pattern="^prop_\\d+$"))
+    application.add_handler(CallbackQueryHandler(admin_only(menu_callback), pattern="^menu_"))
+    application.add_handler(CallbackQueryHandler(admin_only(back_to_menu_callback), pattern="^back_to_menu$"))
+    application.add_handler(CallbackQueryHandler(admin_only(show_property_detail), pattern="^prop_\\d+$"))
 
     # Remove property callbacks
-    application.add_handler(CommandHandler("remove", remove_property_start))
-    application.add_handler(CallbackQueryHandler(remove_property_callback, pattern="^remove_"))
-    application.add_handler(CallbackQueryHandler(remove_property_confirm, pattern="^confirm_remove_"))
+    application.add_handler(CommandHandler("remove", admin_only(remove_property_start)))
+    application.add_handler(CallbackQueryHandler(admin_only(remove_property_callback), pattern="^remove_"))
+    application.add_handler(CallbackQueryHandler(admin_only(remove_property_confirm), pattern="^confirm_remove_"))
 
     # Handle text input for menu-based add property (address or account number)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        handle_property_input
+        admin_only(handle_property_input)
     ))
 
     logger.info("Bot handlers configured")

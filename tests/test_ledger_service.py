@@ -21,7 +21,7 @@ def make_charge(
         tenant_id=tenant_id,
         property_id=20,
         tenant_ref=SimpleNamespace(name="Cierra Trotter"),
-        property_ref=SimpleNamespace(address="7251 Studebaker Ave."),
+        property_ref=SimpleNamespace(address="102 Example Ave."),
         charge_type=charge_type,
         description="Monthly Rent" if charge_type == "rent" else "Utility Charge",
         amount=Decimal(amount),

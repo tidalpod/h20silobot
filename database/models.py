@@ -10,6 +10,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, declarative_base
 
+from database.encrypted import EncryptedText
+
 Base = declarative_base()
 
 
@@ -519,6 +521,33 @@ class WebUser(Base):
 
     def __repr__(self):
         return f"<WebUser {self.email}>"
+
+
+class LoginAttempt(Base):
+    """Shared, privacy-preserving failed-login throttle across app replicas."""
+    __tablename__ = "login_attempts"
+
+    id = Column(Integer, primary_key=True)
+    key_hash = Column(String(64), nullable=False, index=True)
+    attempted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_login_attempt_key_time", "key_hash", "attempted_at"),
+    )
+
+
+class PublicSubmissionAttempt(Base):
+    """Shared abuse throttle for public, unauthenticated forms."""
+    __tablename__ = "public_submission_attempts"
+
+    id = Column(Integer, primary_key=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    key_hash = Column(String(64), nullable=False, index=True)
+    attempted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_public_submission_event_key_time", "event_type", "key_hash", "attempted_at"),
+    )
 
 
 class Tenant(Base):
@@ -1475,7 +1504,7 @@ class TenantBankAccount(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
 
     # Plaid tokens
-    plaid_access_token = Column(String(255), nullable=False)
+    plaid_access_token = Column(EncryptedText(), nullable=False)
     plaid_item_id = Column(String(255), nullable=False)
     plaid_account_id = Column(String(255), nullable=False)
 
@@ -1700,13 +1729,13 @@ class EntityBankAccount(Base):
     entity_id = Column(Integer, ForeignKey("entity_configs.id", ondelete="CASCADE"), nullable=False)
 
     # Plaid tokens (nullable for manual entries)
-    plaid_access_token = Column(String(255), nullable=True)
+    plaid_access_token = Column(EncryptedText(), nullable=True)
     plaid_item_id = Column(String(255), nullable=True)
     plaid_account_id = Column(String(255), nullable=True)
 
     # Manual entry fields
-    routing_number = Column(String(9), nullable=True)
-    account_number = Column(String(17), nullable=True)
+    routing_number = Column(EncryptedText(), nullable=True)
+    account_number = Column(EncryptedText(), nullable=True)
 
     # Display info
     account_name = Column(String(255), nullable=True)
@@ -2165,14 +2194,13 @@ class BillAlertLog(Base):
 
 
 class VaultEntry(Base):
-    """Credential entry for the Blue Deer bot password vault. Plaintext at rest;
-    access is gated by PIN + admin whitelist + private-chat only."""
+    """Credential entry encrypted at rest and gated by PIN + admin access."""
     __tablename__ = "vault_entries"
 
     id = Column(Integer, primary_key=True)
     label = Column(String(120), nullable=False)
     username = Column(String(255), nullable=True)
-    password = Column(Text, nullable=False)
+    password = Column(EncryptedText(), nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

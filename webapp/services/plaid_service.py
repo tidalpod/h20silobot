@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import hmac
+import json
+import time
 from typing import Optional
 
 import aiohttp
+import jwt
 
 from webapp.config import web_config
 
 logger = logging.getLogger(__name__)
+
+_verification_keys: dict[str, tuple[float, dict]] = {}
+PLAID_WEBHOOK_MAX_AGE_SECONDS = 5 * 60
+PLAID_KEY_CACHE_SECONDS = 24 * 60 * 60
 
 PLAID_ENVS = {
     "sandbox": "https://sandbox.plaid.com",
@@ -31,6 +40,53 @@ def _auth_body() -> dict:
         "client_id": web_config.plaid_client_id,
         "secret": web_config.plaid_secret,
     }
+
+
+async def _get_webhook_verification_key(key_id: str) -> Optional[dict]:
+    cached = _verification_keys.get(key_id)
+    if cached and cached[0] > time.time():
+        return cached[1]
+
+    url = f"{_base_url()}/webhook_verification_key/get"
+    payload = {**_auth_body(), "key_id": key_id}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=_headers()) as resp:
+            data = await resp.json()
+            if resp.status != 200 or not data.get("key"):
+                logger.warning("Plaid webhook verification key lookup failed")
+                return None
+            key = data["key"]
+            _verification_keys[key_id] = (time.time() + PLAID_KEY_CACHE_SECONDS, key)
+            return key
+
+
+async def verify_webhook_signature(payload: bytes, signed_jwt: str) -> bool:
+    """Verify Plaid's ES256 JWT and the exact request-body SHA-256 digest."""
+    if not signed_jwt:
+        return False
+    try:
+        header = jwt.get_unverified_header(signed_jwt)
+        if header.get("alg") != "ES256" or not header.get("kid"):
+            return False
+        key = await _get_webhook_verification_key(header["kid"])
+        if not key:
+            return False
+        public_key = jwt.algorithms.ECAlgorithm.from_jwk(json.dumps(key))
+        claims = jwt.decode(
+            signed_jwt,
+            public_key,
+            algorithms=["ES256"],
+            options={"verify_aud": False},
+        )
+        issued_at = int(claims.get("iat", 0))
+        if not issued_at or abs(time.time() - issued_at) > PLAID_WEBHOOK_MAX_AGE_SECONDS:
+            return False
+        expected_hash = claims.get("request_body_sha256", "")
+        actual_hash = hashlib.sha256(payload).hexdigest()
+        return bool(expected_hash) and hmac.compare_digest(expected_hash, actual_hash)
+    except Exception:
+        logger.warning("Plaid webhook signature verification failed", exc_info=True)
+        return False
 
 
 async def create_link_token(tenant_id: int, tenant_name: str) -> dict:

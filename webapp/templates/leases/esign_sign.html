@@ -54,7 +54,7 @@
         <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <h3 class="text-sm font-semibold text-gray-700">Document Preview</h3>
         </div>
-        <iframe src="{{ lease.file_url }}" class="w-full" style="height: 600px;" frameborder="0"></iframe>
+        <iframe src="{{ lease.file_url }}{% if lease.file_url.startswith('/protected-files/') or lease.file_url.startswith('/uploads/leases/') %}?signing_token={{ token|urlencode }}{% endif %}" class="w-full" style="height: 600px;" frameborder="0"></iframe>
     </div>
     {% endif %}
 

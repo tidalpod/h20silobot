@@ -2,9 +2,8 @@
 
 PIN-gated, admin-only. Works in DMs and in whitelisted group chats
 (BLUEDEER_VAULT_GROUP_IDS, falling back to BLUEDEER_GROUP_CHAT_ID).
-Passwords are stored plaintext; the PIN (bcrypt-hashed) is the sole
-access control alongside the admin whitelist. Trade-off chosen for
-simplicity — see the design spec.
+Passwords are transparently encrypted at rest and protected by the PIN
+and administrator allowlist.
 
 Wiring:
     from bluedeer_bot import vault

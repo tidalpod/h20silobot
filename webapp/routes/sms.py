@@ -10,11 +10,15 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, or_, update
 from sqlalchemy.orm import selectinload
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from twilio.request_validator import RequestValidator
 
 from database.connection import get_session
 from database.models import SMSMessage, Tenant, Vendor, Property, MessageDirection, Showing, ShowingStatus
 from webapp.services.twilio_service import twilio_service
 from webapp.auth.dependencies import get_current_user
+from webapp.config import web_config
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,19 @@ router = APIRouter(prefix="/sms", tags=["sms"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def _twilio_signature_url(request: Request) -> str:
+    """Return the public URL Twilio used when computing its signature."""
+    configured = urlsplit(web_config.site_url)
+    if configured.scheme and configured.netloc:
+        base = f"{configured.scheme}://{configured.netloc}"
+    else:
+        forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
+        base = f"{forwarded_proto}://{host}"
+    query = f"?{request.url.query}" if request.url.query else ""
+    return f"{base}{request.url.path}{query}"
 
 
 def normalize_phone(phone: str) -> Optional[str]:
@@ -60,7 +77,18 @@ async def twilio_incoming_webhook(
     Twilio sends a POST request here when someone texts our number.
     We store the message and try to match it to a tenant.
     """
-    logger.info(f"Incoming SMS from {From}: {Body[:50]}...")
+    if not web_config.twilio_auth_token:
+        logger.error("Twilio webhook rejected: TWILIO_AUTH_TOKEN is not configured")
+        return JSONResponse({"error": "Webhook unavailable"}, status_code=503)
+
+    form_data = dict(await request.form())
+    signature = request.headers.get("X-Twilio-Signature", "")
+    validator = RequestValidator(web_config.twilio_auth_token)
+    if not validator.validate(_twilio_signature_url(request), form_data, signature):
+        logger.warning("Rejected incoming SMS with invalid Twilio signature")
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+    logger.info("Verified incoming SMS sid=%s", MessageSid or "unknown")
 
     try:
         async with get_session() as session:
@@ -88,7 +116,7 @@ async def twilio_incoming_webhook(
                         if tenant_phone == from_number:
                             tenant_id = tenant.id
                             property_id = tenant.property_id
-                            logger.info(f"Matched incoming SMS to tenant: {tenant.name}")
+                            logger.info("Matched incoming SMS to tenant_id=%s", tenant.id)
                             break
 
                 # If no tenant match, try matching against vendors
@@ -99,7 +127,7 @@ async def twilio_incoming_webhook(
                     for vendor in result.scalars().all():
                         if vendor.phone and normalize_phone(vendor.phone) == from_number:
                             vendor_id = vendor.id
-                            logger.info(f"Matched incoming SMS to vendor: {vendor.name}")
+                            logger.info("Matched incoming SMS to vendor_id=%s", vendor.id)
                             break
 
             # Store the incoming message

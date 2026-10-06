@@ -41,9 +41,14 @@ class WebConfig:
 
     # Site URL (for absolute links in signing emails)
     site_url: str = os.getenv("SITE_URL", "https://bluedeer.space")
+    # Comma-separated direct proxy IPs permitted to supply X-Forwarded-For.
+    trusted_proxy_ips: str = os.getenv("TRUSTED_PROXY_IPS", "")
 
     # Database (shared with bot)
     database_url: str = os.getenv("DATABASE_URL", "")
+
+    # Encryption key for credentials and financial tokens at rest.
+    encryption_key: str = os.getenv("ENCRYPTION_KEY", "")
 
     # Plaid ACH Payments
     plaid_client_id: str = os.getenv("PLAID_CLIENT_ID", "")
@@ -74,8 +79,7 @@ class WebConfig:
     def has_r2(self) -> bool:
         """Check if Cloudflare R2 is configured"""
         return bool(self.r2_account_id and self.r2_access_key_id
-                     and self.r2_access_key_secret and self.r2_bucket_name
-                     and self.r2_public_url)
+                     and self.r2_access_key_secret and self.r2_bucket_name)
 
     @property
     def has_tenantreportx(self) -> bool:
@@ -111,9 +115,13 @@ class WebConfig:
         """Validate required configuration"""
         errors = []
         if self.secret_key == "change-me-in-production":
-            errors.append("WEB_SECRET_KEY should be set to a secure random value")
+            errors.append("WEB_SECRET_KEY must be set to a secure random value")
         if not self.database_url:
             errors.append("DATABASE_URL is required")
+        from database.encrypted import validate_encryption_key
+        encryption_error = validate_encryption_key()
+        if encryption_error:
+            errors.append(encryption_error)
         return errors
 
 
