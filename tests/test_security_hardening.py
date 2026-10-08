@@ -2,6 +2,7 @@ import hashlib
 import json
 import time
 import asyncio
+from types import SimpleNamespace
 
 import jwt
 import pytest
@@ -10,11 +11,13 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from starlette.requests import Request
 
 from database.encrypted import decrypt_sensitive_value, encrypt_sensitive_value, is_encrypted
+from database.models import ESignStatus
 from telegram_access import is_authorized
 from webapp.auth.dependencies import require_auth
 from webapp.config import web_config
 from webapp.request_security import client_ip, is_same_origin_embeddable_path
 from webapp.routes.api import router as api_router
+from webapp.routes.leases import _preferred_lease_file_url
 from webapp.services import plaid_service
 from webapp.services.storage_service import storage
 from webapp.services.upload_security import safe_upload_extension
@@ -76,6 +79,22 @@ def test_only_private_file_routes_are_same_origin_embeddable():
     assert is_same_origin_embeddable_path("/protected-files/leases/example.pdf")
     assert is_same_origin_embeddable_path("/uploads/leases/example.pdf")
     assert not is_same_origin_embeddable_path("/leases/40")
+
+
+def test_completed_signed_lease_is_preferred_for_preview_and_download():
+    lease = SimpleNamespace(file_url="/protected-files/leases/original.pdf")
+    envelopes = [
+        SimpleNamespace(
+            status=ESignStatus.COMPLETED,
+            signed_file_url="/protected-files/leases/signed/completed.pdf",
+        )
+    ]
+
+    assert _preferred_lease_file_url(lease, envelopes) == (
+        "/protected-files/leases/signed/completed.pdf",
+        True,
+    )
+    assert _preferred_lease_file_url(lease, []) == (lease.file_url, False)
 
 
 def test_entire_api_router_requires_authentication():

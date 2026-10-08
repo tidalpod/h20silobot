@@ -31,6 +31,17 @@ ALLOWED_TYPES = {
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
+def _preferred_lease_file_url(lease, envelopes) -> tuple[str, bool]:
+    """Prefer the newest completed signed PDF, falling back to the source file."""
+    for envelope in envelopes:
+        if (
+            envelope.status == ESignStatus.COMPLETED
+            and envelope.signed_file_url
+        ):
+            return envelope.signed_file_url, True
+    return lease.file_url, False
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_leases(
     request: Request,
@@ -202,6 +213,9 @@ async def lease_detail(request: Request, lease_id: int):
             .order_by(desc(ESignEnvelope.created_at))
         )
         esign_envelopes = esign_result.scalars().all()
+        preview_file_url, preview_is_signed = _preferred_lease_file_url(
+            lease, esign_envelopes
+        )
 
         # Load landlord info from builder data (for e-sign form pre-fill)
         from database.models import LeaseBuilder
@@ -224,6 +238,8 @@ async def lease_detail(request: Request, lease_id: int):
             "user": user,
             "lease": lease,
             "esign_envelopes": esign_envelopes,
+            "preview_file_url": preview_file_url,
+            "preview_is_signed": preview_is_signed,
             "landlord_info": landlord_info,
         },
     )
@@ -341,23 +357,34 @@ async def download_lease(request: Request, lease_id: int):
         if not lease:
             return RedirectResponse(url="/leases", status_code=303)
 
-        local_path = storage.resolve_local_path(lease.file_url)
+        esign_result = await session.execute(
+            select(ESignEnvelope)
+            .where(ESignEnvelope.lease_document_id == lease_id)
+            .order_by(desc(ESignEnvelope.created_at))
+        )
+        source_url, is_signed = _preferred_lease_file_url(
+            lease, esign_result.scalars().all()
+        )
+
+        local_path = storage.resolve_local_path(source_url)
         if local_path:
+            download_title = f"{lease.title} - Signed" if is_signed else lease.title
             return FileResponse(
                 path=str(local_path),
-                filename=f"{lease.title}.{lease.file_type}",
+                filename=f"{download_title}.{lease.file_type}",
                 media_type="application/octet-stream",
             )
 
         # Private R2 objects are exposed only through authenticated app
         # routes, so stream the object rather than redirecting to a public
         # bucket URL.
-        contents = storage.download(lease.file_url)
+        contents = storage.download(source_url)
         if contents is None:
             return RedirectResponse(url=f"/leases/{lease_id}?error=file_missing", status_code=303)
 
         extension = re.sub(r"[^A-Za-z0-9]", "", lease.file_type or "") or "pdf"
-        safe_title = re.sub(r"[^A-Za-z0-9._ -]", "_", lease.title or "lease").strip()
+        title = f"{lease.title} - Signed" if is_signed else lease.title
+        safe_title = re.sub(r"[^A-Za-z0-9._ -]", "_", title or "lease").strip()
         filename = f"{safe_title or 'lease'}.{extension}"
         media_type = "application/pdf" if extension.lower() == "pdf" else "application/octet-stream"
         return Response(

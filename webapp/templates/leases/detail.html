@@ -312,10 +312,10 @@
         {% if lease.file_type == 'pdf' %}
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
             <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Document Preview</h2>
-                <a href="/leases/{{ lease.id }}/download" class="text-sm text-blue-600 hover:text-blue-500">Download PDF</a>
+                <h2 class="text-sm font-semibold text-gray-700">{% if preview_is_signed %}Signed Document Preview{% else %}Document Preview{% endif %}</h2>
+                <a href="/leases/{{ lease.id }}/download" class="text-sm text-blue-600 hover:text-blue-500">{% if preview_is_signed %}Download Signed PDF{% else %}Download PDF{% endif %}</a>
             </div>
-            <iframe src="{{ lease.file_url }}" class="w-full" style="height: 800px;" frameborder="0"></iframe>
+            <iframe src="{{ preview_file_url }}" class="w-full" style="height: 800px;" frameborder="0"></iframe>
         </div>
         {% else %}
         <div class="bg-white shadow-sm rounded-xl border border-gray-100 p-12 text-center">
