@@ -8,6 +8,11 @@ import os
 from webapp.config import web_config
 
 
+def is_same_origin_embeddable_path(path: str) -> bool:
+    """Return whether a response is an authenticated same-origin file preview."""
+    return path.startswith(("/uploads/", "/protected-files/"))
+
+
 def client_ip(request) -> str:
     peer = request.client.host if request.client else "unknown"
     # Railway overwrites X-Real-IP at its public edge with the originating

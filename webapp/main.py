@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .config import web_config
 from database.connection import init_db
+from webapp.request_security import is_same_origin_embeddable_path
 
 # Configure logging
 logging.basicConfig(
@@ -229,10 +230,15 @@ async def security_and_cache_headers(request: Request, call_next):
                 return JSONResponse({"detail": "Cross-origin request rejected"}, status_code=403)
 
     response = await call_next(request)
-    is_upload = request.url.path.startswith("/uploads/")
-    frame_ancestors = "'self'" if is_upload else "'none'"
+    # Authenticated PDFs and legacy protected uploads are intentionally shown
+    # in same-origin preview iframes. They must not be frameable by any other
+    # site, while ordinary application pages remain non-frameable.
+    is_embeddable_file = is_same_origin_embeddable_path(request.url.path)
+    frame_ancestors = "'self'" if is_embeddable_file else "'none'"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN" if is_upload else "DENY")
+    response.headers.setdefault(
+        "X-Frame-Options", "SAMEORIGIN" if is_embeddable_file else "DENY"
+    )
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault(

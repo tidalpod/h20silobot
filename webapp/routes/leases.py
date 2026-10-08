@@ -1,12 +1,13 @@
 """Lease management routes"""
 
 import json
+import re
 import uuid
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
@@ -340,18 +341,32 @@ async def download_lease(request: Request, lease_id: int):
         if not lease:
             return RedirectResponse(url="/leases", status_code=303)
 
-        # R2 URLs → redirect; local files → FileResponse
-        if storage.is_remote_url(lease.file_url):
-            return RedirectResponse(url=lease.file_url, status_code=302)
-
         local_path = storage.resolve_local_path(lease.file_url)
-        if not local_path:
+        if local_path:
+            return FileResponse(
+                path=str(local_path),
+                filename=f"{lease.title}.{lease.file_type}",
+                media_type="application/octet-stream",
+            )
+
+        # Private R2 objects are exposed only through authenticated app
+        # routes, so stream the object rather than redirecting to a public
+        # bucket URL.
+        contents = storage.download(lease.file_url)
+        if contents is None:
             return RedirectResponse(url=f"/leases/{lease_id}?error=file_missing", status_code=303)
 
-        return FileResponse(
-            path=str(local_path),
-            filename=f"{lease.title}.{lease.file_type}",
-            media_type="application/octet-stream",
+        extension = re.sub(r"[^A-Za-z0-9]", "", lease.file_type or "") or "pdf"
+        safe_title = re.sub(r"[^A-Za-z0-9._ -]", "_", lease.title or "lease").strip()
+        filename = f"{safe_title or 'lease'}.{extension}"
+        media_type = "application/pdf" if extension.lower() == "pdf" else "application/octet-stream"
+        return Response(
+            content=contents,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
         )
 
 

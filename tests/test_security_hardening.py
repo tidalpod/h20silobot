@@ -13,21 +13,21 @@ from database.encrypted import decrypt_sensitive_value, encrypt_sensitive_value,
 from telegram_access import is_authorized
 from webapp.auth.dependencies import require_auth
 from webapp.config import web_config
-from webapp.request_security import client_ip
+from webapp.request_security import client_ip, is_same_origin_embeddable_path
 from webapp.routes.api import router as api_router
 from webapp.services import plaid_service
 from webapp.services.storage_service import storage
 from webapp.services.upload_security import safe_upload_extension
 
 
-def _request(peer="127.0.0.1", headers=None):
+def _request(peer="127.0.0.1", headers=None, path="/"):
     raw_headers = [
         (name.lower().encode(), value.encode()) for name, value in (headers or {}).items()
     ]
     return Request({
         "type": "http",
         "method": "GET",
-        "path": "/",
+        "path": path,
         "headers": raw_headers,
         "client": (peer, 1234),
         "scheme": "https",
@@ -70,6 +70,12 @@ def test_railway_real_ip_is_accepted_only_on_railway(monkeypatch):
 
     monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
     assert client_ip(_request("10.0.0.3", headers)) == "203.0.113.25"
+
+
+def test_only_private_file_routes_are_same_origin_embeddable():
+    assert is_same_origin_embeddable_path("/protected-files/leases/example.pdf")
+    assert is_same_origin_embeddable_path("/uploads/leases/example.pdf")
+    assert not is_same_origin_embeddable_path("/leases/40")
 
 
 def test_entire_api_router_requires_authentication():
